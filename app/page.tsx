@@ -293,7 +293,7 @@ function OrbitCard({
 
   return (
     <motion.div
-      className="absolute w-32 h-36"
+      className="absolute w-32 h-36 rounded-2xl overflow-hidden cursor-pointer"
       style={{
         left: "50%",
         top: "50%",
@@ -302,42 +302,36 @@ function OrbitCard({
         x,
         y,
         rotate: rotation,
+        boxShadow:
+          "0 14px 44px rgba(0,0,0,0.72), 0 0 0 1px rgba(255,255,255,0.07), 0 0 18px rgba(180,10,10,0.1)",
       }}
-      whileHover={{ scale: 1.14, zIndex: 10 }}
+      whileHover={{
+        scale: 1.14,
+        zIndex: 10,
+        boxShadow:
+          "0 20px 60px rgba(0,0,0,0.85), 0 0 0 2px rgba(220,38,38,0.65), 0 0 32px rgba(220,38,38,0.3)",
+      }}
       transition={{ type: "spring", stiffness: 340, damping: 22 }}
     >
-      <motion.div
-        className="w-full h-full rounded-2xl overflow-hidden cursor-pointer"
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={alt} className="w-full h-full object-cover" />
+      <div
+        className="absolute inset-0"
         style={{
-          boxShadow:
-            "0 14px 44px rgba(0,0,0,0.72), 0 0 0 1px rgba(255,255,255,0.07), 0 0 18px rgba(180,10,10,0.1)",
+          background:
+            "linear-gradient(to bottom, transparent 45%, rgba(5,1,1,0.5) 100%)",
         }}
-        whileHover={{
-          boxShadow:
-            "0 20px 60px rgba(0,0,0,0.85), 0 0 0 2px rgba(220,38,38,0.65), 0 0 32px rgba(220,38,38,0.3)",
+      />
+      <motion.div
+        className="absolute inset-0"
+        initial={{ opacity: 0 }}
+        whileHover={{ opacity: 1 }}
+        transition={{ duration: 0.25 }}
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 55%)",
         }}
-        transition={{ duration: 0.2 }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className="w-full h-full object-cover" />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to bottom, transparent 45%, rgba(5,1,1,0.5) 100%)",
-          }}
-        />
-        <motion.div
-          className="absolute inset-0"
-          initial={{ opacity: 0 }}
-          whileHover={{ opacity: 1 }}
-          transition={{ duration: 0.25 }}
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 55%)",
-          }}
-        />
-      </motion.div>
+      />
     </motion.div>
   );
 }

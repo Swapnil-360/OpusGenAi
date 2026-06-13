@@ -160,12 +160,11 @@ export default function GeneratePage() {
   };
 
   return (
-    <div className="h-full flex flex-col lg:flex-row overflow-hidden" style={{ background: "#0f0404" }}>
+    <div className="flex flex-col lg:flex-row lg:h-full lg:overflow-hidden" style={{ background: "#0f0404" }}>
 
       {/* ══ LEFT PANEL ═══════════════════════════════════════════════════ */}
       <div
-        className="h-[46vh] lg:h-auto lg:w-[400px] xl:w-[420px] shrink-0 flex flex-col"
-        style={{ borderRight: `1px solid ${W.border}`, borderBottom: `1px solid ${W.border}` }}
+        className="w-full lg:w-100 xl:w-105 shrink-0 flex flex-col border-b border-white/9 lg:border-b-0 lg:border-r"
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-4 shrink-0" style={{ borderBottom: `1px solid ${W.border}` }}>
@@ -181,7 +180,7 @@ export default function GeneratePage() {
         </div>
 
         {/* Prompt area */}
-        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-4 flex flex-col gap-3">
+        <div className="px-4 pt-4 pb-4 flex flex-col gap-3 lg:flex-1 lg:overflow-y-auto">
 
           {/* Template quick-use */}
           <div className="relative">
@@ -464,7 +463,7 @@ export default function GeneratePage() {
       </div>
 
       {/* ══ RIGHT PANEL ══════════════════════════════════════════════════ */}
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="w-full lg:flex-1 lg:overflow-y-auto">
         <div className="px-5 pt-5 pb-4">
           <AnimatePresence mode="wait">
 

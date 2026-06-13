@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Bell, Check, ChevronRight, CreditCard, Crown, Globe, History,
-  KeyRound, LogOut, Moon, Palette, Shield, Sparkles, Sun, User, Zap,
+  Bell, Check, ChevronRight, CreditCard, Crown, History,
+  KeyRound, LogOut, Shield, Sparkles, User, Zap,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MOCK_CURRENT_USER, PLANS, MOCK_GENERATIONS } from "@/lib/mock-data";
@@ -31,7 +31,6 @@ const SECTIONS = [
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "security", label: "Security", icon: Shield },
   { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "appearance", label: "Appearance", icon: Palette },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
 
@@ -67,8 +66,7 @@ export default function AccountPage() {
   const [activeSection, setActiveSection] = useState<SectionId>("profile");
   const [name, setName] = useState(user.name);
   const [email, setEmail] = useState(user.email);
-  const [theme, setTheme] = useState<"dark" | "light" | "system">("dark");
-  const [notifications, setNotifications] = useState({ generationDone: true, billing: true, tips: false, newsletter: false });
+const [notifications, setNotifications] = useState({ generationDone: true, billing: true, tips: false, newsletter: false });
   const [savingProfile, setSavingProfile] = useState(false);
 
   const creditsPercent = Math.round((user.credits / 10) * 100);
@@ -81,10 +79,42 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="h-full flex flex-col lg:flex-row overflow-hidden" style={{ background: W.bg }}>
+    <div className="flex flex-col lg:flex-row lg:h-full lg:overflow-hidden" style={{ background: W.bg }}>
 
-      {/* ══ SIDEBAR NAV ════════════════════════════════════════════════ */}
-      <div className="lg:w-56 xl:w-64 shrink-0 flex flex-col" style={{ borderRight: `1px solid ${W.border}`, borderBottom: `1px solid ${W.border}` }}>
+      {/* ══ MOBILE: user bar + horizontal section tabs ══════════════════ */}
+      <div className="lg:hidden shrink-0" style={{ borderBottom: `1px solid ${W.border}` }}>
+        <div className="flex items-center gap-3 px-4 py-3" style={{ borderBottom: `1px solid ${W.border}` }}>
+          <Avatar className="w-9 h-9 shrink-0" style={{ outline: `2px solid ${W.border}`, outlineOffset: "1px" }}>
+            <AvatarImage src={user.avatar} />
+            <AvatarFallback className="text-xs font-bold" style={{ background: W.redBg, color: W.red }}>
+              {user.name.split(" ").map((n: string) => n[0]).join("")}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold truncate" style={{ color: W.text }}>{user.name}</p>
+            <p className="text-[11px] truncate" style={{ color: W.dim }}>{user.email}</p>
+          </div>
+          <span className="text-[10px] rounded-full px-2 py-0.5 font-semibold shrink-0"
+            style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.muted }}>
+            {planLabel(user.plan)} Plan
+          </span>
+        </div>
+        <div className="flex overflow-x-auto gap-1 px-3 py-2" style={{ scrollbarWidth: "none" }}>
+          {SECTIONS.map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setActiveSection(id)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all"
+              style={activeSection === id
+                ? { border: `1px solid ${W.redBorder}`, background: W.redBg, color: W.red }
+                : { border: "1px solid transparent", color: W.muted }}>
+              <Icon className="w-3 h-3 shrink-0" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ══ SIDEBAR NAV (desktop only) ══════════════════════════════════ */}
+      <div className="hidden lg:flex lg:w-56 xl:w-64 shrink-0 flex-col" style={{ borderRight: `1px solid ${W.border}` }}>
 
         {/* User card */}
         <div className="px-4 pt-5 pb-4 shrink-0" style={{ borderBottom: `1px solid ${W.border}` }}>
@@ -146,7 +176,7 @@ export default function AccountPage() {
       </div>
 
       {/* ══ CONTENT ════════════════════════════════════════════════════ */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-6 py-6">
+      <div className="flex-1 lg:overflow-y-auto px-4 sm:px-6 py-5">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeSection}
@@ -460,46 +490,6 @@ export default function AccountPage() {
               </div>
             )}
 
-            {/* ── Appearance ─────────────────────────────────────────── */}
-            {activeSection === "appearance" && (
-              <div>
-                <h2 className="text-xl font-black tracking-tight mb-1" style={{ color: W.text }}>Appearance</h2>
-                <p className="text-sm mb-6" style={{ color: W.muted }}>Theme and display preferences</p>
-                <div>
-                  <p className="text-sm font-semibold mb-3" style={{ color: W.text }}>Color theme</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    {([
-                      { id: "dark" as const, label: "Dark", icon: Moon, desc: "Rich blacks and deep reds" },
-                      { id: "light" as const, label: "Light", icon: Sun, desc: "Clean and bright" },
-                      { id: "system" as const, label: "System", icon: Globe, desc: "Match OS preference" },
-                    ]).map(({ id, label, icon: Icon, desc }) => {
-                      const isActive = theme === id;
-                      return (
-                        <button
-                          key={id}
-                          onClick={() => setTheme(id)}
-                          className="flex flex-col items-center gap-2 p-4 rounded-2xl transition-all"
-                          style={isActive
-                            ? { border: `1px solid ${W.redBorder}`, background: W.redBg }
-                            : { border: `1px solid ${W.border}`, background: W.glassDim }}
-                          onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = W.glass; }}
-                          onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = W.glassDim; }}
-                        >
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: isActive ? W.redBg : W.glass }}>
-                            <Icon className="w-5 h-5" style={{ color: isActive ? W.red : W.muted }} />
-                          </div>
-                          <div className="text-center">
-                            <p className="text-xs font-bold" style={{ color: isActive ? W.red : W.text }}>{label}</p>
-                            <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>{desc}</p>
-                          </div>
-                          {isActive && <Check className="w-4 h-4" style={{ color: W.red }} />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
 
           </motion.div>
         </AnimatePresence>

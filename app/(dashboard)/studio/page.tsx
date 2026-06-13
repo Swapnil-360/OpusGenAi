@@ -171,11 +171,12 @@ export default function StudioPage() {
   }
 
   return (
-    <div className="h-full flex flex-col lg:flex-row overflow-hidden" style={{ background: W.bg }}>
+    <div className="flex flex-col lg:flex-row lg:h-full lg:overflow-hidden" style={{ background: W.bg }}>
 
       {/* ══ LEFT PANEL ═════════════════════════════════════════════════ */}
-      <div className="h-[52vh] lg:h-auto lg:w-[360px] xl:w-[400px] shrink-0 flex flex-col overflow-y-auto"
-        style={{ borderBottom: "1px solid transparent", borderRight: `1px solid ${W.border}` }}>
+      <div
+        className="w-full lg:w-90 xl:w-100 shrink-0 flex flex-col border-b border-white/9 lg:border-b-0 lg:border-r"
+      >
 
         <div className="px-5 pt-5 pb-4 shrink-0" style={{ borderBottom: `1px solid ${W.border}` }}>
           <div className="flex items-center gap-3">
@@ -189,7 +190,7 @@ export default function StudioPage() {
           </div>
         </div>
 
-        <div className="flex-1 px-4 py-4 space-y-5 overflow-y-auto">
+        <div className="px-4 py-4 space-y-5 lg:flex-1 lg:overflow-y-auto">
 
           {/* Step 1 — Image selection */}
           <div>
@@ -337,7 +338,7 @@ export default function StudioPage() {
       </div>
 
       {/* ══ RIGHT PANEL ════════════════════════════════════════════════ */}
-      <div className="flex-1 overflow-y-auto min-h-0 px-5 py-5">
+      <div className="w-full lg:flex-1 lg:overflow-y-auto px-5 py-5">
         <AnimatePresence mode="wait">
 
           {genStatus === "generating" && (

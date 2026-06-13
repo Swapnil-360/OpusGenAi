@@ -532,7 +532,7 @@ export default function LandingPage() {
         <LandingNav />
 
         {/* ══ HERO ════════════════════════════════════════════════════════════ */}
-        <section className="relative min-h-screen flex items-center overflow-hidden">
+        <section className="relative min-h-screen flex items-start md:items-center overflow-hidden">
           {/* Grid */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -558,7 +558,7 @@ export default function LandingPage() {
             }}
           />
 
-          <div className="relative max-w-7xl mx-auto w-full px-6 grid grid-cols-1 lg:grid-cols-[1fr_500px] xl:grid-cols-[1fr_560px] gap-12 xl:gap-16 items-center py-20">
+          <div className="relative max-w-7xl mx-auto w-full px-5 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_500px] xl:grid-cols-[1fr_560px] gap-8 lg:gap-12 xl:gap-16 items-center pt-20 pb-12 md:pt-24 lg:py-20">
             {/* Left: copy */}
             <div>
               <motion.div
@@ -573,8 +573,8 @@ export default function LandingPage() {
                 initial={{ opacity: 0, y: 32 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.08 }}
-                className="font-black tracking-tight leading-[0.9] mb-7"
-                style={{ fontSize: "clamp(3rem,5.5vw,5.8rem)" }}
+                className="font-black tracking-tight leading-[0.9] mb-5 sm:mb-7 text-center lg:text-left"
+                style={{ fontSize: "clamp(2.6rem,5.5vw,5.8rem)" }}
               >
                 Where Great
                 <br />
@@ -597,8 +597,8 @@ export default function LandingPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.24 }}
-                className="leading-relaxed mb-10 max-w-105"
-                style={{ fontSize: "1.05rem", color: "rgba(255,255,255,0.5)" }}
+                className="leading-relaxed mb-8 max-w-lg mx-auto lg:mx-0 text-center lg:text-left"
+                style={{ fontSize: "1rem", color: "rgba(255,255,255,0.5)" }}
               >
                 Turn any product photo into studio-quality marketing visuals —
                 in seconds.
@@ -608,7 +608,7 @@ export default function LandingPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.32 }}
-                className="flex items-center gap-3 flex-wrap"
+                className="flex items-center gap-3 flex-wrap justify-center lg:justify-start"
               >
                 <Link href="/signup">
                   <motion.button
@@ -647,7 +647,7 @@ export default function LandingPage() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.42 }}
-                className="text-xs mt-4"
+                className="text-xs mt-4 text-center lg:text-left"
                 style={{ color: "rgba(255,255,255,0.22)" }}
               >
                 10 free credits · No card required
@@ -663,10 +663,12 @@ export default function LandingPage() {
                 delay: 0.18,
                 ease: [0.25, 0.46, 0.45, 0.94],
               }}
-              className="relative hidden lg:flex items-center justify-center"
+              className="relative flex items-center justify-center"
             >
+              {/* Responsive container — clips/scales the 480×480 orbital */}
+              <div className="relative w-64 h-64 sm:w-80 sm:h-80 lg:w-[480px] lg:h-[480px]">
               <div
-                className="relative"
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 scale-[0.53] sm:scale-[0.67] lg:scale-100 origin-center"
                 style={{ width: 480, height: 480 }}
               >
                 {/* Radial ambient glow */}
@@ -726,6 +728,7 @@ export default function LandingPage() {
                   <img src="/logo/OpusGenAi(white).png" alt="OpusGen AI" className="w-24 h-auto object-contain" />
                 </motion.div>
               </div>
+              </div>{/* end responsive container */}
             </motion.div>
           </div>
         </section>
@@ -773,15 +776,15 @@ export default function LandingPage() {
         </div>
 
         {/* ══ TOOLS ════════════════════════════════════════════════════════════ */}
-        <section id="tools" className="py-28 px-6">
+        <section id="tools" className="py-14 md:py-24 lg:py-28 px-4 sm:px-6">
           <div className="max-w-7xl mx-auto">
             <FadeIn>
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-6 mb-16">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 md:mb-16">
                 <div>
                   <SectionLabel>The Toolbox</SectionLabel>
                   <h2
                     className="font-black tracking-tight leading-[0.9]"
-                    style={{ fontSize: "clamp(2.8rem,4.5vw,5rem)" }}
+                    style={{ fontSize: "clamp(2.4rem,4.5vw,5rem)" }}
                   >
                     Six precision
                     <br />
@@ -918,15 +921,15 @@ export default function LandingPage() {
         {/* ══ TEMPLATES ════════════════════════════════════════════════════════ */}
         <section
           id="templates"
-          className="py-28 px-6"
+          className="py-14 md:py-24 lg:py-28 px-4 sm:px-6"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
           <div className="max-w-7xl mx-auto">
-            <FadeIn className="mb-16">
+            <FadeIn className="mb-10 md:mb-16">
               <SectionLabel>Template Marketplace</SectionLabel>
               <h2
                 className="font-black tracking-tight leading-[0.9]"
-                style={{ fontSize: "clamp(2.8rem,4.5vw,5rem)" }}
+                style={{ fontSize: "clamp(2.4rem,4.5vw,5rem)" }}
               >
                 Premium templates
                 <br />
@@ -1012,7 +1015,7 @@ export default function LandingPage() {
 
         {/* ══ STATS BAR ════════════════════════════════════════════════════════ */}
         <div
-          className="py-16 px-6"
+          className="py-10 md:py-16 px-4 sm:px-6"
           style={{
             borderTop: "1px solid rgba(255,255,255,0.05)",
             borderBottom: "1px solid rgba(255,255,255,0.05)",
@@ -1038,13 +1041,13 @@ export default function LandingPage() {
         </div>
 
         {/* ══ PRICING ══════════════════════════════════════════════════════════ */}
-        <section id="pricing" className="py-28 px-6">
+        <section id="pricing" className="py-14 md:py-24 lg:py-28 px-4 sm:px-6">
           <div className="max-w-5xl mx-auto">
-            <FadeIn className="mb-16">
+            <FadeIn className="mb-10 md:mb-16">
               <SectionLabel>Pricing</SectionLabel>
               <h2
                 className="font-black tracking-tight leading-[0.9]"
-                style={{ fontSize: "clamp(2.8rem,4.5vw,5rem)" }}
+                style={{ fontSize: "clamp(2.4rem,4.5vw,5rem)" }}
               >
                 Simple pricing
                 <br />

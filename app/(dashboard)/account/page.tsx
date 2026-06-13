@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Bell, Check, ChevronRight, CreditCard, Crown, History,
+  Bell, Check, ChevronRight, CreditCard, Crown, Globe, History,
   KeyRound, LogOut, Shield, Sparkles, User, Zap,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

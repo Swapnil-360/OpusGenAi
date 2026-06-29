@@ -99,7 +99,7 @@ export default function HistoryPage() {
             </div>
 
             {/* Search */}
-            <div className="relative w-52">
+            <div className="relative flex-1 sm:flex-none sm:w-52">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: W.dim }} />
               <input
                 value={search}
@@ -133,7 +133,7 @@ export default function HistoryPage() {
         </div>
 
         {/* Status filter pills */}
-        <div className="flex gap-1.5">
+        <div className="flex gap-1.5 flex-wrap">
           {(["all", "completed", "failed"] as FilterStatus[]).map((s) => {
             const count = s === "all" ? MOCK_GENERATIONS.length : MOCK_GENERATIONS.filter((g) => g.status === s).length;
             const isActive = filterStatus === s;

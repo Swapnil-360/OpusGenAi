@@ -4,19 +4,12 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowRight, Check, ChevronDown, Copy, Download, Eraser, Frame,
-  ImagePlus, Maximize2, MessageSquareText, RefreshCw,
-  Replace, ScanText, Scissors, Sparkles, Wand2, X, Zap, Layers, type LucideIcon,
+  ArrowRight, Check, ChevronDown, Copy, Download,
+  ImagePlus, MessageSquareText, RefreshCw,
+  ScanText, Sparkles, Wand2, X, Zap, Layers,
 } from "lucide-react";
-import { TOOLS } from "@/lib/tools-config";
 import { TEMPLATES } from "@/lib/templates-data";
 import { toast } from "sonner";
-import { truncate } from "@/lib/utils";
-
-const TOOL_ICON_MAP: Record<string, LucideIcon> = {
-  "text-to-image": Sparkles, "remove-bg": Scissors, "replace-bg": Replace,
-  cleanup: Eraser, upscale: Maximize2, uncrop: Frame,
-};
 
 const SIZE_PRESETS = [
   { id: "ig-post", label: "IG Post", ratio: "1:1", icon: "📸" },

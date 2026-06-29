@@ -1,0 +1,5 @@
+{
+  "/page": "app/page.js",
+  "/adminopusgenai/page": "app/adminopusgenai/page.js",
+  "/(dashboard)/templates/page": "app/(dashboard)/templates/page.js"
+}

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Star, MessageSquare, Bug, Lightbulb, Heart, MessagesSquare, Filter, ShieldCheck, Inbox } from "lucide-react";
+import { Star, Bug, Lightbulb, Heart, MessagesSquare, Filter, ShieldCheck, Inbox } from "lucide-react";
 import { MOCK_FEEDBACK, type MockFeedback } from "@/lib/mock-data";
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────

@@ -5,6 +5,8 @@ export interface Tool {
   href: string;
   creditCost: number;
   badge?: string;
+  /** Local path under /public/tools/ — e.g. "/tools/text-to-image.jpg" */
+  cardImage: string;
   beforeSeed: string;
   afterSeed: string;
   accentColor: string;
@@ -19,6 +21,7 @@ export const TOOLS: Tool[] = [
     href: "/tools/text-to-image",
     creditCost: 1,
     badge: "Popular",
+    cardImage: "/tools/text-to-image.jpg",
     beforeSeed: "abstract1",
     afterSeed: "cosmetic1",
     accentColor: "#8b5cf6",
@@ -30,6 +33,7 @@ export const TOOLS: Tool[] = [
     description: "Instantly remove the background from any product photo with pixel-perfect accuracy.",
     href: "/tools/remove-bg",
     creditCost: 1,
+    cardImage: "/tools/remove-bg.jpg",
     beforeSeed: "product2",
     afterSeed: "product3",
     accentColor: "#3b82f6",
@@ -42,6 +46,7 @@ export const TOOLS: Tool[] = [
     href: "/tools/replace-bg",
     creditCost: 2,
     badge: "New",
+    cardImage: "/tools/replace-bg.jpg",
     beforeSeed: "bottle1",
     afterSeed: "fashion1",
     accentColor: "#10b981",
@@ -53,6 +58,7 @@ export const TOOLS: Tool[] = [
     description: "Remove unwanted objects, blemishes, or distractions from your product images.",
     href: "/tools/cleanup",
     creditCost: 1,
+    cardImage: "/tools/cleanup.jpg",
     beforeSeed: "shoe1",
     afterSeed: "product4",
     accentColor: "#f59e0b",
@@ -64,6 +70,7 @@ export const TOOLS: Tool[] = [
     description: "Enhance image resolution up to 4× for print-quality assets without losing sharpness.",
     href: "/tools/upscale",
     creditCost: 2,
+    cardImage: "/tools/upscale.jpg",
     beforeSeed: "cosmetic2",
     afterSeed: "bag1",
     accentColor: "#ef4444",
@@ -75,6 +82,7 @@ export const TOOLS: Tool[] = [
     description: "Extend your product image in any direction to fit platform dimensions perfectly.",
     href: "/tools/uncrop",
     creditCost: 1,
+    cardImage: "/tools/uncrop.jpg",
     beforeSeed: "fashion2",
     afterSeed: "product1",
     accentColor: "#ec4899",

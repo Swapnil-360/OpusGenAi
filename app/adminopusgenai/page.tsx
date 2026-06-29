@@ -22,7 +22,6 @@ import {
   Sparkles,
   Wrench,
   Clock,
-  Tag,
   Pencil,
   RefreshCw,
 } from "lucide-react";
@@ -366,18 +365,18 @@ export default function AdminPage() {
         </div>
 
         {/* ── Tab bar ────────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-1 mb-8 p-1 rounded-2xl w-fit"
+        <div className="flex items-center gap-1 mb-8 p-1 rounded-2xl w-fit max-w-full overflow-x-auto no-scrollbar"
           style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
           {TABS.map(({ id, label, icon: Icon }) => {
             const active = activeTab === id;
             return (
               <button key={id} onClick={() => setActiveTab(id)}
-                className="flex items-center gap-2 px-4 h-9 rounded-xl text-sm font-semibold transition-all"
+                className="flex items-center gap-2 px-3 sm:px-4 h-9 rounded-xl text-sm font-semibold transition-all shrink-0"
                 style={{
                   background: active ? T.redPrimary : "transparent",
                   color: active ? "white" : T.muted,
                 }}>
-                <Icon className="w-3.5 h-3.5" />{label}
+                <Icon className="w-3.5 h-3.5 shrink-0" />{label}
                 {id === "feedback" && STATS.newFeedback > 0 && (
                   <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center"
                     style={{ background: active ? "rgba(255,255,255,0.25)" : T.redBg, color: active ? "white" : T.red }}>

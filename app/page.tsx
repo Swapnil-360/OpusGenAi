@@ -10,7 +10,7 @@ import {
   useAnimationFrame,
   type MotionValue,
 } from "framer-motion";
-import { ArrowRight, Check, Sparkles, ArrowUpRight } from "lucide-react";
+import { ArrowRight, Check, Sparkles, ArrowUpRight, Zap } from "lucide-react";
 import { TOOLS } from "@/lib/tools-config";
 import { PLANS, MOCK_CURRENT_USER, type Plan } from "@/lib/mock-data";
 import { LandingNav } from "@/components/landing/LandingNav";
@@ -526,7 +526,7 @@ export default function LandingPage() {
         <LandingNav />
 
         {/* ══ HERO ════════════════════════════════════════════════════════════ */}
-        <section className="relative min-h-screen flex items-start md:items-center overflow-hidden">
+        <section className="relative lg:min-h-screen flex items-start md:items-center overflow-hidden">
           {/* Grid */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -552,7 +552,7 @@ export default function LandingPage() {
             }}
           />
 
-          <div className="relative max-w-7xl mx-auto w-full px-5 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_500px] xl:grid-cols-[1fr_560px] gap-8 lg:gap-12 xl:gap-16 items-center pt-20 pb-12 md:pt-24 lg:py-20">
+          <div className="relative max-w-7xl mx-auto w-full px-5 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_500px] xl:grid-cols-[1fr_560px] gap-8 lg:gap-12 xl:gap-16 items-center pt-20 pb-6 md:pt-24 md:pb-10 lg:py-20">
             {/* Left: copy */}
             <div>
               <motion.div
@@ -809,102 +809,154 @@ export default function LandingPage() {
               </div>
             </FadeIn>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {TOOLS.map((tool, i) => (
                 <FadeIn key={tool.id} delay={i * 0.07}>
-                  <Link href={tool.href}>
-                    <TiltCard intensity={6} className="cursor-pointer">
-                      <SpinBorder>
-                        <div className="group relative">
-                          {/* Preview */}
-                          <div
-                            className="overflow-hidden"
-                            style={{ aspectRatio: "16/9" }}
-                          >
+                  <Link href={tool.href} className="block h-full">
+                    {/* Outer: handles lift + outer glow — no overflow-hidden so shadow is visible */}
+                    <motion.div
+                      className="group relative rounded-2xl h-full cursor-pointer"
+                      whileHover={{
+                        y: -6,
+                        boxShadow: `0 0 0 1px ${tool.accentColor}90, 0 16px 48px rgba(0,0,0,0.6), 0 0 80px ${tool.accentColor}28`,
+                      }}
+                      transition={{ duration: 0.22, ease: "easeOut" }}
+                    >
+                      {/* Spinning border layer — overflow-hidden clips the conic gradient to rounded corners */}
+                      <div
+                        className="relative rounded-2xl overflow-hidden h-full"
+                        style={{ padding: "1.5px" }}
+                      >
+                        {/* Static dim base so the "off" part of the spin isn't transparent */}
+                        <div
+                          className="absolute inset-0 rounded-2xl"
+                          style={{ background: `${tool.accentColor}28` }}
+                        />
+                        {/* Spinning conic gradient — accent-colored bright arc */}
+                        <motion.div
+                          className="absolute rounded-2xl"
+                          style={{
+                            width: "200%",
+                            height: "200%",
+                            top: "-50%",
+                            left: "-50%",
+                            willChange: "transform",
+                            background: `conic-gradient(from 0deg at 50% 50%,
+                              transparent 0deg,
+                              ${tool.accentColor}44 20deg,
+                              ${tool.accentColor}cc 48deg,
+                              ${tool.accentColor}ff 60deg,
+                              ${tool.accentColor}cc 72deg,
+                              ${tool.accentColor}44 92deg,
+                              transparent 130deg,
+                              transparent 240deg,
+                              ${tool.accentColor}66 285deg,
+                              ${tool.accentColor}44 310deg,
+                              transparent 340deg
+                            )`,
+                          }}
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                        />
+
+                        {/* Content — clips image/info to inner radius */}
+                        <div
+                          className="relative flex flex-col h-full overflow-hidden"
+                          style={{
+                            borderRadius: "calc(1rem - 1.5px)",
+                            background: "#0d0303",
+                          }}
+                        >
+                          {/* Image */}
+                          <div className="relative overflow-hidden shrink-0" style={{ aspectRatio: "16/9" }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={`https://picsum.photos/seed/${tool.afterSeed}/480/270`}
+                              src={tool.cardImage}
                               alt={tool.label}
-                              className="w-full h-full object-cover"
-                              style={{ transition: "transform 0.7s ease" }}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.transform =
-                                  "scale(1.07)")
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.transform = "scale(1)")
-                              }
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.07]"
                             />
+                            {/* Bottom fade */}
                             <div
                               className="absolute inset-0"
                               style={{
                                 background:
-                                  "linear-gradient(to top, rgba(3,3,3,0.88) 0%, rgba(3,3,3,0.2) 55%, transparent 100%)",
+                                  "linear-gradient(to top, rgba(13,3,3,0.94) 0%, rgba(13,3,3,0.3) 45%, transparent 100%)",
                               }}
                             />
+                            {/* Accent tint on hover */}
                             <div
                               className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                              style={{
-                                background: `linear-gradient(135deg, ${tool.accentColor}20 0%, transparent 60%)`,
-                              }}
+                              style={{ background: `linear-gradient(135deg, ${tool.accentColor}1a 0%, transparent 55%)` }}
                             />
+                            {/* Badge */}
+                            {tool.badge && (
+                              <div className="absolute top-2.5 left-2.5">
+                                <span
+                                  className="text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm"
+                                  style={{
+                                    background: "rgba(220,38,38,0.9)",
+                                    color: "#fff",
+                                    border: "1px solid rgba(255,255,255,0.2)",
+                                  }}
+                                >
+                                  {tool.badge}
+                                </span>
+                              </div>
+                            )}
+                            {/* Credits */}
+                            <div className="absolute top-2.5 right-2.5">
+                              <span
+                                className="text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm flex items-center gap-1"
+                                style={{
+                                  background: "rgba(0,0,0,0.65)",
+                                  color: "rgba(255,255,255,0.85)",
+                                  border: "1px solid rgba(255,255,255,0.12)",
+                                }}
+                              >
+                                <Zap className="w-2.5 h-2.5" style={{ color: tool.accentColor }} />
+                                {tool.creditCost}cr
+                              </span>
+                            </div>
                           </div>
 
                           {/* Info */}
-                          <div className="p-5">
-                            <div className="flex items-start justify-between mb-2.5">
-                              <div className="flex items-center gap-2.5">
-                                <div
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                                  style={{
-                                    background: `${tool.accentColor}20`,
-                                  }}
-                                >
-                                  <Sparkles
-                                    className="w-3.5 h-3.5"
-                                    style={{ color: tool.accentColor }}
-                                  />
-                                </div>
-                                <h3 className="font-bold text-[15px]">
-                                  {tool.label}
-                                </h3>
+                          <div className="px-4 pt-3.5 pb-4 flex flex-col flex-1">
+                            <div className="flex items-center gap-2.5 mb-2">
+                              <div
+                                className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                                style={{
+                                  background: `${tool.accentColor}22`,
+                                  border: `1px solid ${tool.accentColor}40`,
+                                }}
+                              >
+                                <Sparkles className="w-3 h-3" style={{ color: tool.accentColor }} />
                               </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {tool.badge && (
-                                  <span
-                                    className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                                    style={{
-                                      background: "rgba(220,38,38,0.18)",
-                                      border: "1px solid rgba(220,38,38,0.25)",
-                                      color: "#f87171",
-                                    }}
-                                  >
-                                    {tool.badge}
-                                  </span>
-                                )}
-                                <span
-                                  className="text-[10px]"
-                                  style={{ color: "rgba(255,255,255,0.28)" }}
-                                >
-                                  {tool.creditCost}cr
-                                </span>
-                              </div>
+                              <h3
+                                className="font-bold text-[14px] leading-tight flex-1"
+                                style={{ color: "rgba(255,255,255,0.95)" }}
+                              >
+                                {tool.label}
+                              </h3>
+                              <ArrowUpRight
+                                className="w-4 h-4 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                                style={{ color: tool.accentColor }}
+                              />
                             </div>
                             <p
-                              className="text-sm leading-relaxed line-clamp-2"
-                              style={{ color: "rgba(255,255,255,0.42)" }}
+                              className="text-xs leading-relaxed line-clamp-2"
+                              style={{ color: "rgba(255,255,255,0.58)" }}
                             >
                               {tool.description}
                             </p>
-                          </div>
-
-                          {/* Arrow */}
-                          <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ArrowUpRight className="w-4 h-4 text-red-400" />
+                            {/* Bottom accent line on hover */}
+                            <div
+                              className="absolute bottom-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                              style={{ background: `linear-gradient(to right, transparent, ${tool.accentColor}80, transparent)` }}
+                            />
                           </div>
                         </div>
-                      </SpinBorder>
-                    </TiltCard>
+                      </div>
+                    </motion.div>
                   </Link>
                 </FadeIn>
               ))}

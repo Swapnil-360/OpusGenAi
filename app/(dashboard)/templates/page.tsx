@@ -93,7 +93,7 @@ export default function TemplatesPage() {
         </div>
 
         {/* Category filters */}
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
           {TEMPLATE_CATEGORIES.map((cat) => {
             const count = cat.id === "all" ? TEMPLATES.length : TEMPLATES.filter((t) => t.category === cat.id).length;
             const isActive = activeCategory === cat.id;
@@ -248,7 +248,7 @@ export default function TemplatesPage() {
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.93, y: 16, opacity: 0 }}
               transition={{ type: "spring", stiffness: 340, damping: 28 }}
-              className="relative w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden z-10"
+              className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-3xl shadow-2xl z-10"
               style={{ background: "#0d0303", border: `1px solid ${W.border}` }}
             >
               {/* Cover */}

@@ -339,4 +339,13 @@
   .animate-appear-zoom {
     animation: appear-zoom 0.5s ease-out forwards;
   }
+
+  /* ── Hide scrollbar (keeps scroll functional) ── */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   motion,
@@ -10,7 +11,7 @@ import {
   useAnimationFrame,
   type MotionValue,
 } from "framer-motion";
-import { ArrowRight, Check, Sparkles, ArrowUpRight } from "lucide-react";
+import { ArrowRight, Check, Sparkles, ArrowUpRight, Zap } from "lucide-react";
 import { TOOLS } from "@/lib/tools-config";
 import { PLANS, MOCK_CURRENT_USER, type Plan } from "@/lib/mock-data";
 import { LandingNav } from "@/components/landing/LandingNav";
@@ -20,19 +21,12 @@ import { cn } from "@/lib/utils";
 
 // ─── Static data ─────────────────────────────────────────────────────────────
 
-const HERO_STATS = [
-  { value: "12k+", label: "Products created" },
-  { value: "15s", label: "Avg. generation" },
-  { value: "98%", label: "Success rate" },
-  { value: "4K", label: "Max output" },
-];
-
 const CAPABILITIES = [
   "Product Photography",
   "Background Removal",
   "Background Replacement",
   "Image Cleanup",
-  "4× Upscale",
+  "4× AI Upscale",
   "Smart Uncrop",
   "Social Captions",
   "Hashtag Generation",
@@ -40,6 +34,10 @@ const CAPABILITIES = [
   "E-commerce Visuals",
   "Marketing Assets",
   "Campaign Creatives",
+  "Studio Lighting",
+  "Shadow Generation",
+  "Batch Processing",
+  "One-Click Export",
 ];
 
 const TEMPLATES = [
@@ -293,7 +291,7 @@ function OrbitCard({
 
   return (
     <motion.div
-      className="absolute w-32 h-36"
+      className="absolute w-32 h-36 rounded-2xl overflow-hidden cursor-pointer"
       style={{
         left: "50%",
         top: "50%",
@@ -302,42 +300,36 @@ function OrbitCard({
         x,
         y,
         rotate: rotation,
+        boxShadow:
+          "0 14px 44px rgba(0,0,0,0.72), 0 0 0 1px rgba(255,255,255,0.07), 0 0 18px rgba(180,10,10,0.1)",
       }}
-      whileHover={{ scale: 1.14, zIndex: 10 }}
+      whileHover={{
+        scale: 1.14,
+        zIndex: 10,
+        boxShadow:
+          "0 20px 60px rgba(0,0,0,0.85), 0 0 0 2px rgba(220,38,38,0.65), 0 0 32px rgba(220,38,38,0.3)",
+      }}
       transition={{ type: "spring", stiffness: 340, damping: 22 }}
     >
-      <motion.div
-        className="w-full h-full rounded-2xl overflow-hidden cursor-pointer"
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={alt} loading="lazy" className="w-full h-full object-cover" />
+      <div
+        className="absolute inset-0"
         style={{
-          boxShadow:
-            "0 14px 44px rgba(0,0,0,0.72), 0 0 0 1px rgba(255,255,255,0.07), 0 0 18px rgba(180,10,10,0.1)",
+          background:
+            "linear-gradient(to bottom, transparent 45%, rgba(5,1,1,0.5) 100%)",
         }}
-        whileHover={{
-          boxShadow:
-            "0 20px 60px rgba(0,0,0,0.85), 0 0 0 2px rgba(220,38,38,0.65), 0 0 32px rgba(220,38,38,0.3)",
+      />
+      <motion.div
+        className="absolute inset-0"
+        initial={{ opacity: 0 }}
+        whileHover={{ opacity: 1 }}
+        transition={{ duration: 0.25 }}
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 55%)",
         }}
-        transition={{ duration: 0.2 }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} className="w-full h-full object-cover" />
-        <div
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(to bottom, transparent 45%, rgba(5,1,1,0.5) 100%)",
-          }}
-        />
-        <motion.div
-          className="absolute inset-0"
-          initial={{ opacity: 0 }}
-          whileHover={{ opacity: 1 }}
-          transition={{ duration: 0.25 }}
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, transparent 55%)",
-          }}
-        />
-      </motion.div>
+      />
     </motion.div>
   );
 }
@@ -374,41 +366,45 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
         />
       )}
 
-      <div className="p-7 flex flex-col">
-        {/* Badge — "Current plan" overrides tier badge */}
+      <div className="p-3 sm:p-7 flex flex-col">
+        {/* Badge */}
         {isCurrent ? (
           <span
-            className="self-start mb-5 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1 flex items-center gap-1.5"
+            className="self-start mb-2 sm:mb-5 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1 flex items-center gap-1 sm:gap-1.5"
             style={{ background: G.bg, border: `1px solid ${G.border}`, color: G.text }}
           >
-            <Check className="w-3 h-3" />Current plan
+            <Check className="w-2 h-2 sm:w-3 sm:h-3" />
+            <span className="hidden sm:inline">Current plan</span>
+            <span className="sm:hidden">Current</span>
           </span>
         ) : isPro ? (
           <span
-            className="self-start mb-5 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
+            className="self-start mb-2 sm:mb-5 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1"
             style={{ background: A.bg, border: `1px solid ${A.border}`, color: A.text }}
           >
-            Most popular
+            <span className="hidden sm:inline">Most popular</span>
+            <span className="sm:hidden">Popular</span>
           </span>
         ) : isBasic ? (
           <span
-            className="self-start mb-5 text-[10px] font-bold uppercase tracking-widest rounded-full px-3 py-1"
+            className="self-start mb-2 sm:mb-5 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1"
             style={{ background: A.bg, border: `1px solid ${A.border}`, color: A.text }}
           >
-            Best value
+            <span className="hidden sm:inline">Best value</span>
+            <span className="sm:hidden">Value</span>
           </span>
         ) : null}
 
         {/* Price */}
-        <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: "rgba(255,255,255,0.38)" }}>
+        <div className="mb-2 sm:mb-6">
+          <p className="text-[8px] sm:text-xs font-semibold uppercase tracking-wider mb-1 sm:mb-2" style={{ color: "rgba(255,255,255,0.52)" }}>
             {plan.name}
           </p>
 
-          {/* Original / discounted */}
+          {/* Original price — hidden on mobile */}
           {plan.originalPrice && (
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="text-sm line-through" style={{ color: "rgba(255,255,255,0.25)" }}>
+            <div className="hidden sm:flex items-center gap-2 mb-1.5">
+              <span className="text-sm line-through" style={{ color: "rgba(255,255,255,0.40)" }}>
                 ${plan.originalPrice}/mo
               </span>
               <span
@@ -420,21 +416,22 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
             </div>
           )}
 
-          <div className="flex items-end gap-1">
-            <p className="text-5xl font-black leading-none">
+          <div className="flex items-end gap-0.5 sm:gap-1">
+            <p className="text-2xl sm:text-5xl font-black leading-none">
               {plan.price === 0 ? "Free" : `$${plan.price}`}
             </p>
             {plan.price > 0 && (
-              <span className="text-sm mb-1" style={{ color: "rgba(255,255,255,0.28)" }}>/mo</span>
+              <span className="text-[9px] sm:text-sm mb-0.5 sm:mb-1" style={{ color: "rgba(255,255,255,0.52)" }}>/mo</span>
             )}
           </div>
-          <p className="text-xs font-medium mt-2" style={{ color: `${A.text}88` }}>
-            {plan.credits} credits included
+          <p className="text-[9px] sm:text-xs font-medium mt-1 sm:mt-2" style={{ color: `${A.text}88` }}>
+            <span className="sm:hidden">{plan.credits} cr.</span>
+            <span className="hidden sm:inline">{plan.credits} credits included</span>
           </p>
         </div>
 
-        {/* Features */}
-        <ul className="space-y-2.5 mb-7 flex-1">
+        {/* Features — hidden on mobile */}
+        <ul className="hidden sm:block space-y-2.5 mb-7 flex-1">
           {plan.features.slice(0, isPro ? 5 : 4).map((f) => (
             <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: "rgba(255,255,255,0.48)" }}>
               <div
@@ -451,17 +448,19 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
         {/* CTA */}
         {isCurrent ? (
           <div
-            className="w-full h-11 rounded-xl text-sm font-bold flex items-center justify-center gap-2 cursor-default"
+            className="w-full h-7 sm:h-11 rounded-lg sm:rounded-xl text-[9px] sm:text-sm font-bold flex items-center justify-center gap-1 sm:gap-2 cursor-default"
             style={{ border: `1px solid ${G.border}`, background: G.bg, color: G.text }}
           >
-            <Check className="w-4 h-4" />Active plan
+            <Check className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="sm:hidden">Active</span>
+            <span className="hidden sm:inline">Active plan</span>
           </div>
         ) : (
           <Link href="/signup">
             <motion.button
-              whileHover={{ scale: 1.02, boxShadow: isPro ? "0 0 32px rgba(220,38,38,0.4)" : isBasic ? "0 0 32px rgba(56,189,248,0.4)" : "none" }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="w-full h-11 rounded-xl text-sm font-bold transition-all"
+              className="w-full h-7 sm:h-11 rounded-lg sm:rounded-xl text-[9px] sm:text-sm font-bold transition-all"
               style={
                 isPro
                   ? { background: "#dc2626", color: "#fff", boxShadow: "0 0 20px rgba(220,38,38,0.28)" }
@@ -470,7 +469,8 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
                   : { border: "1px solid rgba(255,255,255,0.09)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.7)" }
               }
             >
-              {plan.cta}
+              <span className="sm:hidden">{plan.cta.split(" ")[0]}</span>
+              <span className="hidden sm:inline">{plan.cta}</span>
             </motion.button>
           </Link>
         )}
@@ -532,7 +532,7 @@ export default function LandingPage() {
         <LandingNav />
 
         {/* ══ HERO ════════════════════════════════════════════════════════════ */}
-        <section className="relative min-h-screen flex items-start md:items-center overflow-hidden">
+        <section className="relative lg:min-h-screen flex items-start md:items-center overflow-hidden">
           {/* Grid */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -558,22 +558,14 @@ export default function LandingPage() {
             }}
           />
 
-          <div className="relative max-w-7xl mx-auto w-full px-5 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_500px] xl:grid-cols-[1fr_560px] gap-8 lg:gap-12 xl:gap-16 items-center pt-20 pb-12 md:pt-24 lg:py-20">
+          <div className="relative max-w-7xl mx-auto w-full px-5 sm:px-6 grid grid-cols-1 lg:grid-cols-[1fr_500px] xl:grid-cols-[1fr_560px] gap-6 lg:gap-12 xl:gap-16 items-center pt-14 pb-4 md:pt-18 md:pb-8 lg:py-20">
             {/* Left: copy */}
             <div>
-              <motion.div
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                <SectionLabel>AI Creative Studio</SectionLabel>
-              </motion.div>
-
               <motion.h1
                 initial={{ opacity: 0, y: 32 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.08 }}
-                className="font-black tracking-tight leading-[0.9] mb-5 sm:mb-7 text-center lg:text-left"
+                className="font-black tracking-tight leading-[0.9] mb-3 sm:mb-5 text-center lg:text-left"
                 style={{ fontSize: "clamp(2.6rem,5.5vw,5.8rem)" }}
               >
                 Where Great
@@ -596,8 +588,8 @@ export default function LandingPage() {
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.24 }}
-                className="leading-relaxed mb-8 max-w-lg mx-auto lg:mx-0 text-center lg:text-left"
+                transition={{ delay: 0.18 }}
+                className="leading-relaxed mb-6 max-w-lg mx-auto lg:mx-0 text-center lg:text-left"
                 style={{ fontSize: "1rem", color: "rgba(255,255,255,0.5)" }}
               >
                 Turn any product photo into studio-quality marketing visuals —
@@ -648,7 +640,7 @@ export default function LandingPage() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.42 }}
                 className="text-xs mt-4 text-center lg:text-left"
-                style={{ color: "rgba(255,255,255,0.22)" }}
+                style={{ color: "rgba(255,255,255,0.50)" }}
               >
                 10 free credits · No card required
               </motion.p>
@@ -717,6 +709,7 @@ export default function LandingPage() {
                     top: "50%",
                     marginLeft: -48,
                     marginTop: -48,
+                    filter: "drop-shadow(0 0 0px transparent)",
                   }}
                   whileHover={{
                     scale: 1.18,
@@ -724,8 +717,7 @@ export default function LandingPage() {
                   }}
                   transition={{ type: "spring", stiffness: 320, damping: 22 }}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo/OpusGenAi(white).png" alt="OpusGen AI" className="w-24 h-auto object-contain" />
+                  <Image src="/logo/OpusGenAi(white).png" alt="OpusGen AI" width={96} height={96} className="object-contain" />
                 </motion.div>
               </div>
               </div>{/* end responsive container */}
@@ -756,17 +748,17 @@ export default function LandingPage() {
           <motion.div
             className="flex whitespace-nowrap"
             animate={{ x: "-50%" }}
-            transition={{ duration: 32, repeat: Infinity, ease: "linear" }}
+            transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
           >
             {[...CAPABILITIES, ...CAPABILITIES].map((cap, i) => (
               <div
                 key={i}
-                className="flex items-center gap-4 px-6 py-5 shrink-0"
+                className="flex items-center gap-2.5 px-4 py-3 shrink-0"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-red-700 shrink-0" />
+                <span className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: "#dc2626" }} />
                 <span
-                  className="text-sm font-medium"
-                  style={{ color: "rgba(255,255,255,0.4)" }}
+                  className="text-[13px] sm:text-sm font-semibold tracking-wide uppercase"
+                  style={{ color: "rgba(255,255,255,0.65)", letterSpacing: "0.04em" }}
                 >
                   {cap}
                 </span>
@@ -776,10 +768,10 @@ export default function LandingPage() {
         </div>
 
         {/* ══ TOOLS ════════════════════════════════════════════════════════════ */}
-        <section id="tools" className="py-14 md:py-24 lg:py-28 px-4 sm:px-6">
+        <section id="tools" className="py-10 md:py-16 lg:py-20 px-4 sm:px-6">
           <div className="max-w-7xl mx-auto">
             <FadeIn>
-              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10 md:mb-16">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6 md:mb-10">
                 <div>
                   <SectionLabel>The Toolbox</SectionLabel>
                   <h2
@@ -801,7 +793,7 @@ export default function LandingPage() {
                 <Link
                   href="/signup"
                   className="flex items-center gap-1.5 text-sm font-medium shrink-0 pb-1 group transition-colors"
-                  style={{ color: "rgba(255,255,255,0.35)" }}
+                  style={{ color: "rgba(255,255,255,0.52)" }}
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.color = "rgba(248,113,113,1)")
                   }
@@ -815,102 +807,152 @@ export default function LandingPage() {
               </div>
             </FadeIn>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               {TOOLS.map((tool, i) => (
                 <FadeIn key={tool.id} delay={i * 0.07}>
-                  <Link href={tool.href}>
-                    <TiltCard intensity={6} className="cursor-pointer">
-                      <SpinBorder>
-                        <div className="group relative">
-                          {/* Preview */}
-                          <div
-                            className="overflow-hidden"
-                            style={{ aspectRatio: "16/9" }}
-                          >
+                  <Link href={tool.href} className="block h-full">
+                    {/* Outer: handles lift + outer glow — no overflow-hidden so shadow is visible */}
+                    <motion.div
+                      className="group relative rounded-2xl h-full cursor-pointer"
+                      whileHover={{
+                        y: -6,
+                        boxShadow: `0 0 0 1px ${tool.accentColor}90, 0 16px 48px rgba(0,0,0,0.6), 0 0 80px ${tool.accentColor}28`,
+                      }}
+                      transition={{ duration: 0.22, ease: "easeOut" }}
+                    >
+                      {/* Spinning border layer — overflow-hidden clips the conic gradient to rounded corners */}
+                      <div
+                        className="relative rounded-2xl overflow-hidden h-full"
+                        style={{ padding: "1.5px" }}
+                      >
+                        {/* Static dim base so the "off" part of the spin isn't transparent */}
+                        <div
+                          className="absolute inset-0 rounded-2xl"
+                          style={{ background: `${tool.accentColor}28` }}
+                        />
+                        {/* Spinning conic gradient — CSS animation (GPU compositor, zero JS overhead) */}
+                        <div
+                          className="card-spin absolute"
+                          style={{
+                            width: "200%",
+                            height: "200%",
+                            top: "-50%",
+                            left: "-50%",
+                            background: `conic-gradient(from 0deg at 50% 50%,
+                              transparent 0deg,
+                              ${tool.accentColor}44 20deg,
+                              ${tool.accentColor}cc 48deg,
+                              ${tool.accentColor}ff 60deg,
+                              ${tool.accentColor}cc 72deg,
+                              ${tool.accentColor}44 92deg,
+                              transparent 130deg,
+                              transparent 240deg,
+                              ${tool.accentColor}66 285deg,
+                              ${tool.accentColor}44 310deg,
+                              transparent 340deg
+                            )`,
+                          }}
+                        />
+
+                        {/* Content — clips image/info to inner radius */}
+                        <div
+                          className="relative flex flex-col h-full overflow-hidden"
+                          style={{
+                            borderRadius: "calc(1rem - 1.5px)",
+                            background: "#0d0303",
+                          }}
+                        >
+                          {/* Image */}
+                          <div className="relative overflow-hidden shrink-0" style={{ aspectRatio: "16/9" }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={`https://picsum.photos/seed/${tool.afterSeed}/480/270`}
+                              src={tool.cardImage}
                               alt={tool.label}
-                              className="w-full h-full object-cover"
-                              style={{ transition: "transform 0.7s ease" }}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.transform =
-                                  "scale(1.07)")
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.transform = "scale(1)")
-                              }
+                              loading="lazy"
+                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.07]"
                             />
+                            {/* Bottom fade */}
                             <div
                               className="absolute inset-0"
                               style={{
                                 background:
-                                  "linear-gradient(to top, rgba(3,3,3,0.88) 0%, rgba(3,3,3,0.2) 55%, transparent 100%)",
+                                  "linear-gradient(to top, rgba(13,3,3,0.94) 0%, rgba(13,3,3,0.3) 45%, transparent 100%)",
                               }}
                             />
+                            {/* Accent tint on hover */}
                             <div
                               className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                              style={{
-                                background: `linear-gradient(135deg, ${tool.accentColor}20 0%, transparent 60%)`,
-                              }}
+                              style={{ background: `linear-gradient(135deg, ${tool.accentColor}1a 0%, transparent 55%)` }}
                             />
+                            {/* Badge */}
+                            {tool.badge && (
+                              <div className="absolute top-2.5 left-2.5">
+                                <span
+                                  className="text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm"
+                                  style={{
+                                    background: "rgba(220,38,38,0.9)",
+                                    color: "#fff",
+                                    border: "1px solid rgba(255,255,255,0.2)",
+                                  }}
+                                >
+                                  {tool.badge}
+                                </span>
+                              </div>
+                            )}
+                            {/* Credits */}
+                            <div className="absolute top-2.5 right-2.5">
+                              <span
+                                className="text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm flex items-center gap-1"
+                                style={{
+                                  background: "rgba(0,0,0,0.65)",
+                                  color: "rgba(255,255,255,0.85)",
+                                  border: "1px solid rgba(255,255,255,0.12)",
+                                }}
+                              >
+                                <Zap className="w-2.5 h-2.5" style={{ color: tool.accentColor }} />
+                                {tool.creditCost}cr
+                              </span>
+                            </div>
                           </div>
 
                           {/* Info */}
-                          <div className="p-5">
-                            <div className="flex items-start justify-between mb-2.5">
-                              <div className="flex items-center gap-2.5">
-                                <div
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-                                  style={{
-                                    background: `${tool.accentColor}20`,
-                                  }}
-                                >
-                                  <Sparkles
-                                    className="w-3.5 h-3.5"
-                                    style={{ color: tool.accentColor }}
-                                  />
-                                </div>
-                                <h3 className="font-bold text-[15px]">
-                                  {tool.label}
-                                </h3>
+                          <div className="px-3 pt-2.5 pb-3 flex flex-col flex-1">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <div
+                                className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                                style={{
+                                  background: `${tool.accentColor}22`,
+                                  border: `1px solid ${tool.accentColor}40`,
+                                }}
+                              >
+                                <Sparkles className="w-2.5 h-2.5" style={{ color: tool.accentColor }} />
                               </div>
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                {tool.badge && (
-                                  <span
-                                    className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                                    style={{
-                                      background: "rgba(220,38,38,0.18)",
-                                      border: "1px solid rgba(220,38,38,0.25)",
-                                      color: "#f87171",
-                                    }}
-                                  >
-                                    {tool.badge}
-                                  </span>
-                                )}
-                                <span
-                                  className="text-[10px]"
-                                  style={{ color: "rgba(255,255,255,0.28)" }}
-                                >
-                                  {tool.creditCost}cr
-                                </span>
-                              </div>
+                              <h3
+                                className="font-bold text-[13px] leading-tight flex-1"
+                                style={{ color: "rgba(255,255,255,0.95)" }}
+                              >
+                                {tool.label}
+                              </h3>
+                              <ArrowUpRight
+                                className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                                style={{ color: tool.accentColor }}
+                              />
                             </div>
                             <p
-                              className="text-sm leading-relaxed line-clamp-2"
-                              style={{ color: "rgba(255,255,255,0.42)" }}
+                              className="text-[11px] leading-relaxed line-clamp-2 hidden sm:block"
+                              style={{ color: "rgba(255,255,255,0.58)" }}
                             >
                               {tool.description}
                             </p>
-                          </div>
-
-                          {/* Arrow */}
-                          <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ArrowUpRight className="w-4 h-4 text-red-400" />
+                            {/* Bottom accent line on hover */}
+                            <div
+                              className="absolute bottom-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                              style={{ background: `linear-gradient(to right, transparent, ${tool.accentColor}80, transparent)` }}
+                            />
                           </div>
                         </div>
-                      </SpinBorder>
-                    </TiltCard>
+                      </div>
+                    </motion.div>
                   </Link>
                 </FadeIn>
               ))}
@@ -921,11 +963,11 @@ export default function LandingPage() {
         {/* ══ TEMPLATES ════════════════════════════════════════════════════════ */}
         <section
           id="templates"
-          className="py-14 md:py-24 lg:py-28 px-4 sm:px-6"
+          className="py-10 md:py-16 lg:py-20 px-4 sm:px-6"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
           <div className="max-w-7xl mx-auto">
-            <FadeIn className="mb-10 md:mb-16">
+            <FadeIn className="mb-6 md:mb-10">
               <SectionLabel>Template Marketplace</SectionLabel>
               <h2
                 className="font-black tracking-tight leading-[0.9]"
@@ -941,7 +983,7 @@ export default function LandingPage() {
               </h2>
             </FadeIn>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
               {TEMPLATES.map((tmpl, i) => (
                 <FadeIn key={tmpl.name} delay={i * 0.06}>
                   <Link href="/templates">
@@ -956,6 +998,7 @@ export default function LandingPage() {
                           <img
                             src={`https://picsum.photos/seed/${tmpl.seed}/480/360`}
                             alt={tmpl.name}
+                            loading="lazy"
                             className="w-full h-full object-cover"
                             style={{ transition: "transform 0.8s ease" }}
                             onMouseEnter={(e) =>
@@ -1013,33 +1056,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ══ STATS BAR ════════════════════════════════════════════════════════ */}
-        <div
-          className="py-10 md:py-16 px-4 sm:px-6"
-          style={{
-            borderTop: "1px solid rgba(255,255,255,0.05)",
-            borderBottom: "1px solid rgba(255,255,255,0.05)",
-          }}
-        >
-          <div className="max-w-5xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-8">
-            {HERO_STATS.map(({ value, label }, i) => (
-              <FadeIn key={label} delay={i * 0.08}>
-                <div className="text-center">
-                  <p className="text-4xl sm:text-5xl font-black tabular-nums">
-                    {value}
-                  </p>
-                  <p
-                    className="text-xs mt-2 font-medium"
-                    style={{ color: "rgba(255,255,255,0.3)" }}
-                  >
-                    {label}
-                  </p>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
-        </div>
-
         {/* ══ PRICING ══════════════════════════════════════════════════════════ */}
         <section id="pricing" className="py-14 md:py-24 lg:py-28 px-4 sm:px-6">
           <div className="max-w-5xl mx-auto">
@@ -1059,7 +1075,7 @@ export default function LandingPage() {
               </h2>
             </FadeIn>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 items-center">
               {PLANS.map((plan, i) => (
                 <FadeIn
                   key={plan.id}
@@ -1072,7 +1088,7 @@ export default function LandingPage() {
             </div>
             <p
               className="text-center text-xs mt-8"
-              style={{ color: "rgba(255,255,255,0.18)" }}
+              style={{ color: "rgba(255,255,255,0.48)" }}
             >
               All 6 tools · All templates · Credits never expire
             </p>

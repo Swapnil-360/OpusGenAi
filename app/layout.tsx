@@ -12,6 +12,14 @@ export const metadata: Metadata = {
   description:
     "Create stunning product content in minutes. AI-powered photography, background tools, and social media captions — built for e-commerce brands.",
   keywords: "AI product photography, background removal, e-commerce images, product photos AI",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/logo/2-removebg-preview.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: "/logo/2-removebg-preview.png",
+    shortcut: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

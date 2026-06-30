@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Layers, Sparkles } from "lucide-react";
+import { ArrowRight, Grid2X2, Layers, PenLine, Sparkles, Zap } from "lucide-react";
 import { ToolPageShell } from "@/components/tools/ToolPageShell";
 
 const TOOL_COLOR = "#8b5cf6";
@@ -49,23 +49,25 @@ export default function TextToImagePage() {
           </div>
         </motion.div>
 
-        <h2 className="text-xl font-black tracking-tight mb-2" style={{ color: W.text }}>Text to Image</h2>
-        <p className="text-sm leading-relaxed mb-8" style={{ color: W.muted }}>
+        <h2 className="text-sm font-semibold mb-1.5" style={{ color: W.text }}>Text to Image</h2>
+        <p className="text-xs leading-relaxed mb-6" style={{ color: W.muted }}>
           Generate professional product photography from any text description. Choose a template or write your own scene.
         </p>
 
-        <div className="grid grid-cols-2 gap-3 w-full mb-8">
+        <div className="grid grid-cols-2 gap-2.5 w-full mb-6">
           {[
-            { icon: "✍️", label: "Custom prompt", desc: "Describe any scene" },
-            { icon: "🎨", label: "12+ templates", desc: "One-click presets" },
-            { icon: "⚡", label: "15 seconds", desc: "Average generation" },
-            { icon: "🖼️", label: "4 images", desc: "Per generation" },
-          ].map(({ icon, label, desc }) => (
+            { icon: PenLine,   label: "Custom prompt", desc: "Describe any scene" },
+            { icon: Layers,    label: "12+ templates", desc: "One-click presets" },
+            { icon: Zap,       label: "15 seconds",    desc: "Average generation" },
+            { icon: Grid2X2,   label: "4 images",      desc: "Per generation" },
+          ].map(({ icon: Icon, label, desc }) => (
             <div key={label} className="flex items-center gap-3 p-3 rounded-xl text-left"
               style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
-              <span className="text-2xl shrink-0">{icon}</span>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${TOOL_COLOR}14` }}>
+                <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: TOOL_COLOR }} />
+              </div>
               <div>
-                <p className="text-xs font-bold" style={{ color: W.text }}>{label}</p>
+                <p className="text-xs font-semibold" style={{ color: W.text }}>{label}</p>
                 <p className="text-[10px]" style={{ color: W.dim }}>{desc}</p>
               </div>
             </div>
@@ -75,19 +77,19 @@ export default function TextToImagePage() {
         <div className="flex flex-col gap-2.5 w-full">
           <Link href="/generate">
             <motion.div
-              whileHover={{ scale: 1.02, boxShadow: "0 0 24px rgba(139,92,246,0.4)" }}
+              whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
-              className="w-full h-11 rounded-full font-bold text-sm text-white flex items-center justify-center gap-2 cursor-pointer transition-all"
-              style={{ background: TOOL_COLOR, boxShadow: "0 0 14px rgba(139,92,246,0.2)" }}
+              className="w-full h-10 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 cursor-pointer transition-all"
+              style={{ background: TOOL_COLOR }}
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-3.5 h-3.5" />
               Open Generate Studio
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-3.5 h-3.5" />
             </motion.div>
           </Link>
           <Link href="/templates">
             <div
-              className="w-full h-11 rounded-full font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
+              className="w-full h-10 rounded-xl font-medium text-sm flex items-center justify-center gap-2 cursor-pointer transition-all"
               style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = W.text; (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,0.18)"; }}
               onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = W.muted; (e.currentTarget as HTMLElement).style.borderColor = W.border; }}

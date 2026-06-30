@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, Star, X, Send, Check } from "lucide-react";
 
@@ -88,6 +88,26 @@ function FeedbackModal({ onClose }: { onClose: () => void }) {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const getEls = () => Array.from(modalRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE) ?? []);
+    getEls()[0]?.focus();
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") { onClose(); return; }
+      if (e.key !== "Tab") return;
+      const els = getEls();
+      if (!els.length) return;
+      const first = els[0], last = els[els.length - 1];
+      if (e.shiftKey) { if (document.activeElement === first) { e.preventDefault(); last.focus(); } }
+      else { if (document.activeElement === last) { e.preventDefault(); first.focus(); } }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => { document.body.style.overflow = ""; document.removeEventListener("keydown", onKeyDown); };
+  }, [onClose]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -117,6 +137,10 @@ function FeedbackModal({ onClose }: { onClose: () => void }) {
 
       {/* Modal */}
       <motion.div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="feedback-modal-title"
         className="relative w-full max-w-md rounded-2xl p-6 shadow-2xl"
         style={{
           background: W.card,
@@ -176,7 +200,7 @@ function FeedbackModal({ onClose }: { onClose: () => void }) {
                   <MessageSquare className="w-4 h-4" style={{ color: W.redLight }} />
                 </div>
                 <div>
-                  <h2 className="text-base font-black tracking-tight" style={{ color: W.text }}>
+                  <h2 id="feedback-modal-title" className="text-base font-black tracking-tight" style={{ color: W.text }}>
                     Share your feedback
                   </h2>
                   <p className="text-xs" style={{ color: W.muted }}>Help us make OpusGen AI better</p>

@@ -31,7 +31,7 @@ function FacebookIcon({ className }: { className?: string }) {
 const W = {
   text: "rgba(255,255,255,0.88)",
   muted: "rgba(255,255,255,0.45)",
-  dim: "rgba(255,255,255,0.22)",
+  dim: "rgba(255,255,255,0.42)",
   border: "rgba(255,255,255,0.07)",
   glass: "rgba(255,255,255,0.04)",
   glassMid: "rgba(255,255,255,0.06)",
@@ -97,6 +97,10 @@ export function LandingFooter() {
   function subscribe(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim()) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
     setDone(true);
     setEmail("");
     toast.success("You're on the list!");
@@ -154,6 +158,8 @@ export function LandingFooter() {
             </p>
             <form onSubmit={subscribe} className="flex gap-2">
               <input
+                id="newsletter-email"
+                name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -177,6 +183,7 @@ export function LandingFooter() {
               <motion.button
                 whileTap={{ scale: 0.92 }}
                 type="submit"
+                aria-label="Subscribe to newsletter"
                 className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 text-white transition-all"
                 style={{
                   background: "#dc2626",

@@ -104,7 +104,7 @@ export default function TermsPage() {
         ]} />
         <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Billing:</strong> Paid plans are billed monthly in advance. All payments are processed securely by Stripe. By providing payment details, you authorise us to charge your payment method for all fees incurred.</P>
         <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Refunds:</strong> Monthly subscription fees are non-refundable except where required by applicable law. Unused credits do not roll over between billing cycles and expire at period end. Credits purchased as one-time add-ons do not expire.</P>
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Price changes:</strong> We reserve the right to change pricing with at least 30 days' notice to existing subscribers. Continued use after the effective date constitutes acceptance.</P>
+        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Price changes:</strong> We reserve the right to change pricing with at least 30 days&apos; notice to existing subscribers. Continued use after the effective date constitutes acceptance.</P>
       </Section>
 
       <Section title="5. Acceptable Use Policy">

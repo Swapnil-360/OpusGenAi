@@ -44,6 +44,10 @@
   to { --angle: 360deg; }
 }
 
+@keyframes card-border-spin {
+  to { transform: rotate(360deg); }
+}
+
 @keyframes appear-zoom {
   0% { opacity: 0; transform: scale(0.95); }
   100% { opacity: 1; transform: scale(1); }
@@ -167,10 +171,22 @@
 /* ── Base styles ────────────────────────────────────────────────────────── */
 
 @layer base {
-  * { @apply border-border outline-ring/50; }
+  * { @apply border-border; outline: none; }
   body { @apply bg-background text-foreground; }
-  html { @apply font-sans; }
+  html { @apply font-sans; scrollbar-gutter: stable; }
   ::selection { background: oklch(0.62 0.252 263.1 / 25%); }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid rgba(220, 38, 38, 0.8);
+    outline-offset: 2px;
+    border-radius: inherit;
+  }
 }
 
 /* ── Utility classes ────────────────────────────────────────────────────── */
@@ -338,5 +354,35 @@
   /* ── Appear zoom animation ── */
   .animate-appear-zoom {
     animation: appear-zoom 0.5s ease-out forwards;
+  }
+
+  /* ── Hide scrollbar (keeps scroll functional) ── */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* ── Tool card spinning border (GPU compositor — no JS) ── */
+  .card-spin {
+    animation: card-border-spin 4s linear infinite;
+    will-change: transform;
+  }
+}
+
+/* ── Respect user motion preferences ───────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-spin {
+    animation: none !important;
   }
 }

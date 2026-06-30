@@ -32,11 +32,11 @@ const RATIO_PRESETS = [
 type Ratio = (typeof RATIO_PRESETS)[number]["id"];
 
 const EXPAND_DIRS = [
-  { id: "all", label: "All sides", icon: "⊞" },
-  { id: "top-bottom", label: "Top & bottom", icon: "⇕" },
-  { id: "left-right", label: "Left & right", icon: "⇔" },
-  { id: "top", label: "Top only", icon: "↑" },
-  { id: "bottom", label: "Bottom only", icon: "↓" },
+  { id: "all",        label: "All sides"   },
+  { id: "top-bottom", label: "Top & bottom" },
+  { id: "left-right", label: "Left & right" },
+  { id: "top",        label: "Top only"    },
+  { id: "bottom",     label: "Bottom only" },
 ] as const;
 type ExpandDir = (typeof EXPAND_DIRS)[number]["id"];
 
@@ -49,6 +49,7 @@ export default function UncropPage() {
   const [result, setResult] = useState<string | null>(null);
 
   function process() {
+    if (status === "processing") return;
     if (!input) { toast.error("Upload an image first."); return; }
     setStatus("processing");
     setTimeout(() => {
@@ -104,21 +105,20 @@ export default function UncropPage() {
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color: W.dim }}>Expand direction</p>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {EXPAND_DIRS.map(({ id, label, icon }) => {
+                    {EXPAND_DIRS.map(({ id, label }) => {
                       const isActive = expandDir === id;
                       return (
                         <button
                           key={id}
                           onClick={() => setExpandDir(id)}
-                          className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all text-left"
+                          className="px-2 py-2 rounded-xl transition-all text-center text-[11px] font-medium"
                           style={isActive
-                            ? { border: `1px solid ${A.border}`, background: A.bg }
-                            : { border: `1px solid ${W.border}`, background: W.glassDim }}
-                          onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.background = W.glass; } }}
-                          onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = W.glassDim; } }}
+                            ? { border: `1px solid ${A.border}`, background: A.bg, color: A.text }
+                            : { border: `1px solid ${W.border}`, background: W.glassDim, color: W.muted }}
+                          onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.background = W.glass; e.currentTarget.style.color = W.text; } }}
+                          onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = W.glassDim; e.currentTarget.style.color = W.muted; } }}
                         >
-                          <span className="text-base leading-none">{icon}</span>
-                          <span className="text-[11px] font-semibold" style={{ color: isActive ? A.text : W.muted }}>{label}</span>
+                          {label}
                         </button>
                       );
                     })}
@@ -143,13 +143,12 @@ export default function UncropPage() {
                 </div>
 
                 <motion.button
+                  whileHover={{ scale: 1.015 }}
                   whileTap={{ scale: 0.97 }}
-                  className="w-full h-11 rounded-full font-bold text-sm text-white flex items-center justify-center gap-2 transition-all"
-                  style={{ background: TOOL_COLOR, boxShadow: "0 0 14px rgba(236,72,153,0.2)" }}
+                  className="w-full h-10 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                  style={{ background: TOOL_COLOR }}
                   disabled={status === "processing"}
                   onClick={process}
-                  onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 0 24px rgba(236,72,153,0.4)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 0 14px rgba(236,72,153,0.2)"; }}
                 >
                   {status === "processing"
                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Expanding image…</>

@@ -40,6 +40,7 @@ export default function CleanupPage() {
   const [result, setResult] = useState<string | null>(null);
 
   function process() {
+    if (status === "processing") return;
     if (!input) { toast.error("Upload an image first."); return; }
     setStatus("processing");
     setTimeout(() => {
@@ -119,6 +120,11 @@ export default function CleanupPage() {
                     max={100}
                     value={strength}
                     onChange={(e) => setStrength(Number(e.target.value))}
+                    aria-label="Cleanup strength"
+                    aria-valuemin={20}
+                    aria-valuemax={100}
+                    aria-valuenow={strength}
+                    aria-valuetext={`${strength}%`}
                     className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
                     style={{ accentColor: TOOL_COLOR, background: "rgba(255,255,255,0.08)" }}
                   />
@@ -136,13 +142,12 @@ export default function CleanupPage() {
                 </div>
 
                 <motion.button
+                  whileHover={{ scale: 1.015 }}
                   whileTap={{ scale: 0.97 }}
-                  className="w-full h-11 rounded-full font-bold text-sm text-white flex items-center justify-center gap-2 transition-all"
-                  style={{ background: TOOL_COLOR, boxShadow: "0 0 14px rgba(245,158,11,0.2)" }}
+                  className="w-full h-10 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                  style={{ background: TOOL_COLOR }}
                   disabled={status === "processing"}
                   onClick={process}
-                  onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 0 24px rgba(245,158,11,0.4)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 0 14px rgba(245,158,11,0.2)"; }}
                 >
                   {status === "processing"
                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Cleaning up…</>

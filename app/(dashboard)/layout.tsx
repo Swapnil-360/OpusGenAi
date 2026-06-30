@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -58,8 +59,7 @@ function SidebarContent({ pathname, collapsed, setMobileOpen }: SidebarProps) {
       >
         {collapsed && (
           <motion.div whileHover={{ scale: 1.06 }} transition={{ duration: 0.15 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo/OpusGen%20Ai(Orange).png" alt="OpusGen AI" className="h-7 w-auto" />
+            <Image src="/logo/OpusGen Ai(Orange).png" alt="OpusGen AI" height={28} width={120} className="h-7 w-auto object-contain" />
           </motion.div>
         )}
         <AnimatePresence initial={false}>

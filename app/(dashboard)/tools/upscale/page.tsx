@@ -49,6 +49,7 @@ export default function UpscalePage() {
   }
 
   function process() {
+    if (status === "processing") return;
     if (!input) { toast.error("Upload an image first."); return; }
     setStatus("processing");
     setTimeout(() => {
@@ -137,13 +138,12 @@ export default function UpscalePage() {
                 </div>
 
                 <motion.button
+                  whileHover={{ scale: 1.015 }}
                   whileTap={{ scale: 0.97 }}
-                  className="w-full h-11 rounded-full font-bold text-sm text-white flex items-center justify-center gap-2 transition-all"
-                  style={{ background: TOOL_COLOR, boxShadow: "0 0 14px rgba(239,68,68,0.2)" }}
+                  className="w-full h-10 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-60"
+                  style={{ background: TOOL_COLOR }}
                   disabled={status === "processing"}
                   onClick={process}
-                  onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 0 24px rgba(239,68,68,0.4)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 0 14px rgba(239,68,68,0.2)"; }}
                 >
                   {status === "processing"
                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Upscaling {scale}…</>

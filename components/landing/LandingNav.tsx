@@ -97,9 +97,9 @@ export function LandingNav() {
             <Link href="/login">
               <button
                 className="px-4 py-1.5 text-[13px] font-medium transition-colors"
-                style={{ color: "rgba(255,255,255,0.38)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.38)")}
+                style={{ color: "rgba(255,255,255,0.55)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.9)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}
               >
                 Sign in
               </button>

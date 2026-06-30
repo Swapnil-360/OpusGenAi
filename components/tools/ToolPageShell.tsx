@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, Download, X, Zap } from "lucide-react";
+import { ArrowLeft, Check, Download, ImageUp, X, Zap } from "lucide-react";
 import { CreditBadge } from "@/components/shared/CreditBadge";
 import { MOCK_CURRENT_USER } from "@/lib/mock-data";
 
@@ -41,7 +41,7 @@ export function ToolPageShell({ title, description, creditCost, accentColor, chi
             </Link>
             <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: accentColor }} />
             <div className="min-w-0">
-              <h1 className="font-bold tracking-tight leading-tight" style={{ color: S.text }}>{title}</h1>
+              <h1 className="text-sm font-semibold leading-tight" style={{ color: S.text }}>{title}</h1>
               <p className="text-xs truncate hidden sm:block" style={{ color: S.muted }}>{description}</p>
             </div>
           </div>
@@ -116,7 +116,7 @@ export function UploadZone({ label = "Drop image here", preview, onUpload, onRem
         transition={{ duration: 0.2 }}
       >
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: S.glass }}>
-          <span className="text-3xl">📷</span>
+          <ImageUp className="w-7 h-7" style={{ color: S.muted }} />
         </div>
         <p className="text-sm font-semibold mb-1" style={{ color: S.text }}>{label}</p>
         <p className="text-xs" style={{ color: S.muted }}>or click to browse · JPG, PNG, WebP</p>
@@ -149,13 +149,22 @@ export function ResultPanel({ status, result, accentColor, onDownload }: ResultP
 
   if (status === "processing") {
     return (
-      <div className="rounded-2xl aspect-square w-full max-w-sm flex flex-col items-center justify-center gap-4"
+      <div className="rounded-2xl aspect-square w-full max-w-sm overflow-hidden relative"
         style={{ border: `1px solid ${S.border}` }}>
-        <div
-          className="w-12 h-12 rounded-full border-2 animate-spin"
-          style={{ borderColor: `${accentColor}30`, borderTopColor: accentColor }}
-        />
-        <p className="text-sm animate-pulse" style={{ color: S.muted }}>Processing…</p>
+        {/* Shimmer skeleton */}
+        <div className="absolute inset-0 shimmer" />
+        {/* Floating pill indicator */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <div
+            className="w-10 h-10 rounded-full border-2 animate-spin"
+            style={{ borderColor: `${accentColor}25`, borderTopColor: accentColor }}
+          />
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full backdrop-blur-sm"
+            style={{ background: "rgba(0,0,0,0.55)", border: `1px solid ${accentColor}30` }}>
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: accentColor }} />
+            <p className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.8)" }}>Processing…</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -192,10 +201,10 @@ export function ResultPanel({ status, result, accentColor, onDownload }: ResultP
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="absolute top-3 right-3 text-[11px] font-bold px-2.5 py-1 rounded-full text-white"
+        className="absolute top-3 right-3 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full text-white"
         style={{ background: "rgba(0,0,0,0.65)", border: "1px solid rgba(255,255,255,0.2)" }}
       >
-        ✓ Done
+        <Check className="w-3 h-3" />Done
       </motion.div>
     </div>
   );

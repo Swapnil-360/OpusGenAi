@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -37,6 +38,17 @@ export default function HistoryPage() {
   const [starred, setStarred] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  useEffect(() => {
+    document.body.style.overflow = selected ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [selected]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) { if (e.key === "Escape") setSelected(null); }
+    if (selected) document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selected]);
+
   const generations = MOCK_GENERATIONS.filter((g) => {
     if (filterStatus !== "all" && g.status !== filterStatus) return false;
     if (search.trim() && !g.prompt.toLowerCase().includes(search.toLowerCase())) return false;
@@ -65,16 +77,16 @@ export default function HistoryPage() {
     <div className="h-full flex flex-col overflow-hidden" style={{ background: W.bg }}>
 
       {/* Header */}
-      <div className="px-6 pt-6 pb-4 shrink-0" style={{ borderBottom: `1px solid ${W.border}` }}>
-        <div className="flex flex-col sm:flex-row sm:items-end gap-4 mb-4">
+      <div className="px-5 pt-3 pb-3 shrink-0" style={{ borderBottom: `1px solid ${W.border}` }}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2.5 mb-1">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: W.redBg, border: `1px solid ${W.redBorder}` }}>
-                <History className="w-4 h-4" style={{ color: W.red }} />
+            <div className="flex items-center gap-2 mb-0.5">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: W.redBg, border: `1px solid ${W.redBorder}` }}>
+                <History className="w-3.5 h-3.5" style={{ color: W.red }} />
               </div>
-              <h1 className="text-2xl font-black tracking-tight" style={{ color: W.text }}>History</h1>
+              <h1 className="text-sm font-semibold" style={{ color: W.text }}>History</h1>
             </div>
-            <p className="text-sm ml-10.5" style={{ color: W.muted }}>
+            <p className="text-[11px] ml-9" style={{ color: W.muted }}>
               {MOCK_GENERATIONS.length} generations · {MOCK_GENERATIONS.reduce((a, g) => a + g.images.length, 0)} images
             </p>
           </div>
@@ -168,7 +180,7 @@ export default function HistoryPage() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-5 py-4">
         {generations.length === 0 ? (
           <div className="flex flex-col items-center text-center py-20">
             <Clock className="w-10 h-10 mb-3" style={{ color: W.dim }} />
@@ -180,7 +192,7 @@ export default function HistoryPage() {
             )}
           </div>
         ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {generations.map((gen, i) => {
               const template = gen.templateId ? TEMPLATES.find((t) => t.id === gen.templateId) : null;
               const isStarred = starred.has(gen.id);
@@ -190,14 +202,14 @@ export default function HistoryPage() {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.06 }}
-                  className="group rounded-2xl overflow-hidden cursor-pointer transition-all"
+                  className="group rounded-xl overflow-hidden cursor-pointer transition-all"
                   style={{ background: W.card, border: `1px solid ${W.border}` }}
                   onMouseEnter={(e) => (e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)")}
                   onMouseLeave={(e) => (e.currentTarget.style.borderColor = W.border)}
                   onClick={() => setSelected(gen.id)}
                 >
                   {/* Image grid */}
-                  <div className="grid grid-cols-2 gap-0.5 aspect-square relative">
+                  <div className="grid grid-cols-2 gap-0.5 h-36 relative">
                     {gen.images.slice(0, 4).map((src, ii) => (
                       <div key={ii} className="relative overflow-hidden" style={{ background: W.glass }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -205,7 +217,7 @@ export default function HistoryPage() {
                       </div>
                     ))}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-                    <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                    <div className="absolute top-1.5 right-1.5 flex items-center gap-1.5">
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleStar(gen.id); }}
                         className="w-7 h-7 rounded-lg backdrop-blur-sm flex items-center justify-center transition-all"
@@ -229,7 +241,7 @@ export default function HistoryPage() {
                   </div>
 
                   {/* Card footer */}
-                  <div className="px-4 py-3">
+                  <div className="px-3 py-2">
                     <p className="text-xs font-medium line-clamp-1 mb-1" style={{ color: W.text }}>{truncate(gen.prompt, 72)}</p>
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1 text-[10px]" style={{ color: W.dim }}>
@@ -309,9 +321,9 @@ export default function HistoryPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 shrink-0 opacity-40 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                     <button onClick={(e) => { e.stopPropagation(); toggleStar(gen.id); }}
-                      className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                      className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
                       style={{ color: isStarred ? "#fbbf24" : W.dim }}
                       onMouseEnter={(e) => { if (!isStarred) e.currentTarget.style.color = "#fbbf24"; }}
                       onMouseLeave={(e) => { if (!isStarred) e.currentTarget.style.color = W.dim; }}
@@ -358,17 +370,20 @@ export default function HistoryPage() {
               animate={{ y: 0, scale: 1 }}
               exit={{ y: 30, scale: 0.96, opacity: 0 }}
               transition={{ type: "spring", stiffness: 320, damping: 26 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="history-modal-title"
               className="relative w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden z-10 max-h-[85vh] flex flex-col"
               style={{ background: "#0d0303", border: `1px solid ${W.border}` }}
             >
               <div className="flex items-center justify-between px-5 pt-4 pb-3 shrink-0" style={{ borderBottom: `1px solid ${W.border}` }}>
                 <div className="flex items-center gap-2">
                   {selectedGen.status === "completed" && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
-                  <p className="text-sm font-bold" style={{ color: W.text }}>{formatTimeAgo(selectedGen.createdAt)}</p>
+                  <p id="history-modal-title" className="text-sm font-bold" style={{ color: W.text }}>{formatTimeAgo(selectedGen.createdAt)}</p>
                   <span className="text-xs" style={{ color: W.muted }}>{selectedGen.aspectRatio}</span>
                 </div>
-                <button onClick={() => setSelected(null)}
-                  className="w-7 h-7 rounded-xl flex items-center justify-center transition-colors"
+                <button onClick={() => setSelected(null)} aria-label="Close"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
                   style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
                   onMouseEnter={(e) => (e.currentTarget.style.color = W.text)}
                   onMouseLeave={(e) => (e.currentTarget.style.color = W.muted)}
@@ -404,8 +419,7 @@ export default function HistoryPage() {
                   const tpl = TEMPLATES.find((t) => t.id === selectedGen.templateId);
                   return tpl ? (
                     <div className="flex items-center gap-2.5 p-2.5 rounded-xl" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={`https://picsum.photos/seed/${tpl.coverSeed}/48/48`} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                      <Image src={`https://picsum.photos/seed/${tpl.coverSeed}/48/48`} alt="" width={48} height={48} className="w-10 h-10 rounded-lg object-cover shrink-0" />
                       <div>
                         <p className="text-xs font-semibold" style={{ color: W.text }}>{tpl.name}</p>
                         <p className="text-[10px]" style={{ color: W.dim }}>{tpl.category} template</p>
@@ -429,11 +443,11 @@ export default function HistoryPage() {
                 </button>
                 <Link href={`/generate?prompt=${encodeURIComponent(selectedGen.prompt)}`} className="flex-1">
                   <motion.button
-                    whileHover={{ scale: 1.02, boxShadow: "0 0 24px rgba(220,38,38,0.35)" }}
+                    whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => setSelected(null)}
                     className="w-full h-9 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5"
-                    style={{ background: "#dc2626", boxShadow: "0 0 14px rgba(220,38,38,0.2)" }}
+                    style={{ background: "#dc2626" }}
                   >
                     <Sparkles className="w-3.5 h-3.5" />Reuse prompt
                   </motion.button>

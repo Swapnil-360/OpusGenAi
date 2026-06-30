@@ -115,7 +115,7 @@ export function SiteBanner() {
       </span>
       <button
         onClick={() => setDismissed(true)}
-        className="absolute right-4 opacity-50 hover:opacity-100 transition-opacity"
+        className="absolute right-3 w-8 h-8 flex items-center justify-center rounded-md opacity-50 hover:opacity-100 transition-opacity"
         style={{ color: style!.color }}
       >
         <X className="w-3.5 h-3.5" />

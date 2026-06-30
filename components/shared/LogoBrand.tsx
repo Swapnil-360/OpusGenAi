@@ -12,7 +12,7 @@ export function LogoBrand({
   textClass = "text-xl",
 }: LogoBrandProps) {
   return (
-    <span className="flex items-center gap-2.5">
+    <span className="flex items-center gap-2.5 whitespace-nowrap">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src="/logo/OpusGen%20Ai(Orange).png"
@@ -23,9 +23,10 @@ export function LogoBrand({
         OpusGen
       </span>
       <motion.span
-        className={`font-bold tracking-tight ${textClass}`}
+        className={`font-bold tracking-tight inline-block ${textClass}`}
         animate={{ color: ["#ef4444", "#f97316", "#fbbf24", "#f97316", "#ef4444"] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+        transition={{ duration: 3, repeat: 2, ease: "linear" }}
+        style={{ color: "#ef4444" }}
       >
         Ai
       </motion.span>

@@ -37,6 +37,7 @@ export default function ReplaceBgPage() {
   const [result, setResult] = useState<string | null>(null);
 
   function process() {
+    if (status === "processing") return;
     if (!input) { toast.error("Upload an image first."); return; }
     if (!bgPrompt.trim()) { toast.error("Describe the new background."); return; }
     setStatus("processing");
@@ -110,13 +111,12 @@ export default function ReplaceBgPage() {
                 </div>
 
                 <motion.button
+                  whileHover={{ scale: 1.015 }}
                   whileTap={{ scale: 0.97 }}
-                  className="w-full h-11 rounded-full font-bold text-sm text-white flex items-center justify-center gap-2 transition-all"
-                  style={{ background: TOOL_COLOR, boxShadow: "0 0 14px rgba(16,185,129,0.2)", opacity: (!bgPrompt.trim() || status === "processing") ? 0.6 : 1 }}
+                  className="w-full h-10 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+                  style={{ background: TOOL_COLOR }}
                   disabled={status === "processing" || !bgPrompt.trim()}
                   onClick={process}
-                  onMouseEnter={(e) => { if (bgPrompt.trim()) e.currentTarget.style.boxShadow = "0 0 24px rgba(16,185,129,0.4)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 0 14px rgba(16,185,129,0.2)"; }}
                 >
                   {status === "processing"
                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Replacing background…</>

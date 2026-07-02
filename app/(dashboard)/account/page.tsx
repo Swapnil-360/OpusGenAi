@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -8,9 +8,10 @@ import {
   KeyRound, LogOut, Shield, Sparkles, User, Zap,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MOCK_CURRENT_USER, PLANS, MOCK_GENERATIONS } from "@/lib/mock-data";
+import { PLANS } from "@/lib/mock-data";
 import { planLabel } from "@/lib/utils";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 const W = {
   bg: "#0f0404",
@@ -43,9 +44,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-function FieldInput({ value, onChange, type = "text", placeholder, icon: Icon, autoComplete }: {
+function FieldInput({ value, onChange, type = "text", placeholder, icon: Icon, autoComplete, readOnly }: {
   value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  type?: string; placeholder?: string; icon?: React.ElementType; autoComplete?: string;
+  type?: string; placeholder?: string; icon?: React.ElementType; autoComplete?: string; readOnly?: boolean;
 }) {
   return (
     <div className="relative">
@@ -56,15 +57,17 @@ function FieldInput({ value, onChange, type = "text", placeholder, icon: Icon, a
         onChange={onChange}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        readOnly={readOnly}
         className="w-full h-9 rounded-xl text-sm outline-none transition-all"
         style={{
-          background: W.glass,
+          background: readOnly ? "rgba(255,255,255,0.02)" : W.glass,
           border: `1px solid ${W.border}`,
-          color: W.text,
+          color: readOnly ? W.dim : W.text,
           paddingLeft: Icon ? "2.25rem" : "0.75rem",
           paddingRight: "0.75rem",
+          cursor: readOnly ? "default" : "text",
         }}
-        onFocus={(e) => { e.currentTarget.style.borderColor = W.redBorder; }}
+        onFocus={(e) => { if (!readOnly) e.currentTarget.style.borderColor = W.redBorder; }}
         onBlur={(e) => { e.currentTarget.style.borderColor = W.border; }}
       />
     </div>
@@ -72,10 +75,15 @@ function FieldInput({ value, onChange, type = "text", placeholder, icon: Icon, a
 }
 
 export default function AccountPage() {
-  const user = MOCK_CURRENT_USER;
+  const router = useRouter();
+  const supabase = createClient();
+
   const [activeSection, setActiveSection] = useState<SectionId>("profile");
-  const [name, setName] = useState(user.name);
-  const [email, setEmail] = useState(user.email);
+  const [authUser, setAuthUser] = useState<{ email: string; id: string } | null>(null);
+  const [name, setName] = useState("");
+  const [credits, setCredits] = useState(10);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [totalGenerations, setTotalGenerations] = useState(0);
   const [notifications, setNotifications] = useState({
     generationDone: true, billing: true, tips: false, newsletter: false,
   });
@@ -84,20 +92,61 @@ export default function AccountPage() {
   const [newPwd, setNewPwd] = useState("");
   const [savingPwd, setSavingPwd] = useState(false);
 
-  const creditsPercent = Math.min(100, Math.round((user.credits / (PLANS.find((p) => p.id === user.plan)?.credits ?? 10)) * 100));
-  const currentPlan = PLANS.find((p) => p.id === user.plan)!;
-  const totalGenerated = MOCK_GENERATIONS.length;
+  useEffect(() => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      setAuthUser({ email: user.email ?? "", id: user.id });
 
-  function saveProfile() {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, credits, avatar_url")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
+        setName(profile.full_name ?? user.email?.split("@")[0] ?? "");
+        setCredits(profile.credits ?? 10);
+        setAvatarUrl(profile.avatar_url ?? null);
+      }
+
+      const { count } = await supabase
+        .from("generations")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "completed");
+
+      setTotalGenerations(count ?? 0);
+    }
+    load();
+  }, []);
+
+  const currentPlan = PLANS.find((p) => p.id === "free")!;
+  const creditsPercent = Math.min(100, Math.round((credits / (currentPlan?.credits ?? 10)) * 100));
+  const displayName = name || authUser?.email?.split("@")[0] || "User";
+  const initials = displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
+
+  async function saveProfile() {
+    if (!authUser) return;
     setSavingProfile(true);
-    setTimeout(() => { setSavingProfile(false); toast.success("Profile saved!"); }, 1200);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ full_name: name, updated_at: new Date().toISOString() })
+      .eq("id", authUser.id);
+    setSavingProfile(false);
+    if (error) { toast.error("Failed to save profile."); return; }
+    toast.success("Profile saved!");
+  }
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    router.push("/login");
   }
 
   async function handlePasswordChange(e: React.FormEvent) {
     e.preventDefault();
     if (!newPwd || newPwd.length < 8) { toast.error("New password must be at least 8 characters."); return; }
     setSavingPwd(true);
-    const supabase = createClient();
     const { error } = await supabase.auth.updateUser({ password: newPwd });
     setSavingPwd(false);
     if (error) { toast.error(error.message); return; }
@@ -115,23 +164,23 @@ export default function AccountPage() {
           style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
         >
           <Avatar className="w-9 h-9 shrink-0" style={{ outline: `2px solid ${W.border}`, outlineOffset: "1px" }}>
-            <AvatarImage src={user.avatar} />
+            {avatarUrl && <AvatarImage src={avatarUrl} />}
             <AvatarFallback className="text-xs font-bold" style={{ background: W.redBg, color: W.red }}>
-              {user.name.split(" ").map((n: string) => n[0]).join("")}
+              {initials}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-none truncate" style={{ color: W.text }}>{user.name}</p>
-            <p className="text-[11px] mt-0.5 truncate" style={{ color: W.dim }}>{user.email}</p>
+            <p className="text-sm font-semibold leading-none truncate" style={{ color: W.text }}>{displayName}</p>
+            <p className="text-[11px] mt-0.5 truncate" style={{ color: W.dim }}>{authUser?.email ?? "—"}</p>
           </div>
           <span
             className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
             style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.muted }}
           >
-            {planLabel(user.plan)}
+            {planLabel("free")}
           </span>
           <button
-            onClick={() => toast.info("Sign out — not connected to auth.")}
+            onClick={handleSignOut}
             className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all"
             style={{ color: W.dim }}
             title="Sign out"
@@ -174,7 +223,6 @@ export default function AccountPage() {
             {/* ── Profile ── */}
             {activeSection === "profile" && (
               <div className="flex flex-col gap-4">
-                {/* Avatar + stats row */}
                 <div className="flex flex-col sm:flex-row gap-3">
                   {/* Avatar card */}
                   <div
@@ -182,20 +230,20 @@ export default function AccountPage() {
                     style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
                   >
                     <Avatar className="w-12 h-12 shrink-0" style={{ outline: `2px solid ${W.border}`, outlineOffset: "2px" }}>
-                      <AvatarImage src={user.avatar} />
+                      {avatarUrl && <AvatarImage src={avatarUrl} />}
                       <AvatarFallback className="text-base font-bold" style={{ background: W.redBg, color: W.red }}>
-                        {user.name.split(" ").map((n: string) => n[0]).join("")}
+                        {initials}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold truncate" style={{ color: W.text }}>{user.name}</p>
-                      <p className="text-[10px] truncate mb-2" style={{ color: W.dim }}>{user.email}</p>
+                      <p className="text-xs font-semibold truncate" style={{ color: W.text }}>{displayName}</p>
+                      <p className="text-[10px] truncate mb-2" style={{ color: W.dim }}>{authUser?.email ?? "—"}</p>
                       <button
                         className="h-6 px-2.5 rounded-md text-[11px] font-medium transition-all"
                         style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
                         onMouseEnter={(e) => { e.currentTarget.style.color = W.text; }}
                         onMouseLeave={(e) => { e.currentTarget.style.color = W.muted; }}
-                        onClick={() => toast.info("Avatar upload — not connected to backend.")}
+                        onClick={() => toast.info("Avatar upload coming soon.")}
                       >
                         Change photo
                       </button>
@@ -205,9 +253,9 @@ export default function AccountPage() {
                   {/* Stats */}
                   <div className="grid grid-cols-3 gap-2 flex-1">
                     {[
-                      { label: "Generations", value: totalGenerated },
-                      { label: "Credits left", value: user.credits },
-                      { label: "Images", value: totalGenerated * 4 },
+                      { label: "Generations", value: totalGenerations },
+                      { label: "Credits left", value: credits },
+                      { label: "Images", value: totalGenerations },
                     ].map(({ label, value }) => (
                       <div
                         key={label}
@@ -232,7 +280,7 @@ export default function AccountPage() {
                   </div>
                   <div>
                     <SectionLabel>Email address</SectionLabel>
-                    <FieldInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                    <FieldInput type="email" value={authUser?.email ?? ""} readOnly />
                   </div>
                   <div>
                     <SectionLabel>Website</SectionLabel>
@@ -257,7 +305,6 @@ export default function AccountPage() {
             {/* ── Plan & Credits ── */}
             {activeSection === "plan" && (
               <div className="flex flex-col gap-4">
-                {/* Current plan banner */}
                 <div
                   className="relative p-4 rounded-xl overflow-hidden"
                   style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}
@@ -267,18 +314,18 @@ export default function AccountPage() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: W.red }} />
-                        <p className="text-xs font-semibold" style={{ color: W.text }}>{planLabel(user.plan)} Plan</p>
+                        <p className="text-xs font-semibold" style={{ color: W.text }}>{planLabel("free")} Plan</p>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: W.glass, color: W.muted }}>Current</span>
                       </div>
                       <p className="text-xl font-black" style={{ color: W.text }}>
-                        {user.credits} <span className="text-sm font-normal" style={{ color: W.muted }}>credits remaining</span>
+                        {credits} <span className="text-sm font-normal" style={{ color: W.muted }}>credits remaining</span>
                       </p>
                       <p className="text-[11px] mt-0.5" style={{ color: W.dim }}>
-                        Resets monthly · {currentPlan.price === 0 ? "Free forever" : `$${currentPlan.price}/mo`}
+                        Resets monthly · Free forever
                       </p>
                     </div>
                     <div className="shrink-0">
-                      <p className="text-[10px] mb-1 text-right" style={{ color: W.dim }}>{user.credits} / {currentPlan.credits}</p>
+                      <p className="text-[10px] mb-1 text-right" style={{ color: W.dim }}>{credits} / {currentPlan.credits}</p>
                       <div className="w-32 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
                         <motion.div
                           className="h-full rounded-full"
@@ -292,10 +339,9 @@ export default function AccountPage() {
                   </div>
                 </div>
 
-                {/* Plans */}
                 <div className="flex flex-col gap-2.5">
                   {PLANS.map((plan) => {
-                    const isCurrent = plan.id === user.plan;
+                    const isCurrent = plan.id === "free";
                     return (
                       <div
                         key={plan.id}
@@ -342,7 +388,7 @@ export default function AccountPage() {
                               ? { background: "#dc2626", color: "#fff" }
                               : { border: `1px solid ${W.border}`, background: W.glass, color: W.text }}
                             disabled={isCurrent}
-                            onClick={() => toast.info("Plan upgrade — connect Stripe to enable.")}
+                            onClick={() => toast.info("Plan upgrade — Stripe integration coming soon.")}
                           >
                             {isCurrent ? "Current" : plan.cta}
                           </motion.button>
@@ -368,7 +414,7 @@ export default function AccountPage() {
                   whileTap={{ scale: 0.97 }}
                   className="h-8 px-4 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5"
                   style={{ background: "#dc2626" }}
-                  onClick={() => toast.info("Billing — connect Stripe to enable.")}
+                  onClick={() => toast.info("Billing — Stripe integration coming soon.")}
                 >
                   <Zap className="w-3.5 h-3.5" />Upgrade to unlock
                 </motion.button>
@@ -378,7 +424,6 @@ export default function AccountPage() {
             {/* ── Security ── */}
             {activeSection === "security" && (
               <div className="flex flex-col gap-3">
-                {/* Password form */}
                 <div className="p-4 rounded-xl" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
                   <div className="flex items-center gap-3 mb-3.5">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: W.glass }}>
@@ -386,17 +431,8 @@ export default function AccountPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold" style={{ color: W.text }}>Password</p>
-                      <p className="text-[10px]" style={{ color: W.dim }}>Last changed: never</p>
+                      <p className="text-[10px]" style={{ color: W.dim }}>Update your account password</p>
                     </div>
-                    <button
-                      className="h-7 px-3 rounded-lg text-xs font-medium transition-all shrink-0"
-                      style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = W.text}
-                      onMouseLeave={(e) => e.currentTarget.style.color = W.muted}
-                      onClick={() => toast.info("Password reset — connect auth to enable.")}
-                    >
-                      Reset
-                    </button>
                   </div>
                   <form onSubmit={handlePasswordChange} className="flex flex-col gap-3">
                     <div>
@@ -418,10 +454,9 @@ export default function AccountPage() {
                   </form>
                 </div>
 
-                {/* 2FA + Sessions */}
                 {[
-                  { icon: Shield,  title: "Two-factor auth",  sub: "Add an extra layer of security",     cta: "Enable",      danger: false, action: () => toast.info("2FA — connect auth to enable.") },
-                  { icon: History, title: "Active sessions",  sub: "1 active session · This device",     cta: "Revoke all",  danger: true,  action: () => toast.info("Revoke sessions — connect auth to enable.") },
+                  { icon: Shield,  title: "Two-factor auth",  sub: "Add an extra layer of security",     cta: "Enable",      danger: false, action: () => toast.info("2FA coming soon.") },
+                  { icon: History, title: "Active sessions",  sub: "Sign out all other sessions",         cta: "Revoke all",  danger: true,  action: async () => { await supabase.auth.signOut({ scope: "others" }); toast.success("Other sessions signed out."); } },
                 ].map(({ icon: Icon, title, sub, action, cta, danger }) => (
                   <div key={title} className="flex items-center justify-between p-3.5 rounded-xl" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
                     <div className="flex items-center gap-2.5">

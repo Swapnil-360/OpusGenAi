@@ -8,7 +8,7 @@ import {
   ArrowUpRight, Check, Clock, Copy, Download, Grid3X3, History,
   List, Search, SlidersHorizontal, Sparkles, Star, X,
 } from "lucide-react";
-import { MOCK_GENERATIONS } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/client";
 import { TEMPLATES } from "@/lib/templates-data";
 import { formatTimeAgo, truncate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -30,6 +30,12 @@ const W = {
 type ViewMode = "grid" | "list";
 type FilterStatus = "all" | "completed" | "failed";
 
+type CombinedEntry = {
+  id: string; prompt: string; status: "completed" | "processing" | "failed";
+  images: string[]; creditsUsed: number; aspectRatio: string;
+  createdAt: Date; templateId?: string;
+};
+
 export default function HistoryPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [search, setSearch] = useState("");
@@ -37,6 +43,37 @@ export default function HistoryPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [starred, setStarred] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [allGenerations, setAllGenerations] = useState<CombinedEntry[]>([]);
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("generations")
+        .select("id, prompt, status, metadata, credit_cost, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (!data) return;
+      setAllGenerations(
+        data.map((g) => ({
+          id: g.id,
+          prompt: g.prompt ?? "",
+          status: g.status as "completed" | "processing" | "failed",
+          images: (g.metadata as { images?: string[] })?.images ?? [],
+          creditsUsed: g.credit_cost ?? 1,
+          aspectRatio: (g.metadata as { aspectRatio?: string })?.aspectRatio ?? "1:1",
+          createdAt: new Date(g.created_at),
+          templateId: (g.metadata as { templateId?: string })?.templateId,
+        }))
+      );
+    }
+    load();
+  }, []);
 
   useEffect(() => {
     document.body.style.overflow = selected ? "hidden" : "";
@@ -49,13 +86,13 @@ export default function HistoryPage() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [selected]);
 
-  const generations = MOCK_GENERATIONS.filter((g) => {
+  const generations = allGenerations.filter((g) => {
     if (filterStatus !== "all" && g.status !== filterStatus) return false;
     if (search.trim() && !g.prompt.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
-  const selectedGen = selected ? MOCK_GENERATIONS.find((g) => g.id === selected) : null;
+  const selectedGen = selected ? allGenerations.find((g) => g.id === selected) : null;
 
   function toggleStar(id: string) {
     setStarred((prev) => {
@@ -87,7 +124,7 @@ export default function HistoryPage() {
               <h1 className="text-sm font-semibold" style={{ color: W.text }}>History</h1>
             </div>
             <p className="text-[11px] ml-9" style={{ color: W.muted }}>
-              {MOCK_GENERATIONS.length} generations · {MOCK_GENERATIONS.reduce((a, g) => a + g.images.length, 0)} images
+              {allGenerations.length} generations · {allGenerations.reduce((a, g) => a + g.images.length, 0)} images
             </p>
           </div>
 
@@ -147,7 +184,7 @@ export default function HistoryPage() {
         {/* Status filter pills */}
         <div className="flex gap-1.5 flex-wrap">
           {(["all", "completed", "failed"] as FilterStatus[]).map((s) => {
-            const count = s === "all" ? MOCK_GENERATIONS.length : MOCK_GENERATIONS.filter((g) => g.status === s).length;
+            const count = s === "all" ? allGenerations.length : allGenerations.filter((g) => g.status === s).length;
             const isActive = filterStatus === s;
             return (
               <button
@@ -216,7 +253,7 @@ export default function HistoryPage() {
                         <img src={src} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                       </div>
                     ))}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/50 via-transparent to-transparent" />
                     <div className="absolute top-1.5 right-1.5 flex items-center gap-1.5">
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleStar(gen.id); }}

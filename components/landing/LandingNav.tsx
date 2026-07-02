@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, X, Menu } from "lucide-react";
 import { TOOLS } from "@/lib/tools-config";
 import { LogoBrand } from "@/components/shared/LogoBrand";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { createClient } from "@/lib/supabase/client";
 
 const NAV_LINKS = [
   { href: "/", label: "Home", section: null },
@@ -14,9 +16,58 @@ const NAV_LINKS = [
   { href: "#pricing", label: "Pricing", section: "pricing" },
 ];
 
+type AuthUser = { name: string; avatarUrl: string | null } | null;
+
+function getInitials(name: string): string {
+  return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+}
+
 export function LandingNav() {
   const [active, setActive] = useState("Home");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [authUser, setAuthUser] = useState<AuthUser>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  /* Check auth state */
+  useEffect(() => {
+    const supabase = createClient();
+
+    async function loadUser() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setAuthUser(null); return; }
+
+        const meta = user.user_metadata ?? {};
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name, avatar_url")
+          .eq("id", user.id)
+          .single();
+
+        const name =
+          (profile?.full_name as string | null) ||
+          (meta.full_name as string | null) ||
+          (meta.name as string | null) ||
+          (user.email?.split("@")[0] ?? "Account");
+        const avatarUrl =
+          (profile?.avatar_url as string | null) ||
+          (meta.avatar_url as string | null) ||
+          (meta.picture as string | null) ||
+          null;
+
+        setAuthUser({ name, avatarUrl });
+      } catch (err) {
+        console.error("LandingNav auth check failed:", err);
+        setAuthUser(null);
+      } finally {
+        setAuthChecked(true);
+      }
+    }
+    loadUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => loadUser());
+    return () => subscription.unsubscribe();
+  }, []);
 
   /* Track active section on scroll */
   useEffect(() => {
@@ -94,26 +145,47 @@ export function LandingNav() {
 
           {/* ── Right actions ── */}
           <div className="ml-auto hidden md:flex items-center gap-2">
-            <Link href="/login">
-              <button
-                className="px-4 py-1.5 text-[13px] font-medium transition-colors"
-                style={{ color: "rgba(255,255,255,0.55)" }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.9)")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}
-              >
-                Sign in
-              </button>
-            </Link>
-            <Link href="/signup">
-              <motion.button
-                whileHover={{ scale: 1.04, boxShadow: "0 0 30px rgba(220,38,38,0.5)" }}
-                whileTap={{ scale: 0.97 }}
-                className="flex items-center px-5 py-2 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-[13px] transition-all"
-                style={{ boxShadow: "0 0 18px rgba(220,38,38,0.25)" }}
-              >
-                Start free
-              </motion.button>
-            </Link>
+            {authUser ? (
+              <Link href="/account" className="flex items-center gap-2.5 pl-2 pr-1 py-1 rounded-full transition-colors group" style={{ background: "rgba(255,255,255,0.05)" }}>
+                <span
+                  className="text-[13px] font-semibold transition-colors"
+                  style={{ color: "rgba(255,255,255,0.7)" }}
+                >
+                  {authUser.name}
+                </span>
+                <Avatar className="w-8 h-8 shrink-0">
+                  {authUser.avatarUrl && (
+                    <AvatarImage src={authUser.avatarUrl} alt={authUser.name} referrerPolicy="no-referrer" />
+                  )}
+                  <AvatarFallback className="text-xs font-bold" style={{ background: "rgba(220,38,38,0.2)", color: "#f87171" }}>
+                    {getInitials(authUser.name)}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
+            ) : (
+              <>
+                <Link href="/login">
+                  <button
+                    className="px-4 py-1.5 text-[13px] font-medium transition-colors"
+                    style={{ color: "rgba(255,255,255,0.55)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.9)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}
+                  >
+                    Sign in
+                  </button>
+                </Link>
+                <Link href="/signup">
+                  <motion.button
+                    whileHover={{ scale: 1.04, boxShadow: "0 0 30px rgba(220,38,38,0.5)" }}
+                    whileTap={{ scale: 0.97 }}
+                    className="flex items-center px-5 py-2 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-[13px] transition-all"
+                    style={{ boxShadow: "0 0 18px rgba(220,38,38,0.25)" }}
+                  >
+                    Start free
+                  </motion.button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* ── Mobile: Menu pill button ── */}
@@ -201,24 +273,43 @@ export function LandingNav() {
                   </Link>
                 ))}
                 <div className="h-px my-1" style={{ background: "rgba(255,255,255,0.05)" }} />
-                <div className="flex gap-2 p-1">
-                  <Link href="/login" className="flex-1" onClick={() => setMobileOpen(false)}>
-                    <button
-                      className="w-full h-10 rounded-xl text-sm font-medium transition-colors"
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.09)",
-                        color: "rgba(255,255,255,0.6)",
-                      }}
-                    >
-                      Sign in
-                    </button>
+                {authChecked && authUser ? (
+                  <Link
+                    href="/account"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors"
+                    style={{ color: "rgba(255,255,255,0.8)" }}
+                  >
+                    <Avatar className="w-7 h-7 shrink-0">
+                      {authUser.avatarUrl && (
+                        <AvatarImage src={authUser.avatarUrl} alt={authUser.name} referrerPolicy="no-referrer" />
+                      )}
+                      <AvatarFallback className="text-xs font-bold" style={{ background: "rgba(220,38,38,0.2)", color: "#f87171" }}>
+                        {getInitials(authUser.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-[13px] font-semibold">{authUser.name}</span>
                   </Link>
-                  <Link href="/signup" className="flex-1" onClick={() => setMobileOpen(false)}>
-                    <button className="w-full h-10 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm transition-colors">
-                      Start free
-                    </button>
-                  </Link>
-                </div>
+                ) : (
+                  <div className="flex gap-2 p-1">
+                    <Link href="/login" className="flex-1" onClick={() => setMobileOpen(false)}>
+                      <button
+                        className="w-full h-10 rounded-xl text-sm font-medium transition-colors"
+                        style={{
+                          border: "1px solid rgba(255,255,255,0.09)",
+                          color: "rgba(255,255,255,0.6)",
+                        }}
+                      >
+                        Sign in
+                      </button>
+                    </Link>
+                    <Link href="/signup" className="flex-1" onClick={() => setMobileOpen(false)}>
+                      <button className="w-full h-10 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm transition-colors">
+                        Start free
+                      </button>
+                    </Link>
+                  </div>
+                )}
               </div>
             </motion.div>
           )}

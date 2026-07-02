@@ -35,6 +35,7 @@ const ENHANCE_OPTIONS = [
 
 export default function UpscalePage() {
   const [input, setInput] = useState<string | null>(null);
+  const [inputFile, setInputFile] = useState<File | null>(null);
   const [scale, setScale] = useState<ScaleOption>("4x");
   const [enhancements, setEnhancements] = useState<Set<string>>(new Set(["sharpness", "denoise"]));
   const [status, setStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
@@ -48,15 +49,28 @@ export default function UpscalePage() {
     });
   }
 
-  function process() {
+  async function process() {
     if (status === "processing") return;
-    if (!input) { toast.error("Upload an image first."); return; }
+    if (!inputFile) { toast.error("Upload an image first."); return; }
     setStatus("processing");
-    setTimeout(() => {
-      setResult("https://picsum.photos/seed/bag1/512/512");
+    try {
+      const fd = new FormData();
+      fd.append("image", inputFile);
+      const res = await fetch("/api/upscale", { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error || "Upscale failed.");
+        setStatus("failed");
+        return;
+      }
+      const { image } = await res.json();
+      setResult(image);
       setStatus("completed");
       toast.success(`Upscaled ${scale} successfully!`);
-    }, 3000);
+    } catch {
+      toast.error("Network error. Check your connection.");
+      setStatus("failed");
+    }
   }
 
   return (
@@ -67,8 +81,8 @@ export default function UpscalePage() {
           <UploadZone
             label="Drop your image to upscale"
             preview={input}
-            onUpload={(_, preview) => { setInput(preview); setStatus("idle"); setResult(null); }}
-            onRemove={() => { setInput(null); setStatus("idle"); setResult(null); }}
+            onUpload={(file, preview) => { setInputFile(file); setInput(preview); setStatus("idle"); setResult(null); }}
+            onRemove={() => { setInputFile(null); setInput(null); setStatus("idle"); setResult(null); }}
             accentColor={TOOL_COLOR}
           />
 
@@ -163,7 +177,14 @@ export default function UpscalePage() {
               </span>
             )}
           </div>
-          <ResultPanel status={status} result={result} accentColor={TOOL_COLOR} onDownload={() => toast.success("Download started!")} />
+          <ResultPanel status={status} result={result} accentColor={TOOL_COLOR} onDownload={() => {
+            if (!result) return;
+            const a = document.createElement("a");
+            a.href = result;
+            a.download = `opusgen-upscaled-${Date.now()}.png`;
+            a.click();
+            toast.success("Downloading…");
+          }} />
 
           {status === "completed" && (
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-4 grid grid-cols-2 gap-2.5">

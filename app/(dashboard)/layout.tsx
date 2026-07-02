@@ -2,17 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles, Zap, Clock, User, LogOut, ChevronRight,
   Menu, Layers, PenSquare, Wrench, Scissors, Replace, Eraser, Maximize2, Frame,
 } from "lucide-react";
 import { LogoBrand } from "@/components/shared/LogoBrand";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FeedbackButton } from "@/components/shared/FeedbackModal";
-import { MOCK_CURRENT_USER } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
@@ -45,10 +45,32 @@ const TOOL_ITEMS = [
   { href: "/tools/uncrop", label: "Uncrop", icon: Frame, color: "#f472b6" },
 ];
 
-type SidebarProps = { pathname: string; collapsed: boolean; setMobileOpen: (v: boolean) => void };
+type SidebarUser = {
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  credits: number;
+  plan: "free" | "pro";
+};
 
-function SidebarContent({ pathname, collapsed, setMobileOpen }: SidebarProps) {
-  const user = MOCK_CURRENT_USER;
+type SidebarProps = {
+  pathname: string;
+  collapsed: boolean;
+  setMobileOpen: (v: boolean) => void;
+  user: SidebarUser;
+  onSignOut: () => void;
+};
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }: SidebarProps) {
   return (
     <div className="flex flex-col h-full" style={{ color: S.textPrimary }}>
 
@@ -58,9 +80,11 @@ function SidebarContent({ pathname, collapsed, setMobileOpen }: SidebarProps) {
         style={{ borderBottom: `1px solid ${S.border}` }}
       >
         {collapsed && (
-          <motion.div whileHover={{ scale: 1.06 }} transition={{ duration: 0.15 }}>
-            <Image src="/logo/OpusGen Ai(Orange).png" alt="OpusGen AI" height={28} width={120} className="h-7 w-auto object-contain" />
-          </motion.div>
+          <Link href="/" onClick={() => setMobileOpen(false)}>
+            <motion.div whileHover={{ scale: 1.06 }} transition={{ duration: 0.15 }}>
+              <Image src="/logo/OpusGen Ai(Orange).png" alt="OpusGen AI" height={28} width={120} className="h-7 w-auto object-contain" />
+            </motion.div>
+          </Link>
         )}
         <AnimatePresence initial={false}>
           {!collapsed && (
@@ -71,7 +95,9 @@ function SidebarContent({ pathname, collapsed, setMobileOpen }: SidebarProps) {
               exit={{ opacity: 0, x: -6 }}
               transition={{ duration: 0.18 }}
             >
-              <LogoBrand imgClass="h-9 w-auto" textClass="text-[15px]" />
+              <Link href="/" onClick={() => setMobileOpen(false)}>
+                <LogoBrand imgClass="h-9 w-auto" textClass="text-[15px]" />
+              </Link>
             </motion.div>
           )}
         </AnimatePresence>
@@ -248,7 +274,9 @@ function SidebarContent({ pathname, collapsed, setMobileOpen }: SidebarProps) {
         </AnimatePresence>
 
         {/* User row */}
-        <div
+        <Link
+          href="/account"
+          onClick={() => setMobileOpen(false)}
           className={cn(
             "flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer group transition-all",
             collapsed && "justify-center px-0"
@@ -258,11 +286,18 @@ function SidebarContent({ pathname, collapsed, setMobileOpen }: SidebarProps) {
           onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
           <Avatar className="w-7 h-7 shrink-0">
+            {user.avatarUrl && (
+              <AvatarImage
+                src={user.avatarUrl}
+                alt={user.name}
+                referrerPolicy="no-referrer"
+              />
+            )}
             <AvatarFallback
               className="text-xs font-bold"
               style={{ background: "rgba(220,38,38,0.2)", color: S.activeText }}
             >
-              {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+              {getInitials(user.name)}
             </AvatarFallback>
           </Avatar>
           <AnimatePresence initial={false}>
@@ -284,8 +319,10 @@ function SidebarContent({ pathname, collapsed, setMobileOpen }: SidebarProps) {
                   </p>
                 </div>
                 <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSignOut(); }}
                   className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg"
                   style={{ color: S.textMuted }}
+                  title="Sign out"
                   onMouseEnter={(e) => (e.currentTarget.style.color = S.textPrimary)}
                   onMouseLeave={(e) => (e.currentTarget.style.color = S.textMuted)}
                 >
@@ -294,17 +331,77 @@ function SidebarContent({ pathname, collapsed, setMobileOpen }: SidebarProps) {
               </motion.div>
             )}
           </AnimatePresence>
-        </div>
+        </Link>
       </div>
     </div>
   );
 }
 
+const DEFAULT_USER: SidebarUser = {
+  name: "Loading…",
+  email: "",
+  avatarUrl: null,
+  credits: 0,
+  plan: "free",
+};
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const user = MOCK_CURRENT_USER;
+  const [sidebarUser, setSidebarUser] = useState<SidebarUser>(DEFAULT_USER);
+
+  useEffect(() => {
+    async function loadUser() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Pull display name: prefer profile full_name, then Google metadata, then email prefix
+      const meta = user.user_metadata ?? {};
+      const metaName: string = meta.full_name ?? meta.name ?? "";
+
+      // Load credits and plan from profiles table
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name, credits, avatar_url")
+        .eq("id", user.id)
+        .single();
+
+      const name =
+        (profile?.full_name as string | null) ||
+        metaName ||
+        (user.email?.split("@")[0] ?? "User");
+
+      const avatarUrl: string | null =
+        (profile?.avatar_url as string | null) ||
+        (meta.avatar_url as string | null) ||
+        (meta.picture as string | null) ||
+        null;
+
+      const credits = typeof profile?.credits === "number" ? (profile.credits as number) : 0;
+
+      setSidebarUser({ name, email: user.email ?? "", avatarUrl, credits, plan: "free" });
+    }
+    loadUser();
+
+    // Live credit updates broadcast by pages after a paid action
+    function onCredits(e: Event) {
+      const credits = (e as CustomEvent<number>).detail;
+      if (typeof credits === "number") {
+        setSidebarUser((prev) => ({ ...prev, credits }));
+      }
+    }
+    window.addEventListener("opusgen:credits", onCredits);
+    return () => window.removeEventListener("opusgen:credits", onCredits);
+  }, []);
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: "#0f0404" }}>
@@ -316,7 +413,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         animate={{ width: collapsed ? 64 : 248 }}
         transition={{ type: "spring", stiffness: 280, damping: 28 }}
       >
-        <SidebarContent pathname={pathname} collapsed={collapsed} setMobileOpen={setMobileOpen} />
+        <SidebarContent
+          pathname={pathname}
+          collapsed={collapsed}
+          setMobileOpen={setMobileOpen}
+          user={sidebarUser}
+          onSignOut={handleSignOut}
+        />
 
         {/* Collapse toggle */}
         <motion.button
@@ -354,7 +457,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               initial={{ x: -272 }} animate={{ x: 0 }} exit={{ x: -272 }}
               transition={{ type: "spring", stiffness: 320, damping: 32 }}
             >
-              <SidebarContent pathname={pathname} collapsed={false} setMobileOpen={setMobileOpen} />
+              <SidebarContent
+                pathname={pathname}
+                collapsed={false}
+                setMobileOpen={setMobileOpen}
+                user={sidebarUser}
+                onSignOut={handleSignOut}
+              />
             </motion.aside>
           </div>
         )}
@@ -377,13 +486,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <Menu className="w-5 h-5" />
           </button>
-          <LogoBrand imgClass="h-8 w-auto" textClass="text-sm" />
+          <Link href="/">
+            <LogoBrand imgClass="h-8 w-auto" textClass="text-sm" />
+          </Link>
           <div
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
             style={{ background: "rgba(220,38,38,0.12)", border: "1px solid rgba(220,38,38,0.2)", color: S.activeText }}
           >
             <Zap className="w-3 h-3" />
-            {user.credits}
+            {sidebarUser.credits}
           </div>
         </div>
 

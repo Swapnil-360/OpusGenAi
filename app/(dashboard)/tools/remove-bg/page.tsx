@@ -21,24 +21,71 @@ const W = {
   text: "rgba(255,255,255,0.88)",
 };
 
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function compositeOnColor(blob: Blob, color: string): Promise<string> {
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.src = url;
+  await new Promise<void>((res) => { img.onload = () => res(); });
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(img, 0, 0);
+  URL.revokeObjectURL(url);
+  return canvas.toDataURL("image/png");
+}
+
 export default function RemoveBgPage() {
   const [input, setInput] = useState<string | null>(null);
+  const [inputFile, setInputFile] = useState<File | null>(null);
   const [status, setStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
   const [result, setResult] = useState<string | null>(null);
   const [outputFormat, setOutputFormat] = useState<"transparent" | "white" | "black">("transparent");
 
-  function process() {
-    if (!input) { toast.error("Upload an image first."); return; }
+  async function process() {
+    if (!inputFile) { toast.error("Upload an image first."); return; }
     setStatus("processing");
-    setTimeout(() => {
-      setResult("https://picsum.photos/seed/product3/512/512");
+    try {
+      // Dynamic import keeps WASM out of SSR bundle
+      // publicPath must point to CDN so WASM files match the JS wrapper version
+      const { removeBackground } = await import("@imgly/background-removal");
+      toast.info("AI model loading… (first run ~30s)", { duration: 30000, id: "bg-load" });
+      const blob = await removeBackground(inputFile, {
+        publicPath: "https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/",
+        model: "small",
+      });
+      toast.dismiss("bg-load");
+
+      let resultUrl: string;
+      if (outputFormat === "transparent") {
+        resultUrl = await blobToDataUrl(blob);
+      } else {
+        resultUrl = await compositeOnColor(blob, outputFormat === "white" ? "#ffffff" : "#000000");
+      }
+
+      setResult(resultUrl);
       setStatus("completed");
       toast.success("Background removed!");
-    }, 2200);
+    } catch (err) {
+      console.error("Background removal error:", err);
+      toast.dismiss("bg-load");
+      toast.error("Failed to remove background. Try a different image.");
+      setStatus("failed");
+    }
   }
 
   return (
-    <ToolPageShell title="Remove Background" description="Pixel-perfect background removal in seconds" creditCost={1} accentColor={TOOL_COLOR}>
+    <ToolPageShell title="Remove Background" description="Pixel-perfect AI background removal in seconds" creditCost={1} accentColor={TOOL_COLOR}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Input side */}
         <div>
@@ -46,8 +93,8 @@ export default function RemoveBgPage() {
           <UploadZone
             label="Drop your product photo here"
             preview={input}
-            onUpload={(_, preview) => { setInput(preview); setStatus("idle"); setResult(null); }}
-            onRemove={() => { setInput(null); setStatus("idle"); setResult(null); }}
+            onUpload={(file, preview) => { setInputFile(file); setInput(preview); setStatus("idle"); setResult(null); }}
+            onRemove={() => { setInputFile(null); setInput(null); setStatus("idle"); setResult(null); }}
             accentColor={TOOL_COLOR}
           />
 
@@ -59,8 +106,8 @@ export default function RemoveBgPage() {
                   <div className="grid grid-cols-3 gap-2">
                     {([
                       { id: "transparent" as const, label: "Transparent" },
-                      { id: "white" as const, label: "White" },
-                      { id: "black" as const, label: "Black" },
+                      { id: "white"       as const, label: "White" },
+                      { id: "black"       as const, label: "Black" },
                     ]).map(({ id, label }) => {
                       const isActive = outputFormat === id;
                       return (
@@ -103,7 +150,7 @@ export default function RemoveBgPage() {
                 >
                   {status === "processing"
                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Removing background…</>
-                    : <><Scissors className="w-4 h-4" />Remove Background · 1 credit</>}
+                    : <><Scissors className="w-4 h-4" />Remove Background · Free (AI)</>}
                 </motion.button>
               </motion.div>
             )}
@@ -116,17 +163,24 @@ export default function RemoveBgPage() {
             <p className="text-xs font-bold uppercase tracking-wider" style={{ color: W.dim }}>Result</p>
             {status === "completed" && (
               <span className="text-[10px] font-bold flex items-center gap-1" style={{ color: A.text }}>
-                <Check className="w-3 h-3" />PNG with {outputFormat} background
+                <Check className="w-3 h-3" />PNG · {outputFormat} background
               </span>
             )}
           </div>
-          <ResultPanel status={status} result={result} accentColor={TOOL_COLOR} onDownload={() => toast.success("Download started!")} />
+          <ResultPanel status={status} result={result} accentColor={TOOL_COLOR} onDownload={() => {
+            if (!result) return;
+            const a = document.createElement("a");
+            a.href = result;
+            a.download = `opusgen-no-bg-${Date.now()}.png`;
+            a.click();
+            toast.success("Downloading…");
+          }} />
 
           {status === "completed" && (
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-4 grid grid-cols-2 gap-2.5">
               {[
                 { icon: Scissors, label: "Edge precision", sub: "Sub-pixel accuracy" },
-                { icon: Layers, label: "Hair & fur", sub: "Preserved fine detail" },
+                { icon: Layers,   label: "Hair & fur",     sub: "Preserved fine detail" },
               ].map(({ icon: Icon, label, sub }) => (
                 <div key={label} className="p-3 rounded-xl text-center"
                   style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
@@ -148,8 +202,8 @@ export default function RemoveBgPage() {
         </div>
         <ul className="space-y-1">
           {[
+            "First use downloads the AI model from CDN (~30 MB) — subsequent runs are instant.",
             "Use well-lit images with clear subject/background contrast.",
-            "Higher resolution inputs produce sharper edges.",
             "Works best with product photos on plain or simple backgrounds.",
           ].map((tip) => (
             <li key={tip} className="text-xs flex gap-2" style={{ color: W.muted }}>

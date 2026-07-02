@@ -433,6 +433,15 @@ export default function AccountPage() {
                       <p className="text-xs font-semibold" style={{ color: W.text }}>Password</p>
                       <p className="text-[10px]" style={{ color: W.dim }}>Update your account password</p>
                     </div>
+                    <button
+                      className="h-7 px-3 rounded-lg text-xs font-medium transition-all shrink-0"
+                      style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = W.text}
+                      onMouseLeave={(e) => e.currentTarget.style.color = W.muted}
+                      onClick={() => toast.info("Password reset — connect auth to enable.")}
+                    >
+                      Reset
+                    </button>
                   </div>
                   <form onSubmit={handlePasswordChange} className="flex flex-col gap-3">
                     <div>

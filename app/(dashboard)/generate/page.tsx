@@ -8,8 +8,10 @@ import {
   Check, ChevronDown, Download, ExternalLink,
   ImagePlus, RefreshCw, ScanText,
   Sparkles, Wand2, X, Zap, Layers,
+  Globe, ShoppingBag, Megaphone, LayoutTemplate, Heart,
 } from "lucide-react";
 import { TEMPLATES } from "@/lib/templates-data";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 /* ─── Static data ──────────────────────────────────────────────────── */
@@ -48,6 +50,34 @@ const ALL_PROMPTS = [
   "Silk scarf draped over crystal vase with warm golden hour window light",
 ] as const;
 
+const USE_CASES = [
+  {
+    label: "Website / Product Page",
+    icon: Globe,
+    prompt: "clean white seamless studio background, soft even lighting, minimal shadow, sharp focus, professional e-commerce product photography, centered composition",
+  },
+  {
+    label: "Marketplace Listing",
+    icon: ShoppingBag,
+    prompt: "pure white background, bright even studio lighting, no shadows, sharp focus, standard e-commerce marketplace listing style",
+  },
+  {
+    label: "Social Media Post",
+    icon: Heart,
+    prompt: "warm flat surface with soft natural light, blurred simple backdrop, shallow depth of field, trendy minimal social-media aesthetic, inviting mood, no busy interior scene",
+  },
+  {
+    label: "Poster / Ad Banner",
+    icon: LayoutTemplate,
+    prompt: "bold dramatic background with strong negative space for text overlay, high contrast studio lighting, cinematic advertising style",
+  },
+  {
+    label: "Marketing Campaign",
+    icon: Megaphone,
+    prompt: "editorial advertising background, moody cinematic lighting, premium brand campaign aesthetic, shallow depth of field",
+  },
+] as const;
+
 const QUICK_EXAMPLES = [
   { label: "Skincare",  prompt: "Premium skincare serum on white marble with soft natural light and dried flowers" },
   { label: "Sneakers",  prompt: "Minimalist white sneakers floating on a clean studio background with shadow" },
@@ -74,6 +104,92 @@ const W = {
   card:      "#110404",
 };
 
+/* ─── Product-preserving composite ────────────────────────────────────
+ * The AI never redraws the uploaded product — it only generates the
+ * surrounding scene. The real product (background removed) is drawn on
+ * top afterward via canvas, so its pixels are never touched by the model.
+ */
+function loadImageEl(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// Background-removal output is a full-size canvas with lots of transparent
+// padding around the subject. Without trimming that first, "ground contact"
+// placement is measured against the padded box instead of the real product
+// silhouette, which is why composites can look like they're floating.
+function trimTransparentEdges(img: HTMLImageElement): HTMLCanvasElement {
+  const full = document.createElement("canvas");
+  full.width = img.width;
+  full.height = img.height;
+  const fullCtx = full.getContext("2d")!;
+  fullCtx.drawImage(img, 0, 0);
+
+  const { data } = fullCtx.getImageData(0, 0, full.width, full.height);
+  const ALPHA_THRESHOLD = 10;
+  let minX = full.width, minY = full.height, maxX = 0, maxY = 0;
+  for (let y = 0; y < full.height; y++) {
+    for (let x = 0; x < full.width; x++) {
+      if (data[(y * full.width + x) * 4 + 3] > ALPHA_THRESHOLD) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX <= minX || maxY <= minY) return full; // fully transparent — shouldn't happen, fallback
+
+  const w = maxX - minX + 1;
+  const h = maxY - minY + 1;
+  const trimmed = document.createElement("canvas");
+  trimmed.width = w;
+  trimmed.height = h;
+  trimmed.getContext("2d")!.drawImage(full, minX, minY, w, h, 0, 0, w, h);
+  return trimmed;
+}
+
+async function compositeProductOntoBackground(productCutout: Blob, backgroundDataUrl: string): Promise<string> {
+  const [bgImg, productImgRaw] = await Promise.all([
+    loadImageEl(backgroundDataUrl),
+    loadImageEl(URL.createObjectURL(productCutout)),
+  ]);
+  const product = trimTransparentEdges(productImgRaw);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = bgImg.width;
+  canvas.height = bgImg.height;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+
+  // Ground the product's true (trimmed) base on a fixed baseline — standard
+  // product-photography composition, consistent regardless of how much
+  // padding the removal step left around the subject.
+  const groundY = canvas.height * 0.86;
+  const targetH = canvas.height * 0.56;
+  const scale = targetH / product.height;
+  const targetW = product.width * scale;
+  const x = (canvas.width - targetW) / 2;
+  const y = groundY - targetH;
+
+  // Contact shadow anchored exactly at the ground line
+  ctx.save();
+  ctx.filter = "blur(10px)";
+  ctx.fillStyle = "rgba(0,0,0,0.30)";
+  ctx.beginPath();
+  ctx.ellipse(x + targetW / 2, groundY + 2, targetW * 0.38, targetW * 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.drawImage(product, x, y, targetW, targetH);
+
+  return canvas.toDataURL("image/png");
+}
+
 /* ─── Page ──────────────────────────────────────────────────────────── */
 export default function GeneratePage() {
   const [prompt, setPrompt] = useState("");
@@ -86,6 +202,7 @@ export default function GeneratePage() {
   const [genStatus, setGenStatus] = useState<"idle" | "processing" | "done">("idle");
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
+  const [refFile, setRefFile] = useState<File | null>(null);
   const [fullViewSrc, setFullViewSrc] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -103,6 +220,89 @@ export default function GeneratePage() {
     setShowTemplatePicker(false);
   }
 
+  async function generateWithProduct(productFile: File) {
+    toast.info("Keeping your product untouched — generating background…", { id: "gen-progress", duration: 30000 });
+
+    const [{ removeBackground }, bgRes] = await Promise.all([
+      import("@imgly/background-removal"),
+      fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          ratio: selectedSize.ratio,
+          templateId: selectedTemplate,
+          mode: "background",
+        }),
+      }),
+    ]);
+
+    if (!bgRes.ok) {
+      const err = await bgRes.json().catch(() => ({}));
+      throw new Error(err.error || "Generation failed. Try again.");
+    }
+
+    const { image: backgroundImage, credits, generationId } = await bgRes.json();
+
+    const productCutout = await removeBackground(productFile, {
+      publicPath: "https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/",
+      model: "medium",
+    });
+
+    const finalImage = await compositeProductOntoBackground(productCutout, backgroundImage);
+    toast.dismiss("gen-progress");
+
+    if (typeof credits === "number") {
+      window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
+    }
+
+    // Server only stored the raw background — overwrite with the final composited
+    // image so history shows the real result. Best-effort: never breaks the UI.
+    if (generationId) {
+      try {
+        const supabase = createClient();
+        await supabase
+          .from("generations")
+          .update({
+            metadata: {
+              images: [finalImage],
+              aspectRatio: selectedSize.ratio,
+              templateId: selectedTemplate ?? undefined,
+              productPreserved: true,
+            },
+          })
+          .eq("id", generationId);
+      } catch (err) {
+        console.error("Failed to save final composited image:", err);
+      }
+    }
+
+    return finalImage;
+  }
+
+  async function generateFromPromptOnly() {
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: prompt.trim(),
+        ratio: selectedSize.ratio,
+        templateId: selectedTemplate,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || "Generation failed. Try again.");
+    }
+
+    const { image, credits } = await res.json();
+    if (typeof credits === "number") {
+      window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
+    }
+    return image as string;
+  }
+
   async function handleGenerate() {
     if (genStatus === "processing") return;
     if (!prompt.trim()) { toast.error("Type a prompt first."); return; }
@@ -111,34 +311,13 @@ export default function GeneratePage() {
     setGeneratedImage(null);
 
     try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: prompt.trim(),
-          ratio: selectedSize.ratio,
-          templateId: selectedTemplate,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Generation failed. Try again.");
-        setGenStatus("idle");
-        return;
-      }
-
-      const { image, credits } = await res.json();
-      setGeneratedImage(image);
+      const finalImage = refFile ? await generateWithProduct(refFile) : await generateFromPromptOnly();
+      setGeneratedImage(finalImage);
       setGenStatus("done");
       toast.success("Image generated!");
-
-      // Server already persisted + charged; broadcast fresh balance to the sidebar
-      if (typeof credits === "number") {
-        window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
-      }
-    } catch {
-      toast.error("Network error. Check your connection.");
+    } catch (err) {
+      toast.dismiss("gen-progress");
+      toast.error(err instanceof Error ? err.message : "Network error. Check your connection.");
       setGenStatus("idle");
     }
   }
@@ -150,6 +329,17 @@ export default function GeneratePage() {
     setPrompt(tpl.prompt);
     setShowTemplatePicker(false);
     toast.success(`Template applied: ${tpl.name}`);
+  }
+
+  // Appends professional scene language to whatever the user already typed —
+  // works whether that's a full product description (text-only mode) or just
+  // a partial scene idea (product-photo mode, where only the scene matters).
+  function applyUseCase(scenePrompt: string, label: string) {
+    setPrompt((prev) => {
+      const trimmed = prev.trim();
+      return trimmed ? `${trimmed}, ${scenePrompt}` : scenePrompt.charAt(0).toUpperCase() + scenePrompt.slice(1);
+    });
+    toast.success(`${label} style added`);
   }
 
   const imagesReady = genStatus === "done" && !!generatedImage;
@@ -172,7 +362,7 @@ export default function GeneratePage() {
           </div>
           <div>
             <h1 className="text-sm font-semibold leading-none" style={{ color: W.text }}>Generate Images</h1>
-            <p className="text-[11px] mt-0.5" style={{ color: W.muted }}>AI product photography · 1 credit per image</p>
+            <p className="text-[11px] mt-0.5" style={{ color: W.muted }}>AI product photography · 1 credit per image · Upload your product to keep it pixel-perfect</p>
           </div>
         </div>
 
@@ -225,9 +415,9 @@ export default function GeneratePage() {
               {refImage && (
                 <div className="flex items-center gap-2 px-4 pt-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={refImage} alt="ref" className="w-8 h-8 rounded-lg object-cover shrink-0" style={{ border: `1px solid ${W.border}` }} />
-                  <span className="text-[11px]" style={{ color: W.muted }}>Reference image</span>
-                  <button onClick={() => setRefImage(null)} className="ml-auto shrink-0" style={{ color: W.dim }}>
+                  <img src={refImage} alt="Product" className="w-8 h-8 rounded-lg object-cover shrink-0" style={{ border: `1px solid ${W.border}` }} />
+                  <span className="text-[11px]" style={{ color: W.muted }}>Product photo — kept exactly as-is. Use a photo with only this one item in frame.</span>
+                  <button onClick={() => { setRefImage(null); setRefFile(null); }} className="ml-auto shrink-0" style={{ color: W.dim }}>
                     <X className="w-3 h-3" />
                   </button>
                 </div>
@@ -239,7 +429,9 @@ export default function GeneratePage() {
                 onFocus={() => setPromptFocused(true)}
                 onBlur={() => setPromptFocused(false)}
                 rows={4}
-                placeholder="Describe your product scene — e.g. luxury perfume bottle on black marble with cinematic side lighting, editorial style…"
+                placeholder={refFile
+                  ? "Describe the background scene only — e.g. white marble surface with soft morning light…"
+                  : "Describe your product scene — e.g. luxury perfume bottle on black marble with cinematic side lighting, editorial style…"}
                 className="w-full bg-transparent resize-none outline-none px-4 pt-4 pb-2 text-sm leading-relaxed placeholder:opacity-35"
                 style={{ color: W.text }}
                 maxLength={500}
@@ -376,14 +568,14 @@ export default function GeneratePage() {
             </AnimatePresence>
           </div>
 
-          {/* Upload ref image */}
+          {/* Upload product photo — kept pixel-perfect, only the background is generated */}
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
             const f = e.target.files?.[0];
-            if (f) setRefImage(URL.createObjectURL(f));
+            if (f) { setRefFile(f); setRefImage(URL.createObjectURL(f)); }
           }} />
           <button
             onClick={() => fileRef.current?.click()}
-            title="Add reference image"
+            title="Add a photo with only your single product in frame (kept exactly as-is — only the background is AI-generated)"
             className="h-8 w-8 rounded-lg flex items-center justify-center transition-all shrink-0"
             style={{ border: `1px solid ${W.border}`, background: W.glass, color: refImage ? W.red : W.muted }}
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.redBorder; e.currentTarget.style.color = W.red; }}
@@ -482,6 +674,24 @@ export default function GeneratePage() {
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.redBorder; e.currentTarget.style.background = W.redBg; e.currentTarget.style.color = W.red; }}
               onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.border; e.currentTarget.style.background = W.glassDim; e.currentTarget.style.color = W.muted; }}
             >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Use case — professional scene language for users unsure what to write ── */}
+        <div className="flex flex-wrap items-center gap-1.5 -mt-2">
+          <span className="text-[10px] font-bold uppercase tracking-widest mr-1" style={{ color: W.dim }}>Use case</span>
+          {USE_CASES.map(({ label, icon: Icon, prompt: p }) => (
+            <button
+              key={label}
+              onClick={() => applyUseCase(p, label)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
+              style={{ border: `1px solid ${W.border}`, background: W.glassDim, color: W.muted }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.redBorder; e.currentTarget.style.background = W.redBg; e.currentTarget.style.color = W.red; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.border; e.currentTarget.style.background = W.glassDim; e.currentTarget.style.color = W.muted; }}
+            >
+              <Icon className="w-3 h-3 shrink-0" />
               {label}
             </button>
           ))}

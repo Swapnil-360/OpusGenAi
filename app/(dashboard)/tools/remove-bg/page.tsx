@@ -59,10 +59,10 @@ export default function RemoveBgPage() {
       // Dynamic import keeps WASM out of SSR bundle
       // publicPath must point to CDN so WASM files match the JS wrapper version
       const { removeBackground } = await import("@imgly/background-removal");
-      toast.info("AI model loading… (first run ~30s)", { duration: 30000, id: "bg-load" });
+      toast.info("AI model loading… (first run ~45s)", { duration: 45000, id: "bg-load" });
       const blob = await removeBackground(inputFile, {
         publicPath: "https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/",
-        model: "small",
+        model: "medium",
       });
       toast.dismiss("bg-load");
 
@@ -202,9 +202,10 @@ export default function RemoveBgPage() {
         </div>
         <ul className="space-y-1">
           {[
-            "First use downloads the AI model from CDN (~30 MB) — subsequent runs are instant.",
+            "First use downloads the AI model from CDN (~84 MB) — subsequent runs are instant.",
             "Use well-lit images with clear subject/background contrast.",
-            "Works best with product photos on plain or simple backgrounds.",
+            "Upload a photo with only your single product in frame — the tool keeps everything in the foreground, so other items or bottles in the shot will be kept too.",
+            "Glass and transparent products (perfume, glassware) can show slight edge haze — plain or matte products give the cleanest cutouts.",
           ].map((tip) => (
             <li key={tip} className="text-xs flex gap-2" style={{ color: W.muted }}>
               <span style={{ color: TOOL_COLOR }} className="shrink-0">·</span>{tip}

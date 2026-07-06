@@ -356,7 +356,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     async function loadUser() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { router.push("/login"); return; }
 
       // Pull display name: prefer profile full_name, then Google metadata, then email prefix
       const meta = user.user_metadata ?? {};

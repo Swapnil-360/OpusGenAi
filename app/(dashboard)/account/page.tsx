@@ -95,7 +95,7 @@ export default function AccountPage() {
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { router.push("/login"); return; }
       setAuthUser({ email: user.email ?? "", id: user.id });
 
       const { data: profile } = await supabase

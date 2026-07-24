@@ -42,6 +42,14 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Redirects build a fresh NextResponse, which would otherwise drop any
+  // refreshed session cookies that getUser() just wrote onto supabaseResponse.
+  function redirect(url: URL) {
+    const res = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((cookie) => res.cookies.set(cookie));
+    return res;
+  }
+
   const { pathname } = request.nextUrl;
 
   const isProtected = PROTECTED_PATHS.some((p) => pathname.startsWith(p));
@@ -62,7 +70,7 @@ export async function middleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = user ? "/generate" : "/login";
       if (!user) url.searchParams.set("redirectTo", pathname);
-      return NextResponse.redirect(url);
+      return redirect(url);
     }
     return supabaseResponse;
   }
@@ -71,14 +79,14 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectTo", pathname);
-    return NextResponse.redirect(url);
+    return redirect(url);
   }
 
   if (isAuthPage && user) {
     const url = request.nextUrl.clone();
     url.pathname = "/generate";
     url.searchParams.delete("redirectTo");
-    return NextResponse.redirect(url);
+    return redirect(url);
   }
 
   return supabaseResponse;

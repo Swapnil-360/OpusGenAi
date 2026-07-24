@@ -16,7 +16,12 @@ export async function POST(req: NextRequest) {
 <|user|>Write 2 different ${platform} captions for a product photo described as: "${prompt}"
 
 Tone: ${tone}
-Requirements: platform-native style, include relevant emojis, add hashtags, separate the 2 captions with exactly "---" on its own line. Return ONLY the captions.</s>
+Requirements: platform-native style, include relevant emojis where fitting, no hashtags inside the captions.
+
+Return in EXACTLY this format, nothing else:
+CAPTION 1: <first caption>
+CAPTION 2: <second caption>
+HASHTAGS: <8-15 relevant hashtags, space-separated, each starting with #></s>
 <|assistant|>`;
 
     const res = await fetch(`${HF_BASE}/${MODEL}`, {
@@ -46,13 +51,18 @@ Requirements: platform-native style, include relevant emojis, add hashtags, sepa
     const data = await res.json();
     const text: string = Array.isArray(data) ? data[0]?.generated_text ?? "" : data?.generated_text ?? "";
 
-    const captions = text
-      .split("---")
-      .map((c: string) => c.trim())
-      .filter(Boolean)
-      .slice(0, 2);
+    const captionMatches = [...text.matchAll(/CAPTION \d+:\s*([\s\S]*?)(?=\nCAPTION \d+:|\nHASHTAGS:|$)/g)]
+      .map((m) => m[1].trim())
+      .filter(Boolean);
 
-    return NextResponse.json({ captions: captions.length ? captions : [text.trim()] });
+    const hashtagsMatch = text.match(/HASHTAGS:\s*([\s\S]*)$/);
+    const hashtags = hashtagsMatch
+      ? hashtagsMatch[1].match(/#\w+/g) ?? []
+      : [];
+
+    const captions = captionMatches.length ? captionMatches : [text.trim()];
+
+    return NextResponse.json({ captions, hashtags });
   } catch (e) {
     console.error("Caption route error:", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

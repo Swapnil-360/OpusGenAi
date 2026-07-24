@@ -6,7 +6,6 @@ import {
   Check, Copy, Download, Hash, ImagePlus, MessageSquareText,
   RefreshCw, Sparkles, X,
 } from "lucide-react";
-import { CAPTION_BANK, HASHTAG_SETS } from "@/lib/caption-bank";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
@@ -115,7 +114,7 @@ export default function StudioPage() {
   // Whether current settings differ from what was last generated
   const isDirty = genStatus === "done" && (platform !== usedPlatform || tone !== usedTone);
 
-  function generate() {
+  async function generate() {
     if (genStatus === "generating") return;
     if (!activeImageSrc) { toast.error("Upload an image first."); return; }
     const name = productName.trim()
@@ -124,13 +123,30 @@ export default function StudioPage() {
     setGenStatus("generating");
     setUsedPlatform(platform);
     setUsedTone(tone);
-    setTimeout(() => {
-      setCaptions(CAPTION_BANK[platform][tone](name));
-      const tags = HASHTAG_SETS[platform];
-      setHashtags(tags.sort(() => Math.random() - 0.5).slice(0, platform === "instagram" ? 11 : 5));
+
+    try {
+      const res = await fetch("/api/caption", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: name, platform, tone: activeTone.label }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Caption generation failed. Try again.");
+        setGenStatus("idle");
+        return;
+      }
+
+      const { captions: newCaptions, hashtags: newHashtags } = await res.json();
+      setCaptions(newCaptions ?? []);
+      setHashtags(newHashtags ?? []);
       setGenStatus("done");
       toast.success("Captions generated!");
-    }, 1200);
+    } catch {
+      toast.error("Network error. Check your connection.");
+      setGenStatus("idle");
+    }
   }
 
   function copyCaption(text: string, idx: number) {

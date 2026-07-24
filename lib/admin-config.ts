@@ -34,4 +34,3 @@ export const DEFAULT_WELCOME: WelcomeConfig = {
 
 export const BANNER_KEY = "opusgenai_banner";
 export const WELCOME_KEY = "opusgenai_welcome";
-export const ADMIN_SESSION_KEY = "opusgenai_admin_session";

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Replace, Sparkles, Wand2 } from "lucide-react";
 import { ToolPageShell, UploadZone, ResultPanel } from "@/components/tools/ToolPageShell";
+import { compositeProductOntoBackground } from "@/lib/image-composite";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
 const TOOL_COLOR = "#10b981";
@@ -32,20 +34,81 @@ const PRESET_SCENES = [
 
 export default function ReplaceBgPage() {
   const [input, setInput] = useState<string | null>(null);
+  const [inputFile, setInputFile] = useState<File | null>(null);
   const [bgPrompt, setBgPrompt] = useState("");
   const [status, setStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
   const [result, setResult] = useState<string | null>(null);
 
-  function process() {
+  async function process() {
     if (status === "processing") return;
-    if (!input) { toast.error("Upload an image first."); return; }
+    if (!inputFile) { toast.error("Upload an image first."); return; }
     if (!bgPrompt.trim()) { toast.error("Describe the new background."); return; }
     setStatus("processing");
-    setTimeout(() => {
-      setResult("https://picsum.photos/seed/fashion1/512/512");
+
+    try {
+      toast.info("Keeping your product untouched — generating background…", { id: "replace-bg-progress", duration: 30000 });
+
+      const [{ removeBackground }, bgRes] = await Promise.all([
+        import("@imgly/background-removal"),
+        fetch("/api/replace-bg", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: bgPrompt.trim(), ratio: "1:1" }),
+        }),
+      ]);
+
+      if (!bgRes.ok) {
+        const err = await bgRes.json().catch(() => ({}));
+        toast.dismiss("replace-bg-progress");
+        toast.error(err.error || "Background generation failed. Try again.");
+        setStatus("failed");
+        return;
+      }
+
+      const { image: backgroundImage, credits, generationId } = await bgRes.json();
+
+      const productCutout = await removeBackground(inputFile, {
+        publicPath: "https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/",
+        model: "medium",
+      });
+
+      const finalImage = await compositeProductOntoBackground(productCutout, backgroundImage);
+      toast.dismiss("replace-bg-progress");
+
+      setResult(finalImage);
       setStatus("completed");
       toast.success("Background replaced!");
-    }, 2600);
+
+      if (typeof credits === "number") {
+        window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
+      }
+
+      if (generationId) {
+        try {
+          const supabase = createClient();
+          await supabase
+            .from("generations")
+            .update({ metadata: { images: [finalImage], aspectRatio: "1:1", productPreserved: true } })
+            .eq("id", generationId);
+        } catch (err) {
+          console.error("Failed to save final composited image:", err);
+        }
+      }
+    } catch (err) {
+      console.error("Replace-bg error:", err);
+      toast.dismiss("replace-bg-progress");
+      toast.error("Network error. Check your connection.");
+      setStatus("failed");
+    }
+  }
+
+  async function handleDownload() {
+    if (!result) return;
+    const a = document.createElement("a");
+    a.href = result;
+    a.download = `opusgen-replace-bg-${Date.now()}.png`;
+    a.click();
+    toast.success("Downloading…");
   }
 
   return (
@@ -56,8 +119,8 @@ export default function ReplaceBgPage() {
           <UploadZone
             label="Drop your product photo here"
             preview={input}
-            onUpload={(_, preview) => { setInput(preview); setStatus("idle"); setResult(null); }}
-            onRemove={() => { setInput(null); setStatus("idle"); setResult(null); }}
+            onUpload={(file, preview) => { setInputFile(file); setInput(preview); setStatus("idle"); setResult(null); }}
+            onRemove={() => { setInputFile(null); setInput(null); setStatus("idle"); setResult(null); }}
             accentColor={TOOL_COLOR}
           />
 
@@ -129,7 +192,7 @@ export default function ReplaceBgPage() {
 
         <div>
           <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: W.dim }}>Result</p>
-          <ResultPanel status={status} result={result} accentColor={TOOL_COLOR} onDownload={() => toast.success("Download started!")} />
+          <ResultPanel status={status} result={result} accentColor={TOOL_COLOR} onDownload={handleDownload} />
         </div>
       </div>
 

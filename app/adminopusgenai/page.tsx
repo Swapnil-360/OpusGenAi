@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   BarChart3,
   Bell,
@@ -17,26 +18,35 @@ import {
   Zap,
   Archive,
   Eye,
-  AlertTriangle,
   Megaphone,
   Sparkles,
   Wrench,
   Clock,
   Pencil,
   RefreshCw,
+  Wallet,
 } from "lucide-react";
 import {
-  ADMIN_EMAILS,
   BANNER_KEY,
   WELCOME_KEY,
-  ADMIN_SESSION_KEY,
   DEFAULT_BANNER,
   DEFAULT_WELCOME,
   type BannerConfig,
   type BannerMode,
   type WelcomeConfig,
 } from "@/lib/admin-config";
-import { MOCK_FEEDBACK, type MockFeedback } from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/client";
+
+type Feedback = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  rating: number;
+  category: "bug" | "feature" | "compliment" | "general";
+  message: string;
+  status: "new" | "read" | "archived";
+  created_at: string;
+};
 
 // ─── theme tokens ────────────────────────────────────────────────────────────
 const T = {
@@ -58,28 +68,26 @@ const T = {
   blueBg: "rgba(96,165,250,0.08)",
 };
 
-// ─── mock data ────────────────────────────────────────────────────────────────
-const MOCK_USERS = [
-  { id: "u1", name: "Sarah Chen", email: "sarah@skinglow.co", plan: "Pro", joined: "2026-01-14", generations: 284, status: "active" },
-  { id: "u2", name: "Marcus Reed", email: "marcus@studiomr.io", plan: "Basic", joined: "2026-02-03", generations: 97, status: "active" },
-  { id: "u3", name: "Priya Nair", email: "priya@nairbeauty.com", plan: "Free", joined: "2026-03-11", generations: 12, status: "active" },
-  { id: "u4", name: "Jordan Lee", email: "jlee@capsule.studio", plan: "Pro", joined: "2025-12-22", generations: 531, status: "active" },
-  { id: "u5", name: "Aisha Okafor", email: "aisha@lumaphotos.ng", plan: "Basic", joined: "2026-04-01", generations: 43, status: "active" },
-  { id: "u6", name: "Tom Varga", email: "tom@vargacraft.eu", plan: "Free", joined: "2026-05-18", generations: 6, status: "inactive" },
-  { id: "u7", name: "Nina Sousa", email: "nina@ninacreates.pt", plan: "Pro", joined: "2026-01-30", generations: 402, status: "active" },
-  { id: "u8", name: "Kevin Park", email: "kpark@productlab.kr", plan: "Basic", joined: "2026-03-27", generations: 58, status: "active" },
-];
+// ─── real data types ────────────────────────────────────────────────────────
+type AdminUser = {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  credits: number;
+  generations: number;
+  joined: string;
+  lastSignInAt: string | null;
+};
 
-const STATS = {
-  totalUsers: 2847,
-  subscribed: 412,
-  free: 2435,
-  generationsToday: 1203,
-  totalGenerations: 48291,
-  apiHealthPct: 98.7,
-  monthlyRevenue: 5846,
-  avgRating: +(MOCK_FEEDBACK.reduce((a, f) => a + f.rating, 0) / MOCK_FEEDBACK.length).toFixed(1),
-  newFeedback: MOCK_FEEDBACK.filter((f) => f.status === "new").length,
+type AdminStats = {
+  totalUsers: number;
+  totalGenerations: number;
+  generationsToday: number;
+  totalCreditsRemaining: number;
+  totalCreditsSpent: number;
+  falBalance: number | null;
+  falCurrency: string;
 };
 
 // ─── small helpers ────────────────────────────────────────────────────────────
@@ -121,52 +129,53 @@ const BANNER_MODES: { mode: BannerMode; label: string; icon: React.ElementType; 
 ];
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
+// Access control lives in middleware.ts — it checks the verified Supabase
+// session email against the server-only ADMIN_EMAILS allowlist before this
+// page ever renders. This component just displays the signed-in admin.
 export default function AdminPage() {
-  const [authState, setAuthState] = useState<"idle" | "google-picker" | "checking" | "authenticated" | "denied">("idle");
+  const router = useRouter();
   const [adminEmail, setAdminEmail] = useState("");
-  const [mockEmailInput, setMockEmailInput] = useState("");
   const [activeTab, setActiveTab] = useState<"overview" | "messages" | "feedback" | "users">("overview");
   const [banner, setBanner] = useState<BannerConfig>(DEFAULT_BANNER);
   const [welcome, setWelcome] = useState<WelcomeConfig>(DEFAULT_WELCOME);
-  const [feedbackList, setFeedbackList] = useState<MockFeedback[]>(MOCK_FEEDBACK);
+  const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(true);
   const [fbFilter, setFbFilter] = useState<string>("all");
   const [bannerSaved, setBannerSaved] = useState(false);
   const [welcomeSaved, setWelcomeSaved] = useState(false);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [stats, setStats] = useState<AdminStats | null>(null);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState(false);
 
-  // ── restore session on mount ────────────────────────────────────────────────
   useEffect(() => {
-    const session = localStorage.getItem(ADMIN_SESSION_KEY);
-    if (session) {
-      setAdminEmail(session);
-      setAuthState("authenticated");
-    }
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setAdminEmail(user?.email ?? "");
+    });
     const savedBanner = localStorage.getItem(BANNER_KEY);
     if (savedBanner) setBanner(JSON.parse(savedBanner));
     const savedWelcome = localStorage.getItem(WELCOME_KEY);
     if (savedWelcome) setWelcome(JSON.parse(savedWelcome));
+
+    fetch("/api/admin/overview")
+      .then((res) => { if (!res.ok) throw new Error("Failed"); return res.json(); })
+      .then((data) => { setUsers(data.users); setStats(data.stats); })
+      .catch(() => setDataError(true))
+      .finally(() => setDataLoading(false));
+
+    fetch("/api/admin/feedback")
+      .then((res) => { if (!res.ok) throw new Error("Failed"); return res.json(); })
+      .then((data) => setFeedbackList(data.feedback))
+      .catch(() => {})
+      .finally(() => setFeedbackLoading(false));
   }, []);
 
-  // ── Google mock sign-in ──────────────────────────────────────────────────────
-  function handleGoogleContinue() {
-    if (!mockEmailInput.trim()) return;
-    setAuthState("checking");
-    setTimeout(() => {
-      const email = mockEmailInput.trim().toLowerCase();
-      if ((ADMIN_EMAILS as readonly string[]).includes(email)) {
-        localStorage.setItem(ADMIN_SESSION_KEY, email);
-        setAdminEmail(email);
-        setAuthState("authenticated");
-      } else {
-        setAuthState("denied");
-      }
-    }, 1200);
-  }
-
-  function handleSignOut() {
-    localStorage.removeItem(ADMIN_SESSION_KEY);
-    setAuthState("idle");
-    setAdminEmail("");
-    setMockEmailInput("");
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
   }
 
   // ── banner save ──────────────────────────────────────────────────────────────
@@ -183,11 +192,21 @@ export default function AdminPage() {
   }, [welcome]);
 
   // ── feedback actions ─────────────────────────────────────────────────────────
+  async function updateFeedbackStatus(id: string, status: "read" | "archived") {
+    const prev = feedbackList;
+    setFeedbackList((cur) => cur.map((f) => (f.id === id ? { ...f, status } : f)));
+    const res = await fetch("/api/admin/feedback", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status }),
+    });
+    if (!res.ok) setFeedbackList(prev); // revert on failure
+  }
   function markRead(id: string) {
-    setFeedbackList((prev) => prev.map((f) => f.id === id ? { ...f, status: "read" as const } : f));
+    updateFeedbackStatus(id, "read");
   }
   function archiveFeedback(id: string) {
-    setFeedbackList((prev) => prev.map((f) => f.id === id ? { ...f, status: "archived" as const } : f));
+    updateFeedbackStatus(id, "archived");
   }
 
   const filteredFeedback = feedbackList.filter((f) => {
@@ -196,127 +215,11 @@ export default function AdminPage() {
     return f.category === fbFilter || f.status === fbFilter;
   });
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // RENDER: LOGIN
-  // ─────────────────────────────────────────────────────────────────────────────
-  if (authState !== "authenticated") {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4"
-        style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(120,0,0,0.18) 0%, #080101 55%)" }}>
-
-        {/* Login card */}
-        <AnimatePresence mode="wait">
-          {(authState === "idle" || authState === "denied") && (
-            <motion.div key="login"
-              initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.4 }}
-              className="w-full max-w-sm">
-
-              {/* Icon */}
-              <div className="flex justify-center mb-6">
-                <div className="relative">
-                  <div className="absolute inset-0 rounded-full" style={{ background: "rgba(220,38,38,0.2)", filter: "blur(20px)", transform: "scale(2)" }} />
-                  <div className="relative w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: T.redBg, border: `1px solid ${T.redBorder}` }}>
-                    <Shield className="w-8 h-8" style={{ color: T.red }} />
-                  </div>
-                </div>
-              </div>
-
-              <h1 className="text-2xl font-black text-center mb-1" style={{ color: T.text }}>Admin Access</h1>
-              <p className="text-sm text-center mb-2" style={{ color: T.muted }}>OpusGen AI Control Panel</p>
-              <p className="text-xs text-center mb-8" style={{ color: T.dim }}>Authorized personnel only</p>
-
-              {/* Access denied message */}
-              {authState === "denied" && (
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                  className="mb-5 p-4 rounded-xl flex items-start gap-3"
-                  style={{ background: "rgba(220,38,38,0.1)", border: `1px solid rgba(220,38,38,0.25)` }}>
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" style={{ color: T.red }} />
-                  <div>
-                    <p className="text-sm font-bold" style={{ color: T.red }}>Access denied</p>
-                    <p className="text-xs mt-0.5" style={{ color: T.muted }}>This email is not authorized. Use an admin account.</p>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Google button */}
-              <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
-                onClick={() => setAuthState("google-picker")}
-                className="w-full flex items-center justify-center gap-3 h-12 rounded-2xl font-semibold text-sm transition-all"
-                style={{ background: "rgba(255,255,255,0.06)", border: `1px solid rgba(255,255,255,0.12)`, color: T.text }}>
-                <GoogleLogo />
-                Continue with Google
-              </motion.button>
-
-              <p className="text-[11px] text-center mt-6" style={{ color: T.dim }}>
-                This page is not publicly accessible.<br />Do not share this URL.
-              </p>
-            </motion.div>
-          )}
-
-          {/* Google picker modal */}
-          {authState === "google-picker" && (
-            <motion.div key="picker"
-              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.25 }}
-              className="w-full max-w-sm rounded-3xl overflow-hidden"
-              style={{ background: "#1a1a1a", border: `1px solid rgba(255,255,255,0.1)` }}>
-
-              {/* Google header */}
-              <div className="p-7 pb-5">
-                <div className="flex justify-center mb-5">
-                  <GoogleLogo size={32} />
-                </div>
-                <h2 className="text-xl font-bold text-center mb-1" style={{ color: T.text }}>Sign in with Google</h2>
-                <p className="text-xs text-center" style={{ color: T.muted }}>to continue to <strong style={{ color: T.text }}>OpusGen AI Admin</strong></p>
-              </div>
-
-              <div className="px-7 pb-7 space-y-4">
-                <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Email or phone</label>
-                  <input
-                    type="email" autoFocus
-                    value={mockEmailInput}
-                    onChange={(e) => setMockEmailInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleGoogleContinue()}
-                    placeholder="Enter your Google email"
-                    className="w-full h-11 rounded-xl px-4 text-sm outline-none"
-                    style={{ background: "rgba(255,255,255,0.06)", border: `1px solid rgba(255,255,255,0.12)`, color: T.text }}
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <button onClick={() => { setAuthState("idle"); setMockEmailInput(""); }}
-                    className="text-sm font-semibold transition-opacity hover:opacity-70"
-                    style={{ color: "#60a5fa" }}>
-                    Cancel
-                  </button>
-                  <motion.button whileTap={{ scale: 0.96 }}
-                    onClick={handleGoogleContinue}
-                    disabled={!mockEmailInput.trim()}
-                    className="h-9 px-6 rounded-full text-sm font-bold text-white transition-opacity"
-                    style={{ background: "#1a73e8", opacity: mockEmailInput.trim() ? 1 : 0.4 }}>
-                    Next
-                  </motion.button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Checking state */}
-          {authState === "checking" && (
-            <motion.div key="checking"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-              className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-2 rounded-full animate-spin"
-                style={{ borderColor: "rgba(220,38,38,0.2)", borderTopColor: T.redPrimary }} />
-              <p className="text-sm" style={{ color: T.muted }}>Verifying access…</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  }
+  // Feedback is still sample data — the feedback form doesn't persist anywhere yet.
+  const newFeedbackCount = feedbackList.filter((f) => f.status === "new").length;
+  const avgRating = feedbackList.length
+    ? +(feedbackList.reduce((a, f) => a + f.rating, 0) / feedbackList.length).toFixed(1)
+    : 0;
 
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER: DASHBOARD
@@ -377,10 +280,10 @@ export default function AdminPage() {
                   color: active ? "white" : T.muted,
                 }}>
                 <Icon className="w-3.5 h-3.5 shrink-0" />{label}
-                {id === "feedback" && STATS.newFeedback > 0 && (
+                {id === "feedback" && newFeedbackCount > 0 && (
                   <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center"
                     style={{ background: active ? "rgba(255,255,255,0.25)" : T.redBg, color: active ? "white" : T.red }}>
-                    {STATS.newFeedback}
+                    {newFeedbackCount}
                   </span>
                 )}
               </button>
@@ -392,72 +295,81 @@ export default function AdminPage() {
         {activeTab === "overview" && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
 
+            {dataError && (
+              <div className="mb-6 p-4 rounded-xl text-sm" style={{ background: T.redBg, border: `1px solid ${T.redBorder}`, color: T.red }}>
+                Failed to load live data. Check SUPABASE_SERVICE_ROLE_KEY is set.
+              </div>
+            )}
+
+            {stats && stats.falBalance !== null && stats.falBalance < 2 && (
+              <div className="mb-6 p-4 rounded-xl text-sm flex items-center gap-2" style={{ background: T.redBg, border: `1px solid ${T.redBorder}`, color: T.red }}>
+                <Wallet className="w-4 h-4 shrink-0" />
+                fal.ai balance is low — ${stats.falBalance.toFixed(2)} left. Recharge before it hits $0 and tools start failing.
+              </div>
+            )}
+
             {/* Stats grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-              <StatCard icon={Users} label="Total users" value={STATS.totalUsers.toLocaleString()} sub="+124 this month" />
-              <StatCard icon={Zap} label="Subscribed" value={STATS.subscribed} sub={`${((STATS.subscribed / STATS.totalUsers) * 100).toFixed(1)}% conversion`} color={T.green} />
-              <StatCard icon={TrendingUp} label="Generations today" value={STATS.generationsToday.toLocaleString()} sub={`${STATS.totalGenerations.toLocaleString()} all time`} color={T.blue} />
-              <StatCard icon={BarChart3} label="Monthly revenue" value={`$${STATS.monthlyRevenue.toLocaleString()}`} sub="Est. from active subs" color="#a78bfa" />
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+              <StatCard icon={Users} label="Total users" value={dataLoading ? "…" : (stats?.totalUsers ?? 0).toLocaleString()} />
+              <StatCard icon={Zap} label="Credits remaining" value={dataLoading ? "…" : (stats?.totalCreditsRemaining ?? 0).toLocaleString()} sub="across all users" color={T.green} />
+              <StatCard icon={TrendingUp} label="Generations today" value={dataLoading ? "…" : (stats?.generationsToday ?? 0).toLocaleString()} sub={`${(stats?.totalGenerations ?? 0).toLocaleString()} all time`} color={T.blue} />
+              <StatCard icon={BarChart3} label="Credits spent" value={dataLoading ? "…" : (stats?.totalCreditsSpent ?? 0).toLocaleString()} sub="all time" color="#a78bfa" />
+              <StatCard
+                icon={Wallet}
+                label="fal.ai balance"
+                value={dataLoading ? "…" : stats?.falBalance !== null && stats?.falBalance !== undefined ? `$${stats.falBalance.toFixed(2)}` : "N/A"}
+                sub={stats?.falBalance === null ? "FAL_ADMIN_API_KEY missing" : "Uncrop / Cleanup usage"}
+                color={stats?.falBalance !== null && stats?.falBalance !== undefined && stats.falBalance < 2 ? T.red : T.yellow}
+              />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
-              {/* API health */}
-              <div className="p-5 rounded-2xl" style={{ background: T.card, border: `1px solid ${T.border}` }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: T.muted }}>API Health</p>
-                <div className="flex items-end gap-2 mb-3">
-                  <span className="text-3xl font-black" style={{ color: T.green }}>{STATS.apiHealthPct}%</span>
-                  <span className="text-sm mb-1" style={{ color: T.dim }}>uptime</span>
-                </div>
-                <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
-                  <div className="h-full rounded-full" style={{ width: `${STATS.apiHealthPct}%`, background: T.green }} />
-                </div>
-                <div className="flex justify-between mt-2">
-                  <span className="text-[11px]" style={{ color: T.dim }}>All systems</span>
-                  <span className="text-[11px] font-bold flex items-center gap-1" style={{ color: T.green }}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" /> Operational
-                  </span>
-                </div>
-              </div>
-
-              {/* Plan breakdown */}
-              <div className="p-5 rounded-2xl" style={{ background: T.card, border: `1px solid ${T.border}` }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: T.muted }}>Plan Breakdown</p>
-                {[
-                  { label: "Pro", count: 187, color: "#a78bfa" },
-                  { label: "Basic", count: 225, color: T.blue },
-                  { label: "Free", count: STATS.free, color: T.dim },
-                ].map(({ label, count, color }) => (
-                  <div key={label} className="flex items-center gap-3 mb-3 last:mb-0">
-                    <span className="text-xs w-10 font-bold" style={{ color }}>{label}</span>
-                    <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                      <div className="h-full rounded-full" style={{ width: `${(count / STATS.totalUsers) * 100}%`, background: color }} />
-                    </div>
-                    <span className="text-xs w-10 text-right" style={{ color: T.dim }}>{count}</span>
-                  </div>
-                ))}
-              </div>
-
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
               {/* Feedback snapshot */}
               <div className="p-5 rounded-2xl" style={{ background: T.card, border: `1px solid ${T.border}` }}>
                 <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: T.muted }}>Feedback</p>
                 <div className="flex items-end gap-2 mb-3">
-                  <span className="text-3xl font-black" style={{ color: T.text }}>{STATS.avgRating}</span>
+                  <span className="text-3xl font-black" style={{ color: T.text }}>{avgRating}</span>
                   <div className="flex gap-0.5 mb-1">
                     {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} className="w-3.5 h-3.5" fill={s <= Math.round(STATS.avgRating) ? T.yellow : "none"}
-                        style={{ color: s <= Math.round(STATS.avgRating) ? T.yellow : T.dim }} />
+                      <Star key={s} className="w-3.5 h-3.5" fill={s <= Math.round(avgRating) ? T.yellow : "none"}
+                        style={{ color: s <= Math.round(avgRating) ? T.yellow : T.dim }} />
                     ))}
                   </div>
                 </div>
                 <p className="text-xs" style={{ color: T.dim }}>{feedbackList.length} total responses</p>
-                {STATS.newFeedback > 0 && (
+                {newFeedbackCount > 0 && (
                   <div className="mt-3 flex items-center gap-2 p-2.5 rounded-xl cursor-pointer"
                     style={{ background: T.redBg, border: `1px solid ${T.redBorder}` }}
                     onClick={() => setActiveTab("feedback")}>
                     <Bell className="w-3 h-3" style={{ color: T.red }} />
-                    <span className="text-xs font-semibold" style={{ color: T.red }}>{STATS.newFeedback} unread</span>
+                    <span className="text-xs font-semibold" style={{ color: T.red }}>{newFeedbackCount} unread</span>
                     <ChevronRight className="w-3 h-3 ml-auto" style={{ color: T.red }} />
                   </div>
+                )}
+              </div>
+
+              {/* Low-credit users */}
+              <div className="p-5 rounded-2xl" style={{ background: T.card, border: `1px solid ${T.border}` }}>
+                <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: T.muted }}>Low on Credits</p>
+                {dataLoading ? (
+                  <p className="text-xs" style={{ color: T.dim }}>Loading…</p>
+                ) : (
+                  (() => {
+                    const low = users.filter((u) => u.credits <= 2).sort((a, b) => a.credits - b.credits).slice(0, 5);
+                    return low.length === 0 ? (
+                      <p className="text-xs" style={{ color: T.dim }}>No users below 2 credits.</p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {low.map((u) => (
+                          <div key={u.id} className="flex items-center gap-2.5">
+                            <Avatar name={u.name} size={26} />
+                            <span className="text-xs flex-1 truncate" style={{ color: T.text }}>{u.name}</span>
+                            <span className="text-xs font-bold" style={{ color: u.credits === 0 ? T.red : T.yellow }}>{u.credits} left</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()
                 )}
               </div>
             </div>
@@ -471,14 +383,15 @@ export default function AdminPage() {
                 </button>
               </div>
               <div className="space-y-3">
-                {MOCK_USERS.slice(0, 4).map((u) => (
+                {dataLoading && <p className="text-xs" style={{ color: T.dim }}>Loading…</p>}
+                {users.slice(0, 4).map((u) => (
                   <div key={u.id} className="flex items-center gap-3">
                     <Avatar name={u.name} size={32} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold truncate" style={{ color: T.text }}>{u.name}</p>
                       <p className="text-xs truncate" style={{ color: T.dim }}>{u.email}</p>
                     </div>
-                    <PlanBadge plan={u.plan} />
+                    <CreditsBadge credits={u.credits} />
                   </div>
                 ))}
               </div>
@@ -622,18 +535,21 @@ export default function AdminPage() {
             </div>
 
             <div className="space-y-3">
-              {filteredFeedback.length === 0 && (
+              {feedbackLoading && (
+                <div className="text-center py-12" style={{ color: T.dim }}>Loading…</div>
+              )}
+              {!feedbackLoading && filteredFeedback.length === 0 && (
                 <div className="text-center py-12" style={{ color: T.dim }}>No feedback in this category.</div>
               )}
               {filteredFeedback.map((fb) => (
                 <div key={fb.id} className="p-5 rounded-2xl transition-all"
                   style={{ background: T.card, border: `1px solid ${fb.status === "new" ? T.redBorder : T.border}`, opacity: fb.status === "archived" ? 0.5 : 1 }}>
                   <div className="flex items-start gap-3">
-                    <Avatar name={fb.name} size={36} />
+                    <Avatar name={fb.name || fb.email || "Anonymous"} size={36} />
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <span className="text-sm font-bold" style={{ color: T.text }}>{fb.name}</span>
-                        <span className="text-xs" style={{ color: T.dim }}>{fb.email}</span>
+                        <span className="text-sm font-bold" style={{ color: T.text }}>{fb.name || "Anonymous"}</span>
+                        {fb.email && <span className="text-xs" style={{ color: T.dim }}>{fb.email}</span>}
                         <FbCategoryBadge cat={fb.category} />
                         {fb.status === "new" && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}` }}>NEW</span>
@@ -647,7 +563,7 @@ export default function AdminPage() {
                       </div>
                       <p className="text-sm leading-relaxed" style={{ color: T.muted }}>{fb.message}</p>
                       <p className="text-[11px] mt-2" style={{ color: T.dim }}>
-                        {fb.createdAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        {new Date(fb.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       </p>
                     </div>
                     {fb.status !== "archived" && (
@@ -679,9 +595,9 @@ export default function AdminPage() {
 
             {/* Summary row */}
             <div className="grid grid-cols-3 gap-4 mb-6">
-              <StatCard icon={Users} label="Total" value={STATS.totalUsers.toLocaleString()} />
-              <StatCard icon={Zap} label="Subscribed" value={STATS.subscribed} color={T.green} />
-              <StatCard icon={RefreshCw} label="Free tier" value={STATS.free.toLocaleString()} color={T.dim} />
+              <StatCard icon={Users} label="Total" value={dataLoading ? "…" : users.length.toLocaleString()} />
+              <StatCard icon={Zap} label="Credits remaining" value={dataLoading ? "…" : (stats?.totalCreditsRemaining ?? 0).toLocaleString()} color={T.green} />
+              <StatCard icon={RefreshCw} label="Generations" value={dataLoading ? "…" : (stats?.totalGenerations ?? 0).toLocaleString()} color={T.dim} />
             </div>
 
             <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${T.border}` }}>
@@ -689,16 +605,20 @@ export default function AdminPage() {
               <div className="grid grid-cols-12 px-5 py-3 text-[11px] font-bold uppercase tracking-wider"
                 style={{ background: "rgba(255,255,255,0.03)", color: T.dim, borderBottom: `1px solid ${T.border}` }}>
                 <div className="col-span-4">User</div>
-                <div className="col-span-2 hidden sm:block">Plan</div>
+                <div className="col-span-2 hidden sm:block">Credits</div>
                 <div className="col-span-2 hidden md:block">Joined</div>
                 <div className="col-span-2 hidden md:block">Generations</div>
-                <div className="col-span-2">Status</div>
+                <div className="col-span-2">Last active</div>
               </div>
 
-              {MOCK_USERS.map((u, i) => (
+              {dataLoading && <p className="text-xs text-center py-8" style={{ color: T.dim }}>Loading…</p>}
+              {!dataLoading && users.length === 0 && (
+                <p className="text-xs text-center py-8" style={{ color: T.dim }}>No users yet.</p>
+              )}
+              {users.map((u, i) => (
                 <div key={u.id}
                   className="grid grid-cols-12 px-5 py-4 items-center text-sm"
-                  style={{ borderBottom: i < MOCK_USERS.length - 1 ? `1px solid ${T.border}` : "none", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
+                  style={{ borderBottom: i < users.length - 1 ? `1px solid ${T.border}` : "none", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
                   <div className="col-span-4 flex items-center gap-3 min-w-0">
                     <Avatar name={u.name} size={32} />
                     <div className="min-w-0">
@@ -706,17 +626,12 @@ export default function AdminPage() {
                       <p className="text-xs truncate hidden sm:block" style={{ color: T.dim }}>{u.email}</p>
                     </div>
                   </div>
-                  <div className="col-span-2 hidden sm:block"><PlanBadge plan={u.plan} /></div>
-                  <div className="col-span-2 hidden md:block" style={{ color: T.muted }}>{u.joined}</div>
+                  <div className="col-span-2 hidden sm:block"><CreditsBadge credits={u.credits} /></div>
+                  <div className="col-span-2 hidden md:block" style={{ color: T.muted }}>{new Date(u.joined).toLocaleDateString()}</div>
                   <div className="col-span-2 hidden md:block" style={{ color: T.muted }}>{u.generations.toLocaleString()}</div>
                   <div className="col-span-2">
-                    <span className="text-[11px] font-bold px-2 py-1 rounded-full"
-                      style={{
-                        background: u.status === "active" ? T.greenBg : T.card,
-                        color: u.status === "active" ? T.green : T.dim,
-                        border: `1px solid ${u.status === "active" ? "rgba(74,222,128,0.2)" : T.border}`,
-                      }}>
-                      {u.status}
+                    <span className="text-xs" style={{ color: T.dim }}>
+                      {u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleDateString() : "Never"}
                     </span>
                   </div>
                 </div>
@@ -724,7 +639,7 @@ export default function AdminPage() {
             </div>
 
             <p className="text-xs text-center mt-4" style={{ color: T.dim }}>
-              Showing 8 of {STATS.totalUsers.toLocaleString()} users · Connect a database to see all
+              Showing {users.length.toLocaleString()} of {users.length.toLocaleString()} users
             </p>
           </motion.div>
         )}
@@ -735,16 +650,12 @@ export default function AdminPage() {
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
-function PlanBadge({ plan }: { plan: string }) {
-  const map: Record<string, { color: string; bg: string }> = {
-    Pro: { color: "#a78bfa", bg: "rgba(167,139,250,0.1)" },
-    Basic: { color: T.blue, bg: T.blueBg },
-    Free: { color: T.dim, bg: "rgba(255,255,255,0.04)" },
-  };
-  const s = map[plan] ?? map.Free;
+function CreditsBadge({ credits }: { credits: number }) {
+  const color = credits === 0 ? T.red : credits <= 2 ? T.yellow : T.green;
+  const bg = credits === 0 ? T.redBg : credits <= 2 ? T.yellowBg : T.greenBg;
   return (
-    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: s.bg, color: s.color }}>
-      {plan}
+    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full" style={{ background: bg, color }}>
+      {credits} left
     </span>
   );
 }
@@ -781,16 +692,5 @@ function BannerPreview({ config }: { config: BannerConfig }) {
       <span style={{ color: s.color }}>{s.text}</span>
       <X className="w-3.5 h-3.5 ml-auto shrink-0 opacity-50 cursor-pointer" style={{ color: s.color }} />
     </div>
-  );
-}
-
-function GoogleLogo({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 18 18" fill="none">
-      <path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4" />
-      <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853" />
-      <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z" fill="#FBBC05" />
-      <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z" fill="#EA4335" />
-    </svg>
   );
 }

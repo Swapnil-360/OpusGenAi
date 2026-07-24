@@ -1,30 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { fal, uploadDataUrlToFal } from "@/lib/fal";
+import { getUserCredits, chargeCredits } from "@/lib/credits";
+import { buildScenePrompt, buildProductEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
 
-const HF_KEY = process.env.HUGGINGFACE_API_KEY!;
-const MODEL = "black-forest-labs/FLUX.1-schnell";
-const HF_BASE = "https://router.huggingface.co/hf-inference/models";
 const CREDIT_COST = 1;
+// Premium path regenerates the whole image via a paid model — priced higher
+// than the free flux/schnell path to cover the ~13x cost difference
+// ($0.039/image vs ~$0.003-0.006/mp).
+const PREMIUM_CREDIT_COST = 3;
 
-// Map size ratio to closest HF-supported dimensions
-const SIZE_MAP: Record<string, { width: number; height: number }> = {
-  "1:1":  { width: 512, height: 512 },
-  "4:5":  { width: 512, height: 640 },
-  "9:16": { width: 576, height: 1024 },
-  "16:9": { width: 1024, height: 576 },
-  "4:3":  { width: 768, height: 576 },
-};
-
-// When the user supplies their own product photo, we never let the model redraw the
-// product — we only generate the surrounding scene and composite the untouched product
-// cutout on top client-side. This suffix nudges FLUX to leave the center empty.
-function buildScenePrompt(userPrompt: string): string {
-  return `${userPrompt}. Empty professional product-photography backdrop only — no bottles, no packaging, no products, no objects, just a simple flat surface with soft background and lighting. Straight-on eye-level angle, no strong perspective lines or receding surfaces, no busy interior scene, clean seamless composition, high resolution studio quality, negative space in the center where a product will be placed.`;
-}
+// Valid aspect ratios for fal-ai/gemini-25-flash-image/edit — our SIZE_MAP
+// keys (1:1, 4:5, 9:16, 16:9, 4:3) are all supported natively, no mapping needed.
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, ratio = "1:1", templateId, mode } = await req.json();
+    const { prompt, ratio = "1:1", templateId, mode, image: inputImage } = await req.json();
 
     if (!prompt?.trim()) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
@@ -38,55 +29,58 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sign in to generate images." }, { status: 401 });
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", user.id)
-      .single();
+    const isPremium = mode === "premium";
+    const cost = isPremium ? PREMIUM_CREDIT_COST : CREDIT_COST;
 
-    const credits = profile?.credits ?? 0;
-    if (credits < CREDIT_COST) {
+    const credits = await getUserCredits(user.id);
+    if (credits < cost) {
       return NextResponse.json(
         { error: "You're out of credits. Upgrade your plan to keep generating." },
         { status: 402 }
       );
     }
 
-    // ── Generate ──
-    const dims = SIZE_MAP[ratio] ?? SIZE_MAP["1:1"];
-    const isBackgroundOnly = mode === "background";
-    const modelInput = isBackgroundOnly ? buildScenePrompt(prompt.trim()) : prompt;
+    let image: string | undefined;
 
-    const res = await fetch(
-      `${HF_BASE}/${MODEL}`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${HF_KEY}`,
-          "Content-Type": "application/json",
-          "x-wait-for-model": "true",
-        },
-        body: JSON.stringify({
-          inputs: modelInput,
-          parameters: {
-            num_inference_steps: 4,
-            width: dims.width,
-            height: dims.height,
-          },
-        }),
+    if (isPremium) {
+      if (!inputImage) {
+        return NextResponse.json({ error: "Product photo is required for this mode." }, { status: 400 });
       }
-    );
+      const imageUrl = await uploadDataUrlToFal(inputImage);
+      const result = await fal.subscribe("fal-ai/gemini-25-flash-image/edit", {
+        input: {
+          image_urls: [imageUrl],
+          prompt: buildProductEditPrompt(prompt.trim()),
+          aspect_ratio: ratio,
+          num_images: 1,
+          output_format: "png",
+        },
+      });
+      image = (result.data as { images?: { url: string }[] })?.images?.[0]?.url;
+      if (!image) {
+        console.error("fal gemini-25-flash-image/edit returned no image:", result);
+        return NextResponse.json({ error: "Generation failed. Try again." }, { status: 502 });
+      }
+    } else {
+      // ── Generate (free path) ──
+      const dims = SIZE_MAP[ratio] ?? SIZE_MAP["1:1"];
+      const isBackgroundOnly = mode === "background";
+      const modelInput = isBackgroundOnly ? buildScenePrompt(prompt.trim()) : prompt.trim();
 
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("HF error:", err);
-      return NextResponse.json({ error: "Generation failed", detail: err }, { status: res.status });
+      const result = await fal.subscribe("fal-ai/flux/schnell", {
+        input: {
+          prompt: modelInput,
+          image_size: { width: dims.width, height: dims.height },
+          num_inference_steps: 4,
+        },
+      });
+
+      image = (result.data as { images?: { url: string }[] })?.images?.[0]?.url;
+      if (!image) {
+        console.error("fal flux/schnell returned no image:", result);
+        return NextResponse.json({ error: "Generation failed. Try again." }, { status: 502 });
+      }
     }
-
-    const arrayBuffer = await res.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
-    const contentType = res.headers.get("content-type") || "image/png";
-    const image = `data:${contentType};base64,${base64}`;
 
     // ── Persist + charge (server-side, so it can't be skipped) ──
     const { data: insertedRow, error: insertError } = await supabase
@@ -96,35 +90,21 @@ export async function POST(req: NextRequest) {
         tool_id: "generate",
         status: "completed",
         prompt: prompt.trim(),
-        credit_cost: CREDIT_COST,
+        credit_cost: cost,
         completed_at: new Date().toISOString(),
         metadata: {
           images: [image],
           aspectRatio: ratio,
           templateId: templateId ?? undefined,
-          productPreserved: isBackgroundOnly || undefined,
+          productPreserved: mode === "background" || undefined,
+          engine: isPremium ? "gemini-25-flash-image" : undefined,
         },
       })
       .select("id")
       .single();
     if (insertError) console.error("generations insert failed:", insertError.message);
 
-    const { error: rpcError } = await supabase.rpc("decrement_credits", {
-      uid: user.id,
-      amount: CREDIT_COST,
-    });
-    if (rpcError) console.error("decrement_credits failed:", rpcError.message);
-
-    // Transaction log is best-effort (RLS may restrict inserts)
-    const { error: txError } = await supabase.from("credit_transactions").insert({
-      user_id: user.id,
-      amount: -CREDIT_COST,
-      type: "generation",
-      description: "Image generation",
-    });
-    if (txError) console.error("credit_transactions insert failed:", txError.message);
-
-    const newCredits = rpcError ? credits : Math.max(0, credits - CREDIT_COST);
+    const newCredits = await chargeCredits(user.id, cost, credits, isPremium ? "Premium AI product photo" : "Image generation");
 
     return NextResponse.json({ image, credits: newCredits, generationId: insertedRow?.id ?? null });
   } catch (e) {

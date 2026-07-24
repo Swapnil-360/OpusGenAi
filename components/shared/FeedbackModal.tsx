@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquare, Star, X, Send, Check } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 const W = {
   bg: "#0f0404",
@@ -113,10 +115,34 @@ function FeedbackModal({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     if (!message.trim() || rating === 0 || !category) return;
     setSubmitting(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setSubmitting(false);
-    setSubmitted(true);
-    setTimeout(onClose, 2200);
+
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { toast.error("Sign in to send feedback."); setSubmitting(false); return; }
+
+      const { error } = await supabase.from("feedback").insert({
+        user_id: user.id,
+        name: (user.user_metadata?.full_name as string | undefined) ?? null,
+        email: email.trim() || user.email || null,
+        rating,
+        category,
+        message: message.trim(),
+      });
+
+      if (error) {
+        toast.error("Failed to send feedback. Try again.");
+        setSubmitting(false);
+        return;
+      }
+
+      setSubmitting(false);
+      setSubmitted(true);
+      setTimeout(onClose, 2200);
+    } catch {
+      toast.error("Network error. Check your connection.");
+      setSubmitting(false);
+    }
   }
 
   const canSubmit = message.trim().length > 0 && rating > 0 && category !== null;

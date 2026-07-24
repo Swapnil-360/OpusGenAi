@@ -91,12 +91,16 @@ export default function AccountPage() {
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [savingPwd, setSavingPwd] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
       setAuthUser({ email: user.email ?? "", id: user.id });
+
+      // Server-only allowlist check — never trust a client-side email list.
+      fetch("/api/admin/check").then((res) => setIsAdmin(res.ok)).catch(() => {});
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -141,6 +145,7 @@ export default function AccountPage() {
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.push("/login");
+    router.refresh();
   }
 
   async function handlePasswordChange(e: React.FormEvent) {
@@ -179,6 +184,18 @@ export default function AccountPage() {
           >
             {planLabel("free")}
           </span>
+          {isAdmin && (
+            <a
+              href="/adminopusgenai"
+              className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 transition-all"
+              style={{ background: W.redBg, border: `1px solid ${W.redBorder}`, color: W.red }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(220,38,38,0.2)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = W.redBg; }}
+            >
+              <Shield className="w-2.5 h-2.5" />
+              Admin
+            </a>
+          )}
           <button
             onClick={handleSignOut}
             className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all"

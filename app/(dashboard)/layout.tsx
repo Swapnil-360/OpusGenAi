@@ -6,8 +6,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Sparkles, Zap, Clock, User, LogOut, ChevronRight,
-  Menu, Layers, PenSquare, Wrench, Scissors, Replace, Eraser, Maximize2, Frame,
+  Aperture, Zap, Clock, User, LogOut,
+  Menu, Layers, PenSquare, Scissors, Replace, Eraser, Maximize2, Frame,
+  PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { LogoBrand } from "@/components/shared/LogoBrand";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -30,7 +31,7 @@ const S = {
 };
 
 const NAV_ITEMS = [
-  { href: "/generate", label: "Generate", icon: Sparkles },
+  { href: "/generate", label: "Generate", icon: Aperture },
   { href: "/templates", label: "Templates", icon: Layers },
   { href: "/studio", label: "Content Studio", icon: PenSquare },
   { href: "/history", label: "History", icon: Clock },
@@ -104,7 +105,7 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== "/generate" && pathname.startsWith(href));
           return (
@@ -114,8 +115,8 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
               onClick={() => setMobileOpen(false)}
               title={collapsed ? label : undefined}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 relative group",
-                collapsed && "justify-center px-0 w-10 mx-auto"
+                "flex items-center gap-2.5 px-2.5 py-1.75 rounded-md text-[13px] font-medium transition-all duration-150 relative group",
+                collapsed && "justify-center px-0 w-9 h-9 mx-auto"
               )}
               style={{
                 background: active ? S.activeBg : "transparent",
@@ -127,12 +128,12 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
               {active && !collapsed && (
                 <motion.span
                   layoutId="active-pill"
-                  className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-full"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-full"
                   style={{ background: S.red }}
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
-              <Icon className="w-4 h-4 shrink-0 relative z-10" />
+              <Icon className="w-4 h-4 shrink-0 relative z-10" strokeWidth={1.75} />
               <AnimatePresence initial={false}>
                 {!collapsed && (
                   <motion.span
@@ -141,6 +142,7 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -4 }}
                     transition={{ duration: 0.15 }}
+                    className="tracking-wide"
                   >
                     {label}
                   </motion.span>
@@ -161,12 +163,11 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
               transition={{ duration: 0.2 }}
               className="overflow-hidden"
             >
-              <div className="mt-3 mb-1 px-3">
+              <div className="mt-4 mb-1 px-2.5">
                 <p
-                  className="text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5"
+                  className="text-[11px] font-semibold uppercase tracking-wider"
                   style={{ color: S.textDim }}
                 >
-                  <Wrench className="w-3 h-3" />
                   Image Tools
                 </p>
               </div>
@@ -177,18 +178,18 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
                     key={href}
                     href={href}
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-150"
+                    className="flex items-center gap-2.5 px-2.5 py-1.75 rounded-md text-[13px] font-medium transition-all duration-150"
                     style={{ color: active ? S.activeText : S.textMuted }}
                     onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = S.hoverBg; e.currentTarget.style.color = S.textPrimary; } }}
                     onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = S.textMuted; } }}
                   >
                     <div
-                      className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+                      className="w-5 h-5 rounded-[6px] flex items-center justify-center shrink-0"
                       style={{ backgroundColor: `${color}22` }}
                     >
-                      <Icon className="w-3 h-3" style={{ color }} />
+                      <Icon className="w-3 h-3" style={{ color }} strokeWidth={1.75} />
                     </div>
-                    {label}
+                    <span className="tracking-wide">{label}</span>
                   </Link>
                 );
               })}
@@ -229,13 +230,13 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
               transition={{ duration: 0.2 }}
               className="overflow-hidden"
             >
-              <div className="px-2 mb-2">
+              <div className="px-2.5 mb-2">
                 <div
-                  className="rounded-xl p-3"
+                  className="rounded-lg p-3"
                   style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.18)" }}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: S.textDim }}>
+                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: S.textDim }}>
                       Credits
                     </span>
                     <div className="flex items-center gap-1 text-xs font-bold" style={{ color: S.activeText }}>
@@ -260,7 +261,7 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
                       <motion.button
                         whileHover={{ scale: 1.02, boxShadow: "0 0 20px rgba(220,38,38,0.3)" }}
                         whileTap={{ scale: 0.97 }}
-                        className="w-full mt-2.5 h-7 rounded-lg text-[11px] font-bold text-white flex items-center justify-center gap-1.5 transition-all"
+                        className="w-full mt-2.5 h-7 rounded-md text-[11px] font-semibold text-white flex items-center justify-center gap-1.5 transition-all"
                         style={{ background: S.red, boxShadow: "0 0 12px rgba(220,38,38,0.2)" }}
                       >
                         <Zap className="w-2.5 h-2.5" /> Upgrade plan
@@ -278,7 +279,7 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
           href="/account"
           onClick={() => setMobileOpen(false)}
           className={cn(
-            "flex items-center gap-2.5 px-3 py-2 rounded-xl cursor-pointer group transition-all",
+            "flex items-center gap-2.5 px-2.5 py-2 rounded-md cursor-pointer group transition-all",
             collapsed && "justify-center px-0"
           )}
           title={collapsed ? user.name : undefined}
@@ -401,6 +402,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
+    router.refresh();
   }
 
   return (
@@ -424,20 +426,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Collapse toggle */}
         <motion.button
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-18 w-6 h-6 rounded-full flex items-center justify-center z-10 transition-colors"
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="absolute -right-3 top-18 w-6 h-6 rounded-md flex items-center justify-center z-10 transition-colors"
           style={{
             background: S.bg,
             border: `1px solid ${S.border}`,
             color: S.textMuted,
             boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
           }}
-          whileHover={{ scale: 1.15 }}
+          whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           transition={{ duration: 0.15 }}
         >
-          <motion.div animate={{ rotate: collapsed ? 0 : 180 }} transition={{ duration: 0.2 }}>
-            <ChevronRight className="w-3 h-3" />
-          </motion.div>
+          {collapsed
+            ? <PanelLeftOpen className="w-3.5 h-3.5" strokeWidth={1.75} />
+            : <PanelLeftClose className="w-3.5 h-3.5" strokeWidth={1.75} />}
         </motion.button>
       </motion.aside>
 

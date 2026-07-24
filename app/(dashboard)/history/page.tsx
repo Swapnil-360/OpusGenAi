@@ -110,6 +110,23 @@ export default function HistoryPage() {
     setTimeout(() => setCopiedId(null), 1800);
   }
 
+  async function downloadImage(src: string) {
+    try {
+      // data: URLs download directly; remote URLs (fal.media) need fetch+blob
+      // or the browser just navigates instead of downloading.
+      const isRemote = src.startsWith("http");
+      const url = isRemote ? URL.createObjectURL(await (await fetch(src)).blob()) : src;
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `opusgen-${Date.now()}.png`;
+      a.click();
+      if (isRemote) URL.revokeObjectURL(url);
+      toast.success("Downloading…");
+    } catch {
+      toast.error("Download failed.");
+    }
+  }
+
   return (
     <div className="h-full flex flex-col overflow-hidden" style={{ background: W.bg }}>
 
@@ -437,7 +454,11 @@ export default function HistoryPage() {
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={src} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-end justify-end p-2 opacity-0 group-hover:opacity-100">
-                        <button className="w-7 h-7 rounded-lg bg-black/60 flex items-center justify-center">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); downloadImage(src); }}
+                          aria-label="Download image"
+                          className="w-7 h-7 rounded-lg bg-black/60 flex items-center justify-center transition-colors hover:bg-black/80"
+                        >
                           <Download className="w-3.5 h-3.5 text-white" />
                         </button>
                       </div>

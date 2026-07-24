@@ -4,6 +4,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Frame, Wand2 } from "lucide-react";
 import { ToolPageShell, UploadZone, ResultPanel } from "@/components/tools/ToolPageShell";
+import { buildExpandedImageAndMask, type ExpandDirection } from "@/lib/expand-canvas";
 import { toast } from "sonner";
 
 const TOOL_COLOR = "#ec4899";
@@ -48,15 +49,52 @@ export default function UncropPage() {
   const [status, setStatus] = useState<"idle" | "processing" | "completed" | "failed">("idle");
   const [result, setResult] = useState<string | null>(null);
 
-  function process() {
+  async function process() {
     if (status === "processing") return;
     if (!input) { toast.error("Upload an image first."); return; }
     setStatus("processing");
-    setTimeout(() => {
-      setResult("https://picsum.photos/seed/product1/512/512");
+
+    try {
+      const { image, mask } = await buildExpandedImageAndMask(input, ratio, expandDir as ExpandDirection);
+
+      const res = await fetch("/api/uncrop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image, mask, prompt: bgPrompt.trim(), ratio }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Expand failed. Try again.");
+        setStatus("failed");
+        return;
+      }
+
+      const { image: outputImage, credits } = await res.json();
+      setResult(outputImage);
       setStatus("completed");
       toast.success("Image expanded!");
-    }, 2800);
+      if (typeof credits === "number") {
+        window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
+      }
+    } catch (err) {
+      console.error("Uncrop error:", err);
+      toast.error("Network error. Check your connection.");
+      setStatus("failed");
+    }
+  }
+
+  async function handleDownload() {
+    if (!result) return;
+    const res = await fetch(result);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `opusgen-uncrop-${Date.now()}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Downloading…");
   }
 
   return (
@@ -168,7 +206,7 @@ export default function UncropPage() {
               </span>
             )}
           </div>
-          <ResultPanel status={status} result={result} accentColor={TOOL_COLOR} onDownload={() => toast.success("Download started!")} />
+          <ResultPanel status={status} result={result} accentColor={TOOL_COLOR} onDownload={handleDownload} />
         </div>
       </div>
 

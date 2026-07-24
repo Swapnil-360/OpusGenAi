@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowLeft, Check, Download, ImageUp, X, Zap } from "lucide-react";
@@ -79,9 +80,19 @@ interface UploadZoneProps {
 }
 
 export function UploadZone({ label = "Drop image here", preview, onUpload, onRemove, accentColor }: UploadZoneProps) {
+  const [isDragging, setIsDragging] = useState(false);
+
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    onUpload(file, URL.createObjectURL(file));
+  }
+
+  function handleDrop(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
     onUpload(file, URL.createObjectURL(file));
   }
 
@@ -108,17 +119,24 @@ export function UploadZone({ label = "Drop image here", preview, onUpload, onRem
   }
 
   return (
-    <label className="cursor-pointer block">
+    <label
+      className="cursor-pointer block"
+      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+      onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+      onDrop={handleDrop}
+    >
       <motion.div
         className="border-2 border-dashed rounded-2xl p-8 text-center aspect-square w-full max-w-sm flex flex-col items-center justify-center"
-        style={{ borderColor: S.border }}
-        whileHover={{ borderColor: accentColor, backgroundColor: `${accentColor}08` }}
-        transition={{ duration: 0.2 }}
+        animate={isDragging
+          ? { borderColor: accentColor, backgroundColor: `${accentColor}14`, scale: 1.02 }
+          : { borderColor: S.border, backgroundColor: "transparent", scale: 1 }}
+        whileHover={!isDragging ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
+        transition={{ duration: 0.15 }}
       >
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: S.glass }}>
-          <ImageUp className="w-7 h-7" style={{ color: S.muted }} />
+          <ImageUp className="w-7 h-7" style={{ color: isDragging ? accentColor : S.muted }} />
         </div>
-        <p className="text-sm font-semibold mb-1" style={{ color: S.text }}>{label}</p>
+        <p className="text-sm font-semibold mb-1" style={{ color: S.text }}>{isDragging ? "Drop it here" : label}</p>
         <p className="text-xs" style={{ color: S.muted }}>or click to browse · JPG, PNG, WebP</p>
       </motion.div>
       <input type="file" accept="image/*" className="hidden" onChange={handleChange} />

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 const HF_KEY = process.env.HUGGINGFACE_API_KEY!;
 const HF_BASE = "https://router.huggingface.co/hf-inference/models";
@@ -10,6 +11,13 @@ export async function POST(req: NextRequest) {
 
     if (!prompt?.trim()) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
+    }
+
+    // Auth required (prevents anonymous abuse) — no credit charge, this is a free tool.
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Sign in to use this tool." }, { status: 401 });
     }
 
     const input = `<|system|>You are an expert social media copywriter for product photography.</s>

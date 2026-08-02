@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { TEMPLATES } from "@/lib/templates-data";
 import { fileToDataUrl } from "@/lib/mask-canvas";
+import { createClient } from "@/lib/supabase/client";
+import { DEFAULT_NOTIFICATION_PREFS, LOW_CREDIT_THRESHOLD, type NotificationPrefs } from "@/lib/notification-prefs";
 import { toast } from "sonner";
 
 /* ─── Static data ──────────────────────────────────────────────────── */
@@ -170,6 +172,22 @@ export default function GeneratePage() {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
   const [refFile, setRefFile] = useState<File | null>(null);
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("notification_prefs")
+        .eq("id", session.user.id)
+        .single();
+      const saved = data?.notification_prefs as Partial<NotificationPrefs> | null;
+      if (saved) setNotifPrefs((prev) => ({ ...prev, ...saved }));
+    })();
+  }, []);
   const [fullViewSrc, setFullViewSrc] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -262,7 +280,7 @@ export default function GeneratePage() {
     if (typeof credits === "number") {
       window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
     }
-    return image as string;
+    return { image: image as string, credits: typeof credits === "number" ? credits : null };
   }
 
   async function generateFromPromptOnly() {
@@ -285,7 +303,7 @@ export default function GeneratePage() {
     if (typeof credits === "number") {
       window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
     }
-    return image as string;
+    return { image: image as string, credits: typeof credits === "number" ? credits : null };
   }
 
   async function handleGenerate() {
@@ -296,10 +314,18 @@ export default function GeneratePage() {
     setGeneratedImage(null);
 
     try {
-      const finalImage = refFile ? await generateWithProduct(refFile) : await generateFromPromptOnly();
+      const { image: finalImage, credits: remaining } = refFile
+        ? await generateWithProduct(refFile)
+        : await generateFromPromptOnly();
       setGeneratedImage(finalImage);
       setGenStatus("done");
-      toast.success("Image generated!");
+      if (notifPrefs.generationDone) toast.success("Image generated!");
+      if (notifPrefs.billing && remaining !== null && remaining <= LOW_CREDIT_THRESHOLD) {
+        toast.warning(
+          remaining === 0 ? "Out of credits" : `Low on credits — ${remaining} left`,
+          { description: "Upgrade your plan to keep generating.", id: "low-credits" }
+        );
+      }
     } catch (err) {
       toast.dismiss("gen-progress");
       toast.error(err instanceof Error ? err.message : "Network error. Check your connection.");
@@ -316,14 +342,10 @@ export default function GeneratePage() {
     toast.success(`Template applied: ${tpl.name}`);
   }
 
-  // Appends professional scene language to whatever the user already typed —
-  // works whether that's a full product description (text-only mode) or just
-  // a partial scene idea (product-photo mode, where only the scene matters).
+  // Replaces the whole prompt with this use case's scene language — only the
+  // latest click applies, it never merges with a previous selection.
   function applyUseCase(scenePrompt: string, label: string) {
-    setPrompt((prev) => {
-      const trimmed = prev.trim();
-      return trimmed ? `${trimmed}, ${scenePrompt}` : scenePrompt.charAt(0).toUpperCase() + scenePrompt.slice(1);
-    });
+    setPrompt(scenePrompt.charAt(0).toUpperCase() + scenePrompt.slice(1));
     toast.success(`${label} style added`);
   }
 

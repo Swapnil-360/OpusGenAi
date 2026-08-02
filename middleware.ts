@@ -14,6 +14,8 @@ const ADMIN_PATHS = ["/adminopusgenai", "/api/admin"];
 
 const AUTH_PATHS = ["/login", "/signup"];
 
+const MFA_CHALLENGE_PATH = "/mfa-challenge";
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
@@ -86,6 +88,32 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/generate";
     url.searchParams.delete("redirectTo");
+    return redirect(url);
+  }
+
+  // Step-up auth: a user who has enrolled a verified TOTP factor but hasn't
+  // completed the challenge yet sits at aal1 while a verified factor demands
+  // aal2 (nextLevel). Gate protected routes behind /mfa-challenge until they do.
+  if (user && !isDev) {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const needsStepUp = !!aal && aal.nextLevel === "aal2" && aal.currentLevel !== aal.nextLevel;
+
+    if (needsStepUp && isProtected && pathname !== MFA_CHALLENGE_PATH) {
+      const url = request.nextUrl.clone();
+      url.pathname = MFA_CHALLENGE_PATH;
+      url.searchParams.set("redirectTo", pathname);
+      return redirect(url);
+    }
+
+    if (!needsStepUp && pathname === MFA_CHALLENGE_PATH) {
+      const url = request.nextUrl.clone();
+      url.pathname = request.nextUrl.searchParams.get("redirectTo") || "/generate";
+      url.searchParams.delete("redirectTo");
+      return redirect(url);
+    }
+  } else if (!user && pathname === MFA_CHALLENGE_PATH && !isDev) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
     return redirect(url);
   }
 

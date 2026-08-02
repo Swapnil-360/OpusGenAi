@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
-  Bell, Check, CreditCard, Crown, Globe, History,
-  KeyRound, LogOut, Shield, Sparkles, User, Zap,
+  Bell, Check, Clock, CreditCard, Crown, Globe, History,
+  KeyRound, LogOut, Shield, ShieldCheck, Sparkles, User, X as XIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PLANS } from "@/lib/mock-data";
+import { DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from "@/lib/notification-prefs";
 import { planLabel } from "@/lib/utils";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -84,46 +85,119 @@ export default function AccountPage() {
   const [credits, setCredits] = useState(10);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [totalGenerations, setTotalGenerations] = useState(0);
-  const [notifications, setNotifications] = useState({
-    generationDone: true, billing: true, tips: false, newsletter: false,
-  });
+  const [notifications, setNotifications] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
   const [savingProfile, setSavingProfile] = useState(false);
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [savingPwd, setSavingPwd] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // 2FA (Supabase TOTP)
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaLoading, setMfaLoading] = useState(false);
+  const [enrollData, setEnrollData] = useState<{ factorId: string; qrCode: string; secret: string } | null>(null);
+  const [verifyCode, setVerifyCode] = useState("");
+
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
+      // getSession() reads the local session (no network round trip) — RLS still
+      // gates every query below, so this is just as safe as getUser() here.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) { router.push("/login"); return; }
       setAuthUser({ email: user.email ?? "", id: user.id });
 
       // Server-only allowlist check — never trust a client-side email list.
       fetch("/api/admin/check").then((res) => setIsAdmin(res.ok)).catch(() => {});
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name, credits, avatar_url")
-        .eq("id", user.id)
-        .single();
+      const [{ data: profile }, { count }, { data: factors }, prefsResult] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("full_name, credits, avatar_url")
+          .eq("id", user.id)
+          .single(),
+        supabase
+          .from("generations")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("status", "completed"),
+        supabase.auth.mfa.listFactors(),
+        // Isolated from the query above: older schemas without this column
+        // shouldn't break the rest of profile loading, just fall back to defaults.
+        supabase.from("profiles").select("notification_prefs").eq("id", user.id).single(),
+      ]);
 
       if (profile) {
         setName(profile.full_name ?? user.email?.split("@")[0] ?? "");
         setCredits(profile.credits ?? 10);
         setAvatarUrl(profile.avatar_url ?? null);
       }
-
-      const { count } = await supabase
-        .from("generations")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("status", "completed");
-
       setTotalGenerations(count ?? 0);
+
+      const verifiedFactor = factors?.totp.find((f) => f.status === "verified");
+      setMfaFactorId(verifiedFactor?.id ?? null);
+
+      const savedPrefs = prefsResult.data?.notification_prefs as Partial<typeof notifications> | null;
+      if (savedPrefs) setNotifications((prev) => ({ ...prev, ...savedPrefs }));
     }
     load();
   }, []);
+
+  function toggleNotification(key: keyof typeof notifications) {
+    setNotifications((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      if (authUser) {
+        supabase
+          .from("profiles")
+          .update({ notification_prefs: next, updated_at: new Date().toISOString() })
+          .eq("id", authUser.id)
+          .then(({ error }) => { if (error) toast.error("Couldn't save that preference."); });
+      }
+      return next;
+    });
+  }
+
+  async function startMfaEnroll() {
+    setMfaLoading(true);
+    // Clean up a stale unverified factor from any abandoned previous attempt.
+    const { data: existing } = await supabase.auth.mfa.listFactors();
+    const stale = existing?.all.find((f) => f.factor_type === "totp" && f.status === "unverified");
+    if (stale) await supabase.auth.mfa.unenroll({ factorId: stale.id });
+
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "Authenticator app" });
+    setMfaLoading(false);
+    if (error || !data) { toast.error(error?.message || "Couldn't start 2FA setup."); return; }
+    setEnrollData({ factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret });
+  }
+
+  function cancelMfaEnroll() {
+    if (enrollData) supabase.auth.mfa.unenroll({ factorId: enrollData.factorId }).catch(() => {});
+    setEnrollData(null);
+    setVerifyCode("");
+  }
+
+  async function verifyMfaEnroll(e: React.FormEvent) {
+    e.preventDefault();
+    if (!enrollData || verifyCode.length !== 6) return;
+    setMfaLoading(true);
+    const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: enrollData.factorId, code: verifyCode });
+    setMfaLoading(false);
+    if (error) { toast.error(error.message || "Invalid code. Try again."); return; }
+    toast.success("Two-factor authentication enabled.");
+    setMfaFactorId(enrollData.factorId);
+    setEnrollData(null);
+    setVerifyCode("");
+  }
+
+  async function disableMfa() {
+    if (!mfaFactorId) return;
+    setMfaLoading(true);
+    const { error } = await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
+    setMfaLoading(false);
+    if (error) { toast.error(error.message || "Couldn't disable 2FA."); return; }
+    toast.success("Two-factor authentication disabled.");
+    setMfaFactorId(null);
+  }
 
   const currentPlan = PLANS.find((p) => p.id === "free")!;
   const creditsPercent = Math.min(100, Math.round((credits / (currentPlan?.credits ?? 10)) * 100));
@@ -356,6 +430,18 @@ export default function AccountPage() {
                   </div>
                 </div>
 
+                {/* Paid plans aren't purchasable yet — say so up front rather than
+                    letting an inviting CTA dead-end into a toast. */}
+                <div
+                  className="flex items-center gap-2.5 p-3 rounded-xl"
+                  style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
+                >
+                  <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: W.muted }} />
+                  <p className="text-[11px]" style={{ color: W.muted }}>
+                    Paid plans are coming soon — checkout isn&apos;t live yet. Everyone stays on Free for now.
+                  </p>
+                </div>
+
                 <div className="flex flex-col gap-2.5">
                   {PLANS.map((plan) => {
                     const isCurrent = plan.id === "free";
@@ -395,20 +481,13 @@ export default function AccountPage() {
                               ))}
                             </ul>
                           </div>
-                          <motion.button
-                            whileHover={!isCurrent ? { scale: 1.03 } : {}}
-                            whileTap={!isCurrent ? { scale: 0.97 } : {}}
-                            className="mt-1 shrink-0 h-8 px-3.5 rounded-lg text-xs font-semibold transition-all"
-                            style={isCurrent
-                              ? { border: `1px solid ${W.border}`, background: W.glass, color: W.dim, cursor: "default" }
-                              : plan.highlight
-                              ? { background: "#dc2626", color: "#fff" }
-                              : { border: `1px solid ${W.border}`, background: W.glass, color: W.text }}
-                            disabled={isCurrent}
-                            onClick={() => toast.info("Plan upgrade — Stripe integration coming soon.")}
+                          <button
+                            className="mt-1 shrink-0 h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                            style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.dim, cursor: "default" }}
+                            disabled
                           >
-                            {isCurrent ? "Current" : plan.cta}
-                          </motion.button>
+                            {isCurrent ? "Current" : <><Clock className="w-3 h-3" />Coming soon</>}
+                          </button>
                         </div>
                       </div>
                     );
@@ -426,15 +505,12 @@ export default function AccountPage() {
                 <CreditCard className="w-9 h-9 mb-3" style={{ color: W.dim }} />
                 <p className="text-sm font-semibold mb-1" style={{ color: W.muted }}>No payment method on file</p>
                 <p className="text-xs mb-4" style={{ color: W.dim }}>You&apos;re on the Free plan — no card needed</p>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  className="h-8 px-4 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5"
-                  style={{ background: "#dc2626" }}
-                  onClick={() => toast.info("Billing — Stripe integration coming soon.")}
+                <div
+                  className="h-8 px-4 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                  style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.dim }}
                 >
-                  <Zap className="w-3.5 h-3.5" />Upgrade to unlock
-                </motion.button>
+                  <Clock className="w-3.5 h-3.5" />Billing coming soon
+                </div>
               </div>
             )}
 
@@ -471,8 +547,94 @@ export default function AccountPage() {
                   </form>
                 </div>
 
+                {/* Two-factor auth */}
+                <div className="p-4 rounded-xl" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: mfaFactorId ? "rgba(34,197,94,0.12)" : W.glass }}>
+                        {mfaFactorId ? <ShieldCheck className="w-3.5 h-3.5 text-green-400" /> : <Shield className="w-3.5 h-3.5" style={{ color: W.muted }} />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold" style={{ color: W.text }}>Two-factor auth</p>
+                        <p className="text-[10px]" style={{ color: W.dim }}>
+                          {mfaFactorId ? "Enabled — an authenticator code is required at sign-in" : "Add an extra layer of security"}
+                        </p>
+                      </div>
+                    </div>
+                    {!enrollData && (
+                      mfaFactorId ? (
+                        <button
+                          disabled={mfaLoading}
+                          onClick={disableMfa}
+                          className="h-7 px-3 rounded-lg text-xs font-medium transition-all shrink-0 disabled:opacity-50"
+                          style={{ color: "#f87171" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(220,38,38,0.1)"; e.currentTarget.style.color = "#fca5a5"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#f87171"; }}
+                        >
+                          {mfaLoading ? "Disabling…" : "Disable"}
+                        </button>
+                      ) : (
+                        <button
+                          disabled={mfaLoading}
+                          onClick={startMfaEnroll}
+                          className="h-7 px-3 rounded-lg text-xs font-medium transition-all shrink-0 disabled:opacity-50"
+                          style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = W.text)}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = W.muted)}
+                        >
+                          {mfaLoading ? "Starting…" : "Enable"}
+                        </button>
+                      )
+                    )}
+                  </div>
+
+                  {enrollData && (
+                    <div className="mt-4 pt-4 flex flex-col sm:flex-row gap-4" style={{ borderTop: `1px solid ${W.border}` }}>
+                      <div className="shrink-0 self-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={enrollData.qrCode} alt="Scan with your authenticator app" className="w-32 h-32 rounded-lg bg-white p-1.5" />
+                      </div>
+                      <form onSubmit={verifyMfaEnroll} className="flex-1 min-w-0 flex flex-col gap-2.5">
+                        <p className="text-[11px]" style={{ color: W.muted }}>
+                          Scan with Google Authenticator, 1Password, or Authy — or enter this key manually:
+                        </p>
+                        <code className="text-[10px] px-2 py-1.5 rounded-lg break-all select-all" style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.dim }}>
+                          {enrollData.secret}
+                        </code>
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={verifyCode}
+                            onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            placeholder="6-digit code"
+                            className="flex-1 h-9 rounded-xl text-sm text-center tracking-[0.3em] outline-none"
+                            style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.text }}
+                          />
+                          <button
+                            type="button"
+                            onClick={cancelMfaEnroll}
+                            className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
+                            style={{ border: `1px solid ${W.border}`, color: W.dim }}
+                            aria-label="Cancel"
+                          >
+                            <XIcon className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={mfaLoading || verifyCode.length !== 6}
+                          className="h-9 rounded-lg text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{ background: "#dc2626", color: "#fff" }}
+                        >
+                          {mfaLoading ? "Verifying…" : "Verify & enable"}
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+
                 {[
-                  { icon: Shield,  title: "Two-factor auth",  sub: "Add an extra layer of security",     cta: "Enable",      danger: false, action: () => toast.info("2FA coming soon.") },
                   { icon: History, title: "Active sessions",  sub: "Sign out all other sessions",         cta: "Revoke all",  danger: true,  action: async () => { await supabase.auth.signOut({ scope: "others" }); toast.success("Other sessions signed out."); } },
                 ].map(({ icon: Icon, title, sub, action, cta, danger }) => (
                   <div key={title} className="flex items-center justify-between p-3.5 rounded-xl" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
@@ -520,7 +682,7 @@ export default function AccountPage() {
                       <p className="text-[11px] mt-0.5" style={{ color: W.dim }}>{desc}</p>
                     </div>
                     <button
-                      onClick={() => setNotifications((prev) => ({ ...prev, [key]: !prev[key] }))}
+                      onClick={() => toggleNotification(key)}
                       className="relative w-10 h-5 rounded-full transition-colors shrink-0 ml-4"
                       style={{
                         background: notifications[key] ? "#dc2626" : "rgba(255,255,255,0.08)",

@@ -356,7 +356,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     async function loadUser() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      // getSession() reads the already-verified local session (no network round trip);
+      // getUser() would re-hit Supabase's auth server on every mount just for display data.
+      // Every actual data query below is still RLS-gated server-side, so this is safe.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
       if (!user) { router.push("/login"); return; }
 
       // Pull display name: prefer profile full_name, then Google metadata, then email prefix

@@ -474,6 +474,17 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
             </motion.button>
           </Link>
         )}
+
+        {/* Paid tiers aren't purchasable yet — signing up still works, but don't
+            imply a card can be charged today. */}
+        {plan.price > 0 && !isCurrent && (
+          <p
+            className="mt-1.5 sm:mt-2.5 text-center text-[7px] sm:text-[10px]"
+            style={{ color: "rgba(255,255,255,0.40)" }}
+          >
+            Paid plans coming soon — start free today
+          </p>
+        )}
       </div>
     </div>
   );

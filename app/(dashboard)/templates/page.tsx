@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, ChevronRight, Crown, Layers, Lock, Search, Sparkles, X } from "lucide-react";
+import { Crown, Layers, Lock, Search, Sparkles, X } from "lucide-react";
 import {
   TEMPLATE_CATEGORIES, TEMPLATES, getTemplatesByCategory,
   type Template, type TemplateCategory,
 } from "@/lib/templates-data";
 import { toast } from "sonner";
+import { FeaturedCarousel } from "@/components/templates/featured-carousel";
 
 const W = {
   bg: "#0f0404",
@@ -31,7 +32,6 @@ export default function TemplatesPage() {
   const [activeCategory, setActiveCategory] = useState<TemplateCategory>("all");
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<Template | null>(null);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   useEffect(() => {
     document.body.style.overflow = preview ? "hidden" : "";
@@ -132,8 +132,8 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      {/* Grid */}
-      <div className="flex-1 overflow-y-auto px-5 py-4">
+      {/* Carousel */}
+      <div className="flex-1 overflow-y-auto py-4">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center text-center py-20">
             <Search className="w-10 h-10 mb-3" style={{ color: W.dim }} />
@@ -141,103 +141,7 @@ export default function TemplatesPage() {
             <button onClick={() => setSearch("")} className="text-xs hover:underline mt-2" style={{ color: W.red }}>Clear search</button>
           </div>
         ) : (
-          <motion.div layout className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            <AnimatePresence mode="popLayout">
-              {filtered.map((tpl, i) => (
-                <motion.div
-                  key={tpl.id}
-                  layout
-                  initial={{ opacity: 0, y: 16, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ delay: i * 0.04, duration: 0.25 }}
-                  onHoverStart={() => setHoveredId(tpl.id)}
-                  onHoverEnd={() => setHoveredId(null)}
-                  className="group relative flex flex-col rounded-xl overflow-hidden cursor-pointer"
-                  style={{
-                    background: W.card,
-                    border: hoveredId === tpl.id ? `1px solid ${tpl.accentColor}40` : `1px solid ${W.border}`,
-                    boxShadow: hoveredId === tpl.id ? `0 8px 32px ${tpl.accentColor}20, 0 0 0 1px ${tpl.accentColor}25` : "none",
-                    transition: "all 0.22s ease",
-                  }}
-                  onClick={() => setPreview(tpl)}
-                >
-                  {/* Cover image */}
-                  <div className="relative aspect-[4/3] overflow-hidden" style={{ background: W.glass }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`https://picsum.photos/seed/${tpl.coverSeed}/400/300`}
-                      alt={tpl.name}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-
-                    {tpl.isPro && (
-                      <div className="absolute top-1.5 right-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur-sm" style={{ border: "1px solid rgba(251,191,36,0.35)" }}>
-                        <Crown className="w-2.5 h-2.5 text-amber-400" />
-                        <span className="text-[9px] font-bold text-amber-400">PRO</span>
-                      </div>
-                    )}
-
-                    <div className="absolute bottom-1.5 left-1.5">
-                      <span
-                        className="text-[9px] font-bold px-1.5 py-0.5 rounded-md backdrop-blur-sm"
-                        style={{ background: `${tpl.accentColor}28`, color: tpl.accentColor, border: `1px solid ${tpl.accentColor}40` }}
-                      >
-                        {tpl.category.charAt(0).toUpperCase() + tpl.category.slice(1)}
-                      </span>
-                    </div>
-
-                    <motion.div
-                      initial={false}
-                      animate={{ opacity: hoveredId === tpl.id ? 1 : 0 }}
-                      transition={{ duration: 0.18 }}
-                      className="absolute inset-0 bg-black/35 flex items-center justify-center gap-1.5"
-                    >
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setPreview(tpl); }}
-                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-white text-[11px] font-semibold transition-colors"
-                        style={{ background: "rgba(255,255,255,0.12)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.25)" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.22)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
-                      >
-                        <Sparkles className="w-3 h-3" />
-                        Preview
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); applyTemplate(tpl); }}
-                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-white text-[11px] font-bold transition-colors"
-                        style={tpl.isPro
-                          ? { background: "rgba(245,158,11,0.85)", border: "1px solid rgba(251,191,36,0.4)" }
-                          : { background: "rgba(220,38,38,0.85)", border: "1px solid rgba(239,68,68,0.5)" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-                      >
-                        {tpl.isPro ? <Lock className="w-3 h-3" /> : <ArrowUpRight className="w-3 h-3" />}
-                        Use this
-                      </button>
-                    </motion.div>
-                  </div>
-
-                  {/* Card body */}
-                  <div className="px-2.5 py-2 flex-1 flex flex-col">
-                    <div className="flex items-start gap-1.5 mb-1">
-                      <p className="text-xs font-semibold leading-tight flex-1 truncate" style={{ color: W.text }}>{tpl.name}</p>
-                      <ChevronRight className="w-3 h-3 shrink-0 mt-0.5 transition-all group-hover:translate-x-0.5" style={{ color: W.dim }} />
-                    </div>
-                    <p className="text-[10px] leading-snug line-clamp-1" style={{ color: W.muted }}>{tpl.description}</p>
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {tpl.tags.slice(0, 2).map((tag) => (
-                        <span key={tag} className="text-[9px] rounded-md px-1.5 py-0.5 font-medium"
-                          style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.dim }}>
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </motion.div>
+          <FeaturedCarousel items={filtered} onSelect={(tpl) => setPreview(tpl)} />
         )}
 
         <p className="text-[11px] text-center mt-6" style={{ color: W.dim }}>
@@ -353,7 +257,7 @@ export default function TemplatesPage() {
                   <p className="text-[11px] text-center mt-3 flex items-center justify-center gap-1" style={{ color: W.dim }}>
                     <Lock className="w-3 h-3" />
                     Requires Pro plan ·{" "}
-                    <span className="font-semibold cursor-pointer hover:underline" style={{ color: W.red }}>Upgrade for $20/mo</span>
+                    <span className="font-semibold" style={{ color: W.muted }}>Pro plans coming soon</span>
                   </p>
                 )}
               </div>

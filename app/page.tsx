@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   motion,
   useMotionValue,
@@ -14,6 +15,8 @@ import {
 import { ArrowRight, Check, Sparkles, ArrowUpRight, Zap } from "lucide-react";
 import { TOOLS } from "@/lib/tools-config";
 import { PLANS, MOCK_CURRENT_USER, type Plan } from "@/lib/mock-data";
+import { TEMPLATES as ALL_TEMPLATES } from "@/lib/templates-data";
+import { FeaturedCarousel } from "@/components/templates/featured-carousel";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { SiteBanner } from "@/components/shared/SiteBanner";
@@ -38,45 +41,6 @@ const CAPABILITIES = [
   "Shadow Generation",
   "Batch Processing",
   "One-Click Export",
-];
-
-const TEMPLATES = [
-  {
-    name: "Luxury Product Shoot",
-    category: "Photography",
-    seed: "luxury-cosmetic",
-    accent: "#dc2626",
-  },
-  {
-    name: "White Studio Background",
-    category: "Background",
-    seed: "white-studio-2",
-    accent: "#3b82f6",
-  },
-  {
-    name: "Lifestyle Campaign",
-    category: "Lifestyle",
-    seed: "lifestyle-outdoor",
-    accent: "#10b981",
-  },
-  {
-    name: "Cosmetic Ad Creative",
-    category: "Cosmetics",
-    seed: "cosmetic-ad",
-    accent: "#f59e0b",
-  },
-  {
-    name: "Fashion Editorial",
-    category: "Fashion",
-    seed: "fashion-model",
-    accent: "#8b5cf6",
-  },
-  {
-    name: "Social Media Promo",
-    category: "Social",
-    seed: "social-promo-2",
-    accent: "#ec4899",
-  },
 ];
 
 const HERO_IMAGES = [
@@ -518,6 +482,7 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function LandingPage() {
+  const router = useRouter();
   const orbitAngle = useMotionValue(0);
   useAnimationFrame((t) => {
     orbitAngle.set((t * 0.015) % 360);
@@ -994,76 +959,18 @@ export default function LandingPage() {
               </h2>
             </FadeIn>
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-              {TEMPLATES.map((tmpl, i) => (
-                <FadeIn key={tmpl.name} delay={i * 0.06}>
-                  <Link href="/templates">
-                    <TiltCard intensity={5} className="cursor-pointer">
-                      <SpinBorder>
-                        <div
-                          className="group relative"
-                          style={{ aspectRatio: "4/3" }}
-                        >
-                          {/* Image */}
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={`https://picsum.photos/seed/${tmpl.seed}/480/360`}
-                            alt={tmpl.name}
-                            loading="lazy"
-                            className="w-full h-full object-cover"
-                            style={{ transition: "transform 0.8s ease" }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.transform = "scale(1.08)")
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.transform = "scale(1)")
-                            }
-                          />
-                          <div
-                            className="absolute inset-0"
-                            style={{
-                              background:
-                                "linear-gradient(to top, rgba(3,3,3,0.85) 0%, rgba(3,3,3,0.12) 50%, transparent 100%)",
-                            }}
-                          />
-                          <div
-                            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-400"
-                            style={{
-                              background: `linear-gradient(135deg, ${tmpl.accent}1a 0%, transparent 55%)`,
-                            }}
-                          />
-
-                          {/* Info overlay */}
-                          <div className="absolute bottom-0 left-0 right-0 p-5">
-                            <span
-                              className="inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full mb-2.5"
-                              style={{
-                                background: `${tmpl.accent}1a`,
-                                border: `1px solid ${tmpl.accent}35`,
-                                color: tmpl.accent,
-                              }}
-                            >
-                              {tmpl.category}
-                            </span>
-                            <p className="font-bold text-[15px] text-white">
-                              {tmpl.name}
-                            </p>
-                          </div>
-
-                          {/* Arrow */}
-                          <div
-                            className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-                            style={{ background: "rgba(255,255,255,0.12)" }}
-                          >
-                            <ArrowUpRight className="w-3.5 h-3.5" />
-                          </div>
-                        </div>
-                      </SpinBorder>
-                    </TiltCard>
-                  </Link>
-                </FadeIn>
-              ))}
-            </div>
+            <FadeIn>
+              <FeaturedCarousel
+                items={ALL_TEMPLATES}
+                onSelect={() => router.push("/templates")}
+              />
+              <p
+                className="text-center text-[11px] sm:text-xs mt-2"
+                style={{ color: "rgba(255,255,255,0.35)" }}
+              >
+                Drag to browse · {ALL_TEMPLATES.length} templates
+              </p>
+            </FadeIn>
           </div>
         </section>
 

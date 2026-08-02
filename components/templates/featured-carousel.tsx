@@ -92,7 +92,7 @@ export function FeaturedCarousel({ items, onSelect }: FeaturedCarouselProps) {
   if (total === 0) return null;
 
   return (
-    <div className="relative isolate flex flex-col items-center justify-center w-full select-none">
+    <div className="relative isolate flex flex-col items-center justify-center w-full max-w-5xl mx-auto select-none">
       <motion.div
         drag={total > 1 ? "x" : false}
         dragConstraints={{ left: 0, right: 0 }}
@@ -105,7 +105,7 @@ export function FeaturedCarousel({ items, onSelect }: FeaturedCarouselProps) {
         }}
         onDragEnd={handleDragEnd}
         className={cn(
-          "relative w-full max-w-5xl h-56 sm:h-72 lg:h-80 flex items-center justify-center overflow-hidden",
+          "relative w-full h-56 sm:h-72 lg:h-80 flex items-center justify-center overflow-hidden",
           total > 1 && "cursor-grab active:cursor-grabbing",
         )}
       >

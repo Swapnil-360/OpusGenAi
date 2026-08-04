@@ -15,7 +15,7 @@ import {
 import { ArrowRight, Check, Sparkles, ArrowUpRight, Zap } from "lucide-react";
 import { TOOLS } from "@/lib/tools-config";
 import { PLANS, MOCK_CURRENT_USER, type Plan } from "@/lib/mock-data";
-import { TEMPLATES as ALL_TEMPLATES } from "@/lib/templates-data";
+import { useTemplates } from "@/lib/hooks/use-templates";
 import { FeaturedCarousel } from "@/components/templates/featured-carousel";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
@@ -23,6 +23,17 @@ import { SiteBanner } from "@/components/shared/SiteBanner";
 import { cn } from "@/lib/utils";
 
 // ─── Static data ─────────────────────────────────────────────────────────────
+
+// Bento grid spans for the Tools section — see the "Asymmetric bento" comment
+// at its usage site for the layout this produces.
+const BENTO_SPANS = [
+  "lg:col-span-2 lg:row-span-2",
+  "lg:col-span-2",
+  "",
+  "",
+  "lg:col-span-2",
+  "lg:col-span-2",
+];
 
 const CAPABILITIES = [
   "Product Photography",
@@ -483,6 +494,7 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
 
 export default function LandingPage() {
   const router = useRouter();
+  const { templates: ALL_TEMPLATES } = useTemplates();
   const orbitAngle = useMotionValue(0);
   useAnimationFrame((t) => {
     orbitAngle.set((t * 0.015) % 360);
@@ -783,9 +795,14 @@ export default function LandingPage() {
               </div>
             </FadeIn>
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            {/* Asymmetric bento: tool[0] is a 2x2 hero tile, tools[1],[4],[5] are
+                2-wide, tools[2],[3] fill the remaining single cells — an
+                editorial arrangement instead of a uniform grid. Collapses to a
+                plain 2-col stack below lg. All existing card chrome (spin
+                border, tilt glow, image treatment) is untouched. */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 lg:auto-rows-[13rem] gap-3">
               {TOOLS.map((tool, i) => (
-                <FadeIn key={tool.id} delay={i * 0.07}>
+                <FadeIn key={tool.id} delay={i * 0.07} className={BENTO_SPANS[i] ?? ""}>
                   <Link href={tool.href} className="block h-full">
                     {/* Outer: handles lift + outer glow — no overflow-hidden so shadow is visible */}
                     <motion.div

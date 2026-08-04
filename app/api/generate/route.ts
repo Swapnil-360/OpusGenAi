@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits } from "@/lib/credits";
-import { buildScenePrompt, buildProductEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
+import { buildScenePrompt, buildProductEditPrompt, buildPortraitEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
 
 const CREDIT_COST = 1;
 // Premium path regenerates the whole image via a paid model — priced higher
@@ -15,7 +15,7 @@ const PREMIUM_CREDIT_COST = 3;
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, ratio = "1:1", templateId, mode, image: inputImage } = await req.json();
+    const { prompt, ratio = "1:1", templateId, templateType, mode, image: inputImage } = await req.json();
 
     if (!prompt?.trim()) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
@@ -47,10 +47,13 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Product photo is required for this mode." }, { status: 400 });
       }
       const imageUrl = await uploadDataUrlToFal(inputImage);
+      const editPrompt = templateType === "universal"
+        ? buildPortraitEditPrompt(prompt.trim())
+        : buildProductEditPrompt(prompt.trim());
       const result = await fal.subscribe("fal-ai/gemini-25-flash-image/edit", {
         input: {
           image_urls: [imageUrl],
-          prompt: buildProductEditPrompt(prompt.trim()),
+          prompt: editPrompt,
           aspect_ratio: ratio,
           num_images: 1,
           output_format: "png",
@@ -96,6 +99,7 @@ export async function POST(req: NextRequest) {
           images: [image],
           aspectRatio: ratio,
           templateId: templateId ?? undefined,
+          templateType: templateType ?? undefined,
           productPreserved: mode === "background" || undefined,
           engine: isPremium ? "gemini-25-flash-image" : undefined,
         },

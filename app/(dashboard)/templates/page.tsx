@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Crown, Layers, Lock, Search, Sparkles, X } from "lucide-react";
 import {
-  TEMPLATE_CATEGORIES, TEMPLATES, getTemplatesByCategory,
-  type Template, type TemplateCategory,
+  PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, getTemplatesByCategory,
+  type Template, type TemplateType,
 } from "@/lib/templates-data";
+import { useTemplates } from "@/lib/hooks/use-templates";
 import { toast } from "sonner";
 import { FeaturedCarousel } from "@/components/templates/featured-carousel";
 
@@ -27,11 +28,21 @@ const W = {
   redBorder: "rgba(220,38,38,0.35)",
 };
 
+const TYPES: { id: TemplateType; label: string; hint: string }[] = [
+  { id: "production", label: "Production", hint: "For your product photos" },
+  { id: "universal", label: "Universal", hint: "For your own photos" },
+];
+
 export default function TemplatesPage() {
   const router = useRouter();
-  const [activeCategory, setActiveCategory] = useState<TemplateCategory>("all");
+  const { templates, loading } = useTemplates();
+  const [activeType, setActiveType] = useState<TemplateType>("production");
+  const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<Template | null>(null);
+
+  const categories = activeType === "production" ? PRODUCTION_CATEGORIES : UNIVERSAL_CATEGORIES;
+  const byType = templates.filter((t) => t.templateType === activeType);
 
   useEffect(() => {
     document.body.style.overflow = preview ? "hidden" : "";
@@ -44,7 +55,7 @@ export default function TemplatesPage() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [preview]);
 
-  const filtered = getTemplatesByCategory(activeCategory).filter((t) => {
+  const filtered = getTemplatesByCategory(byType, activeCategory).filter((t) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -104,10 +115,34 @@ export default function TemplatesPage() {
           </div>
         </div>
 
+        {/* Type toggle */}
+        <div className="flex gap-1.5 mb-2.5">
+          {TYPES.map((t) => {
+            const isActive = activeType === t.id;
+            const count = templates.filter((tpl) => tpl.templateType === t.id).length;
+            return (
+              <button
+                key={t.id}
+                onClick={() => { setActiveType(t.id); setActiveCategory("all"); }}
+                className="flex-1 sm:flex-none flex flex-col items-start px-3.5 py-1.5 rounded-xl transition-all"
+                style={isActive
+                  ? { border: `1px solid ${W.redBorder}`, background: W.redBg }
+                  : { border: `1px solid ${W.border}`, background: W.glassDim }}
+              >
+                <span className="text-xs font-bold flex items-center gap-1.5" style={{ color: isActive ? W.red : W.text }}>
+                  {t.label}
+                  <span className="text-[9px] rounded-full px-1.5 py-0.5 font-bold" style={{ background: W.glass, color: W.dim }}>{count}</span>
+                </span>
+                <span className="text-[10px]" style={{ color: W.dim }}>{t.hint}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Category filters */}
         <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-          {TEMPLATE_CATEGORIES.map((cat) => {
-            const count = cat.id === "all" ? TEMPLATES.length : TEMPLATES.filter((t) => t.category === cat.id).length;
+          {categories.map((cat) => {
+            const count = cat.id === "all" ? byType.length : byType.filter((t) => t.category === cat.id).length;
             const isActive = activeCategory === cat.id;
             return (
               <motion.button
@@ -134,7 +169,11 @@ export default function TemplatesPage() {
 
       {/* Carousel */}
       <div className="flex-1 overflow-y-auto py-4">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: W.border, borderTopColor: W.red }} />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center text-center py-20">
             <Search className="w-10 h-10 mb-3" style={{ color: W.dim }} />
             <p className="text-sm font-semibold mb-1" style={{ color: W.muted }}>No templates match &ldquo;{search}&rdquo;</p>
@@ -144,9 +183,11 @@ export default function TemplatesPage() {
           <FeaturedCarousel items={filtered} onSelect={(tpl) => setPreview(tpl)} />
         )}
 
-        <p className="text-[11px] text-center mt-6" style={{ color: W.dim }}>
-          {filtered.length} of {TEMPLATES.length} templates · 3 require Pro plan
-        </p>
+        {!loading && (
+          <p className="text-[11px] text-center mt-6" style={{ color: W.dim }}>
+            {filtered.length} of {byType.length} templates
+          </p>
+        )}
       </div>
 
       {/* Preview modal */}
@@ -171,8 +212,17 @@ export default function TemplatesPage() {
               style={{ background: "#0d0303", border: `1px solid ${W.border}` }}
             >
               {/* Cover */}
-              <div className="relative aspect-[16/7] overflow-hidden" style={{ background: W.glass }}>
-                <Image src={`https://picsum.photos/seed/${preview.coverSeed}/800/350`} alt={preview.name} fill sizes="(max-width: 768px) 100vw, 672px" className="object-cover" />
+              <div className="relative aspect-video overflow-hidden" style={{ background: W.glass }}>
+                {preview.coverImageUrl ? (
+                  <Image src={preview.coverImageUrl} alt={preview.name} fill sizes="(max-width: 768px) 100vw, 672px" className="object-cover" />
+                ) : (
+                  <div
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{ background: `linear-gradient(160deg, ${preview.accentColor}30 0%, #0d0303 80%)` }}
+                  >
+                    <span className="text-[11px]" style={{ color: W.dim }}>Preview generating…</span>
+                  </div>
+                )}
                 <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 0%, #0d0303 100%)" }} />
                 <button onClick={() => setPreview(null)} aria-label="Close"
                   className="absolute top-3 right-3 w-9 h-9 rounded-xl backdrop-blur-sm flex items-center justify-center transition-colors"
@@ -201,15 +251,6 @@ export default function TemplatesPage() {
                     style={{ background: `${preview.accentColor}20`, color: preview.accentColor, border: `1px solid ${preview.accentColor}35` }}>
                     {preview.category}
                   </span>
-                </div>
-
-                {/* Preview gallery */}
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {[preview.coverSeed, ...preview.previewSeeds].slice(0, 3).map((seed, i) => (
-                    <div key={i} className="relative aspect-square rounded-xl overflow-hidden" style={{ background: W.glass }}>
-                      <Image src={`https://picsum.photos/seed/${seed}/200/200`} alt="" fill sizes="200px" className="object-cover" />
-                    </div>
-                  ))}
                 </div>
 
                 {/* Prompt */}

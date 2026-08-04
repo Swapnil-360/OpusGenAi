@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Aperture, Check, ChevronDown, Download, ExternalLink,
@@ -11,7 +12,7 @@ import {
   Globe, ShoppingBag, Megaphone, LayoutTemplate, Heart,
   Droplets, Gem, Watch, Pill, Footprints, Briefcase, Smartphone, Flame,
 } from "lucide-react";
-import { TEMPLATES } from "@/lib/templates-data";
+import { useTemplates } from "@/lib/hooks/use-templates";
 import { fileToDataUrl } from "@/lib/mask-canvas";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_NOTIFICATION_PREFS, LOW_CREDIT_THRESHOLD, type NotificationPrefs } from "@/lib/notification-prefs";
@@ -161,6 +162,16 @@ const W = {
 
 /* ─── Page ──────────────────────────────────────────────────────────── */
 export default function GeneratePage() {
+  return (
+    <Suspense>
+      <GeneratePageInner />
+    </Suspense>
+  );
+}
+
+function GeneratePageInner() {
+  const searchParams = useSearchParams();
+  const { templates } = useTemplates();
   const [prompt, setPrompt] = useState("");
   const [promptFocused, setPromptFocused] = useState(false);
   const [selectedSize, setSelectedSize] = useState<SizePreset>(SIZE_PRESETS[0]);
@@ -264,6 +275,7 @@ export default function GeneratePage() {
         prompt: prompt.trim(),
         ratio: selectedSize.ratio,
         templateId: selectedTemplate,
+        templateType: appliedTemplate?.templateType,
         mode: "premium",
         image: imageDataUrl,
       }),
@@ -291,6 +303,7 @@ export default function GeneratePage() {
         prompt: prompt.trim(),
         ratio: selectedSize.ratio,
         templateId: selectedTemplate,
+        templateType: appliedTemplate?.templateType,
       }),
     });
 
@@ -334,13 +347,21 @@ export default function GeneratePage() {
   }
 
   function handleSelectTemplate(id: string) {
-    const tpl = TEMPLATES.find((t) => t.id === id);
+    const tpl = templates.find((t) => t.id === id);
     if (!tpl) return;
     setSelectedTemplate(id);
     setPrompt(tpl.prompt);
     setShowTemplatePicker(false);
     toast.success(`Template applied: ${tpl.name}`);
   }
+
+  // Deep link from /templates ("Use this template" → /generate?template=<id>).
+  // Templates load async, so this waits for the fetch rather than firing once on mount.
+  useEffect(() => {
+    const id = searchParams.get("template");
+    if (id && templates.length > 0) handleSelectTemplate(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, templates]);
 
   // Replaces the whole prompt with this use case's scene language — only the
   // latest click applies, it never merges with a previous selection.
@@ -350,7 +371,7 @@ export default function GeneratePage() {
   }
 
   const imagesReady = genStatus === "done" && !!generatedImage;
-  const appliedTemplate = selectedTemplate ? TEMPLATES.find((t) => t.id === selectedTemplate) : null;
+  const appliedTemplate = selectedTemplate ? templates.find((t) => t.id === selectedTemplate) : null;
 
   return (
     <div className="h-full overflow-y-auto" style={{ background: "#0f0404" }} onClick={() => closeAll()}>
@@ -624,32 +645,50 @@ export default function GeneratePage() {
                   style={{ background: "#130505", border: `1px solid ${W.border}`, boxShadow: "0 20px 50px rgba(0,0,0,0.8)" }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="p-1.5 max-h-64 overflow-y-auto">
-                    <p className="text-[10px] font-bold uppercase tracking-widest px-2 pt-1.5 pb-1.5" style={{ color: W.dim }}>Templates</p>
-                    {TEMPLATES.slice(0, 8).map((tpl) => (
-                      <button
-                        key={tpl.id}
-                        onClick={() => handleSelectTemplate(tpl.id)}
-                        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all text-left"
-                        style={selectedTemplate === tpl.id ? { background: W.redBg } : {}}
-                        onMouseEnter={(e) => { if (selectedTemplate !== tpl.id) e.currentTarget.style.background = W.glass; }}
-                        onMouseLeave={(e) => { if (selectedTemplate !== tpl.id) e.currentTarget.style.background = "transparent"; }}
-                      >
-                        <Image
-                          src={`https://picsum.photos/seed/${tpl.coverSeed}/48/48`}
-                          alt="" width={48} height={48}
-                          className="w-7 h-7 rounded-md object-cover shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[12px] font-semibold leading-none" style={{ color: selectedTemplate === tpl.id ? W.red : W.text }}>
-                            {tpl.name}
-                            {tpl.isPro && <span className="ml-1.5 text-[9px] bg-amber-400/20 text-amber-400 border border-amber-400/30 rounded-full px-1.5 font-bold">PRO</span>}
-                          </p>
-                          <p className="text-[10px] mt-0.5 truncate" style={{ color: W.muted }}>{tpl.description}</p>
+                  <div className="p-1.5 max-h-80 overflow-y-auto">
+                    {([
+                      { type: "production" as const, label: "Production — for your product photos" },
+                      { type: "universal" as const, label: "Universal — for your own photos" },
+                    ]).map(({ type, label }) => {
+                      const group = templates.filter((t) => t.templateType === type).slice(0, 4);
+                      if (group.length === 0) return null;
+                      return (
+                        <div key={type}>
+                          <p className="text-[10px] font-bold uppercase tracking-widest px-2 pt-1.5 pb-1.5" style={{ color: W.dim }}>{label}</p>
+                          {group.map((tpl) => (
+                            <button
+                              key={tpl.id}
+                              onClick={() => handleSelectTemplate(tpl.id)}
+                              className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all text-left"
+                              style={selectedTemplate === tpl.id ? { background: W.redBg } : {}}
+                              onMouseEnter={(e) => { if (selectedTemplate !== tpl.id) e.currentTarget.style.background = W.glass; }}
+                              onMouseLeave={(e) => { if (selectedTemplate !== tpl.id) e.currentTarget.style.background = "transparent"; }}
+                            >
+                              {tpl.coverImageUrl ? (
+                                <Image
+                                  src={tpl.coverImageUrl}
+                                  alt="" width={48} height={48}
+                                  className="w-7 h-7 rounded-md object-cover shrink-0"
+                                />
+                              ) : (
+                                <div
+                                  className="w-7 h-7 rounded-md shrink-0"
+                                  style={{ background: `linear-gradient(160deg, ${tpl.accentColor}45 0%, #0d0303 85%)` }}
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[12px] font-semibold leading-none" style={{ color: selectedTemplate === tpl.id ? W.red : W.text }}>
+                                  {tpl.name}
+                                  {tpl.isPro && <span className="ml-1.5 text-[9px] bg-amber-400/20 text-amber-400 border border-amber-400/30 rounded-full px-1.5 font-bold">PRO</span>}
+                                </p>
+                                <p className="text-[10px] mt-0.5 truncate" style={{ color: W.muted }}>{tpl.description}</p>
+                              </div>
+                              {selectedTemplate === tpl.id && <Check className="w-3 h-3 shrink-0" style={{ color: W.red }} />}
+                            </button>
+                          ))}
                         </div>
-                        {selectedTemplate === tpl.id && <Check className="w-3 h-3 shrink-0" style={{ color: W.red }} />}
-                      </button>
-                    ))}
+                      );
+                    })}
                     <Link href="/templates" className="flex items-center justify-center text-xs font-semibold py-2 hover:underline" style={{ color: W.red }} onClick={() => setShowTemplatePicker(false)}>
                       All templates →
                     </Link>

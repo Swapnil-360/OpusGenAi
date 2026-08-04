@@ -9,7 +9,7 @@ import {
   List, Search, SlidersHorizontal, Sparkles, Star, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { TEMPLATES } from "@/lib/templates-data";
+import { useTemplates } from "@/lib/hooks/use-templates";
 import { formatTimeAgo, truncate } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -37,6 +37,7 @@ type CombinedEntry = {
 };
 
 export default function HistoryPage() {
+  const { templates } = useTemplates();
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
@@ -248,7 +249,7 @@ export default function HistoryPage() {
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
             {generations.map((gen, i) => {
-              const template = gen.templateId ? TEMPLATES.find((t) => t.id === gen.templateId) : null;
+              const template = gen.templateId ? templates.find((t) => t.id === gen.templateId) : null;
               const isStarred = starred.has(gen.id);
               return (
                 <motion.div
@@ -334,7 +335,7 @@ export default function HistoryPage() {
           /* List view */
           <div className="space-y-2">
             {generations.map((gen, i) => {
-              const template = gen.templateId ? TEMPLATES.find((t) => t.id === gen.templateId) : null;
+              const template = gen.templateId ? templates.find((t) => t.id === gen.templateId) : null;
               const isStarred = starred.has(gen.id);
               return (
                 <motion.div
@@ -474,10 +475,14 @@ export default function HistoryPage() {
 
                 {/* Template */}
                 {selectedGen.templateId && (() => {
-                  const tpl = TEMPLATES.find((t) => t.id === selectedGen.templateId);
+                  const tpl = templates.find((t) => t.id === selectedGen.templateId);
                   return tpl ? (
                     <div className="flex items-center gap-2.5 p-2.5 rounded-xl" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
-                      <Image src={`https://picsum.photos/seed/${tpl.coverSeed}/48/48`} alt="" width={48} height={48} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                      {tpl.coverImageUrl ? (
+                        <Image src={tpl.coverImageUrl} alt="" width={48} height={48} className="w-10 h-10 rounded-lg object-cover shrink-0" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg shrink-0" style={{ background: `linear-gradient(160deg, ${tpl.accentColor}45 0%, #0d0303 85%)` }} />
+                      )}
                       <div>
                         <p className="text-xs font-semibold" style={{ color: W.text }}>{tpl.name}</p>
                         <p className="text-[10px]" style={{ color: W.dim }}>{tpl.category} template</p>

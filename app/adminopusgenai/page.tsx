@@ -25,6 +25,10 @@ import {
   Pencil,
   RefreshCw,
   Wallet,
+  Layers,
+  Plus,
+  Trash2,
+  ImagePlus,
 } from "lucide-react";
 import {
   BANNER_KEY,
@@ -35,7 +39,10 @@ import {
   type BannerMode,
   type WelcomeConfig,
 } from "@/lib/admin-config";
+import { PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, type Template, type TemplateType } from "@/lib/templates-data";
+import { useTemplates } from "@/lib/hooks/use-templates";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 type Feedback = {
   id: string;
@@ -90,6 +97,48 @@ type AdminStats = {
   falCurrency: string;
 };
 
+// id set = editing that template; id null = creating a new one.
+type TemplateFormState = {
+  id: string | null;
+  name: string;
+  templateType: TemplateType;
+  category: string;
+  description: string;
+  tags: string; // comma-separated in the form, split into an array on save
+  prompt: string;
+  accentColor: string;
+  isPro: boolean;
+  sortOrder: number;
+};
+
+const EMPTY_TEMPLATE_FORM: TemplateFormState = {
+  id: null,
+  name: "",
+  templateType: "production",
+  category: "",
+  description: "",
+  tags: "",
+  prompt: "",
+  accentColor: "#dc2626",
+  isPro: false,
+  sortOrder: 0,
+};
+
+function templateToForm(tpl: Template): TemplateFormState {
+  return {
+    id: tpl.id,
+    name: tpl.name,
+    templateType: tpl.templateType,
+    category: tpl.category,
+    description: tpl.description,
+    tags: tpl.tags.join(", "),
+    prompt: tpl.prompt,
+    accentColor: tpl.accentColor,
+    isPro: tpl.isPro,
+    sortOrder: tpl.sortOrder,
+  };
+}
+
 // ─── small helpers ────────────────────────────────────────────────────────────
 function Avatar({ name, size = 32 }: { name: string; size?: number }) {
   const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
@@ -135,7 +184,7 @@ const BANNER_MODES: { mode: BannerMode; label: string; icon: React.ElementType; 
 export default function AdminPage() {
   const router = useRouter();
   const [adminEmail, setAdminEmail] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "messages" | "feedback" | "users">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "messages" | "feedback" | "users" | "templates">("overview");
   const [banner, setBanner] = useState<BannerConfig>(DEFAULT_BANNER);
   const [welcome, setWelcome] = useState<WelcomeConfig>(DEFAULT_WELCOME);
   const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
@@ -147,6 +196,13 @@ export default function AdminPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState(false);
+
+  // ── templates tab state ──────────────────────────────────────────────────────
+  const { templates, loading: templatesLoading, refetch: refetchTemplates } = useTemplates();
+  const [templateForm, setTemplateForm] = useState<TemplateFormState | null>(null); // null = form closed
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -209,6 +265,86 @@ export default function AdminPage() {
     updateFeedbackStatus(id, "archived");
   }
 
+  // ── template actions ─────────────────────────────────────────────────────────
+  async function saveTemplate() {
+    if (!templateForm) return;
+    if (!templateForm.name.trim() || !templateForm.category.trim() || !templateForm.description.trim() || !templateForm.prompt.trim()) {
+      toast.error("Name, category, description, and prompt are required.");
+      return;
+    }
+    setSavingTemplate(true);
+    const payload = {
+      name: templateForm.name,
+      templateType: templateForm.templateType,
+      category: templateForm.category,
+      description: templateForm.description,
+      tags: templateForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      prompt: templateForm.prompt,
+      accentColor: templateForm.accentColor,
+      isPro: templateForm.isPro,
+      sortOrder: templateForm.sortOrder,
+    };
+    const res = await fetch(
+      templateForm.id ? `/api/admin/templates/${templateForm.id}` : "/api/admin/templates",
+      {
+        method: templateForm.id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+    setSavingTemplate(false);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast.error(err.error || "Failed to save template.");
+      return;
+    }
+    toast.success(templateForm.id ? "Template updated." : "Template created.");
+    setTemplateForm(null);
+    refetchTemplates();
+  }
+
+  async function deleteTemplate(id: string, name: string) {
+    if (!confirm(`Delete "${name}"? This can't be undone.`)) return;
+    const res = await fetch(`/api/admin/templates/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      toast.error("Failed to delete template.");
+      return;
+    }
+    toast.success("Template deleted.");
+    refetchTemplates();
+  }
+
+  async function regeneratePreview(id: string) {
+    setRegeneratingId(id);
+    const res = await fetch(`/api/admin/templates/${id}/preview`, { method: "POST" });
+    setRegeneratingId(null);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast.error(err.error || "Failed to generate preview.");
+      return;
+    }
+    toast.success("Preview generated.");
+    refetchTemplates();
+  }
+
+  async function generateAllPreviews() {
+    const missing = templates.filter((t) => !t.coverImageUrl);
+    if (missing.length === 0) {
+      toast.info("Every template already has a preview.");
+      return;
+    }
+    setBulkGenerating(true);
+    let failed = 0;
+    for (const tpl of missing) {
+      const res = await fetch(`/api/admin/templates/${tpl.id}/preview`, { method: "POST" });
+      if (!res.ok) failed++;
+    }
+    setBulkGenerating(false);
+    refetchTemplates();
+    if (failed > 0) toast.error(`${failed} of ${missing.length} previews failed — try regenerating those individually.`);
+    else toast.success(`Generated ${missing.length} preview${missing.length === 1 ? "" : "s"}.`);
+  }
+
   const filteredFeedback = feedbackList.filter((f) => {
     if (fbFilter === "all") return true;
     if (fbFilter === "unread") return f.status === "new";
@@ -229,6 +365,7 @@ export default function AdminPage() {
     { id: "messages", label: "Messages", icon: Megaphone },
     { id: "feedback", label: "Feedback", icon: MessageSquare },
     { id: "users", label: "Users", icon: Users },
+    { id: "templates", label: "Templates", icon: Layers },
   ] as const;
 
   return (
@@ -641,6 +778,191 @@ export default function AdminPage() {
             <p className="text-xs text-center mt-4" style={{ color: T.dim }}>
               Showing {users.length.toLocaleString()} of {users.length.toLocaleString()} users
             </p>
+          </motion.div>
+        )}
+
+        {/* ── TEMPLATES TAB ──────────────────────────────────────────────── */}
+        {activeTab === "templates" && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <p className="text-xs" style={{ color: T.muted }}>
+                {templatesLoading ? "Loading…" : `${templates.length} templates · ${templates.filter((t) => !t.coverImageUrl).length} missing a preview`}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={generateAllPreviews}
+                  disabled={bulkGenerating || templatesLoading}
+                  className="flex items-center gap-1.5 text-xs px-3 h-8 rounded-lg font-semibold transition-opacity hover:opacity-80 disabled:opacity-50"
+                  style={{ background: T.card, border: `1px solid ${T.border}`, color: T.muted }}
+                >
+                  <ImagePlus className={`w-3.5 h-3.5 ${bulkGenerating ? "animate-pulse" : ""}`} />
+                  {bulkGenerating ? "Generating…" : "Generate all previews"}
+                </button>
+                <button
+                  onClick={() => setTemplateForm(EMPTY_TEMPLATE_FORM)}
+                  className="flex items-center gap-1.5 text-xs px-3 h-8 rounded-lg font-bold text-white"
+                  style={{ background: T.redPrimary }}
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add template
+                </button>
+              </div>
+            </div>
+
+            {/* Inline add/edit form */}
+            {templateForm && (
+              <div className="p-5 rounded-2xl mb-6" style={{ background: T.card, border: `1px solid ${T.redBorder}` }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-black" style={{ color: T.text }}>{templateForm.id ? "Edit template" : "New template"}</h3>
+                  <button onClick={() => setTemplateForm(null)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: T.dim }}>
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Name</label>
+                    <input value={templateForm.name} onChange={(e) => setTemplateForm((f) => f && { ...f, name: e.target.value })}
+                      className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Type</label>
+                    <div className="flex gap-2">
+                      {(["production", "universal"] as const).map((t) => (
+                        <button key={t} onClick={() => setTemplateForm((f) => f && { ...f, templateType: t })}
+                          className="flex-1 h-9 rounded-xl text-xs font-semibold capitalize transition-all"
+                          style={templateForm.templateType === t
+                            ? { background: T.redBg, border: `1px solid ${T.redBorder}`, color: T.red }
+                            : { background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, color: T.muted }}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Category</label>
+                    <input value={templateForm.category} onChange={(e) => setTemplateForm((f) => f && { ...f, category: e.target.value })}
+                      list="template-category-options"
+                      placeholder="e.g. luxury, professional"
+                      className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
+                    <datalist id="template-category-options">
+                      {(templateForm.templateType === "production" ? PRODUCTION_CATEGORIES : UNIVERSAL_CATEGORIES)
+                        .filter((c) => c.id !== "all")
+                        .map((c) => <option key={c.id} value={c.id} />)}
+                    </datalist>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Tags (comma separated)</label>
+                    <input value={templateForm.tags} onChange={(e) => setTemplateForm((f) => f && { ...f, tags: e.target.value })}
+                      placeholder="marble, dark, dramatic"
+                      className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Accent color</label>
+                    <div className="flex items-center gap-2">
+                      <input type="color" value={templateForm.accentColor} onChange={(e) => setTemplateForm((f) => f && { ...f, accentColor: e.target.value })}
+                        className="w-9 h-9 rounded-xl cursor-pointer" style={{ border: `1px solid ${T.border}`, background: "transparent" }} />
+                      <input value={templateForm.accentColor} onChange={(e) => setTemplateForm((f) => f && { ...f, accentColor: e.target.value })}
+                        className="flex-1 h-9 px-3 rounded-xl text-sm outline-none" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
+                    </div>
+                  </div>
+                  <div className="flex items-end gap-4">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Sort order</label>
+                      <input type="number" value={templateForm.sortOrder} onChange={(e) => setTemplateForm((f) => f && { ...f, sortOrder: Number(e.target.value) || 0 })}
+                        className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
+                    </div>
+                    <button onClick={() => setTemplateForm((f) => f && { ...f, isPro: !f.isPro })}
+                      className="flex items-center gap-2 h-9 px-4 rounded-xl text-xs font-semibold transition-all"
+                      style={templateForm.isPro
+                        ? { background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.3)", color: "#fbbf24" }
+                        : { background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, color: T.muted }}>
+                      <Check className="w-3 h-3" style={{ opacity: templateForm.isPro ? 1 : 0 }} /> Pro
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Description <span style={{ color: T.dim }}>(shown as the template&apos;s tagline)</span></label>
+                  <input value={templateForm.description} onChange={(e) => setTemplateForm((f) => f && { ...f, description: e.target.value })}
+                    className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
+                </div>
+
+                <div className="mb-5">
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>
+                    Prompt <span style={{ color: T.dim }}>(scene language — identity/product fidelity is added automatically at generation time)</span>
+                  </label>
+                  <textarea value={templateForm.prompt} onChange={(e) => setTemplateForm((f) => f && { ...f, prompt: e.target.value })}
+                    rows={3} className="w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none"
+                    style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
+                </div>
+
+                <div className="flex items-center gap-2.5">
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={saveTemplate} disabled={savingTemplate}
+                    className="flex items-center gap-2 h-9 px-5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
+                    style={{ background: T.redPrimary }}>
+                    {savingTemplate ? "Saving…" : templateForm.id ? "Save changes" : "Create template"}
+                  </motion.button>
+                  <button onClick={() => setTemplateForm(null)} className="h-9 px-4 rounded-xl text-sm font-semibold" style={{ color: T.muted }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* List */}
+            <div className="space-y-2.5">
+              {templatesLoading && <p className="text-xs text-center py-8" style={{ color: T.dim }}>Loading…</p>}
+              {!templatesLoading && templates.length === 0 && (
+                <p className="text-xs text-center py-8" style={{ color: T.dim }}>No templates yet — add one to get started.</p>
+              )}
+              {templates.map((tpl) => (
+                <div key={tpl.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: T.card, border: `1px solid ${T.border}` }}>
+                  {tpl.coverImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={tpl.coverImageUrl} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg shrink-0 flex items-center justify-center"
+                      style={{ background: `linear-gradient(160deg, ${tpl.accentColor}30 0%, ${T.bg} 85%)` }}>
+                      <ImagePlus className="w-4 h-4" style={{ color: T.dim }} />
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-sm font-semibold truncate" style={{ color: T.text }}>{tpl.name}</p>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ background: `${tpl.accentColor}20`, color: tpl.accentColor }}>{tpl.category}</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ background: tpl.templateType === "universal" ? "rgba(56,189,248,0.12)" : "rgba(255,255,255,0.06)", color: tpl.templateType === "universal" ? T.blue : T.muted }}>
+                        {tpl.templateType}
+                      </span>
+                      {tpl.isPro && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>PRO</span>}
+                    </div>
+                    <p className="text-xs truncate mt-0.5" style={{ color: T.dim }}>{tpl.description}</p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button onClick={() => regeneratePreview(tpl.id)} disabled={regeneratingId === tpl.id}
+                      title="Regenerate preview"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-50"
+                      style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
+                      <RefreshCw className={`w-3.5 h-3.5 ${regeneratingId === tpl.id ? "animate-spin" : ""}`} style={{ color: T.muted }} />
+                    </button>
+                    <button onClick={() => setTemplateForm(templateToForm(tpl))}
+                      title="Edit"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70"
+                      style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
+                      <Pencil className="w-3.5 h-3.5" style={{ color: T.muted }} />
+                    </button>
+                    <button onClick={() => deleteTemplate(tpl.id, tpl.name)}
+                      title="Delete"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70"
+                      style={{ background: "rgba(220,38,38,0.06)", border: `1px solid ${T.redBorder}` }}>
+                      <Trash2 className="w-3.5 h-3.5" style={{ color: T.red }} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </motion.div>
         )}
 

@@ -21,3 +21,10 @@ export const HF_SIZE_MAP: Record<string, { width: number; height: number }> = {
 export function buildProductEditPrompt(userPrompt: string): string {
   return `${userPrompt}. Keep the product's exact shape, proportions, label design, logo, and all text completely accurate and unchanged. Remove any other objects, other products, or background clutter — show only this single product as a clean, professional e-commerce product photo.`;
 }
+
+// Universal/portrait path (same fal-ai/gemini-25-flash-image/edit model as
+// buildProductEditPrompt): the subject is a person, not a product, so
+// fidelity language is about identity, not label/logo accuracy.
+export function buildPortraitEditPrompt(userPrompt: string): string {
+  return `${userPrompt}. Keep the person's exact face, likeness, facial features, expression, skin tone, and hair completely accurate and unchanged. Remove any other people or distracting background clutter — show only this one person as a clean, professional portrait photo.`;
+}

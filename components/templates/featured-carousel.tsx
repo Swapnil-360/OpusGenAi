@@ -194,13 +194,20 @@ const Card = ({ tpl, index, total, progress, config, onSelect }: CardProps) => {
         "w-32 h-44 sm:w-44 sm:h-60 lg:w-52 lg:h-68",
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={`https://picsum.photos/seed/${tpl.coverSeed}/400/500`}
-        alt={tpl.name}
-        draggable={false}
-        className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-transform duration-700 group-hover:scale-110"
-      />
+      {tpl.coverImageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={tpl.coverImageUrl}
+          alt={tpl.name}
+          draggable={false}
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-transform duration-700 group-hover:scale-110"
+        />
+      ) : (
+        <div
+          className="absolute inset-0"
+          style={{ background: `linear-gradient(160deg, ${tpl.accentColor}35 0%, #0d0303 85%)` }}
+        />
+      )}
 
       <motion.div style={{ opacity: dimOpacity }} className="absolute inset-0 bg-black pointer-events-none" />
 

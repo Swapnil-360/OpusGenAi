@@ -12,8 +12,9 @@ import {
   useAnimationFrame,
   type MotionValue,
 } from "framer-motion";
-import { ArrowRight, Check, Sparkles, ArrowUpRight, Zap } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { TOOLS } from "@/lib/tools-config";
+import { GradientCard, type GradientCardProps } from "@/components/ui/gradient-card";
 import { PLANS, MOCK_CURRENT_USER, type Plan } from "@/lib/mock-data";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { FeaturedCarousel } from "@/components/templates/featured-carousel";
@@ -23,6 +24,8 @@ import { SiteBanner } from "@/components/shared/SiteBanner";
 import { cn } from "@/lib/utils";
 
 // ─── Static data ─────────────────────────────────────────────────────────────
+
+const GRADIENT_CYCLE: NonNullable<GradientCardProps["gradient"]>[] = ["orange", "purple", "green", "gray"];
 
 const CAPABILITIES = [
   "Product Photography",
@@ -784,156 +787,21 @@ export default function LandingPage() {
               </div>
             </FadeIn>
 
-            {/* Uniform grid — every card the same size and aspect ratio (16:9
-                image + fixed-height info block below) so the section reads
-                as one tidy row instead of mismatched tile sizes. */}
+            {/* GradientCard per tool — same component, same size/aspect ratio
+                for all six, cycling the four preset gradients. */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {TOOLS.map((tool, i) => (
-                <FadeIn key={tool.id} delay={i * 0.07}>
-                  <Link href={tool.href} className="block h-full">
-                    {/* Outer: handles lift + outer glow — no overflow-hidden so shadow is visible */}
-                    <motion.div
-                      className="group relative rounded-2xl h-full cursor-pointer"
-                      whileHover={{
-                        y: -6,
-                        boxShadow: `0 0 0 1px ${tool.accentColor}90, 0 16px 48px rgba(0,0,0,0.6), 0 0 80px ${tool.accentColor}28`,
-                      }}
-                      transition={{ duration: 0.22, ease: "easeOut" }}
-                    >
-                      {/* Spinning border layer — overflow-hidden clips the conic gradient to rounded corners */}
-                      <div
-                        className="relative rounded-2xl overflow-hidden h-full"
-                        style={{ padding: "1.5px" }}
-                      >
-                        {/* Static dim base so the "off" part of the spin isn't transparent */}
-                        <div
-                          className="absolute inset-0 rounded-2xl"
-                          style={{ background: `${tool.accentColor}28` }}
-                        />
-                        {/* Spinning conic gradient — CSS animation (GPU compositor, zero JS overhead) */}
-                        <div
-                          className="card-spin absolute"
-                          style={{
-                            width: "200%",
-                            height: "200%",
-                            top: "-50%",
-                            left: "-50%",
-                            background: `conic-gradient(from 0deg at 50% 50%,
-                              transparent 0deg,
-                              ${tool.accentColor}44 20deg,
-                              ${tool.accentColor}cc 48deg,
-                              ${tool.accentColor}ff 60deg,
-                              ${tool.accentColor}cc 72deg,
-                              ${tool.accentColor}44 92deg,
-                              transparent 130deg,
-                              transparent 240deg,
-                              ${tool.accentColor}66 285deg,
-                              ${tool.accentColor}44 310deg,
-                              transparent 340deg
-                            )`,
-                          }}
-                        />
-
-                        {/* Content — clips image/info to inner radius */}
-                        <div
-                          className="relative flex flex-col h-full overflow-hidden"
-                          style={{
-                            borderRadius: "calc(1rem - 1.5px)",
-                            background: "#0d0303",
-                          }}
-                        >
-                          {/* Image */}
-                          <div className="relative overflow-hidden shrink-0" style={{ aspectRatio: "16/9" }}>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={tool.cardImage}
-                              alt={tool.label}
-                              loading="lazy"
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.07]"
-                            />
-                            {/* Bottom fade */}
-                            <div
-                              className="absolute inset-0"
-                              style={{
-                                background:
-                                  "linear-gradient(to top, rgba(13,3,3,0.94) 0%, rgba(13,3,3,0.3) 45%, transparent 100%)",
-                              }}
-                            />
-                            {/* Accent tint on hover */}
-                            <div
-                              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                              style={{ background: `linear-gradient(135deg, ${tool.accentColor}1a 0%, transparent 55%)` }}
-                            />
-                            {/* Badge */}
-                            {tool.badge && (
-                              <div className="absolute top-2.5 left-2.5">
-                                <span
-                                  className="text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm"
-                                  style={{
-                                    background: "rgba(220,38,38,0.9)",
-                                    color: "#fff",
-                                    border: "1px solid rgba(255,255,255,0.2)",
-                                  }}
-                                >
-                                  {tool.badge}
-                                </span>
-                              </div>
-                            )}
-                            {/* Credits */}
-                            <div className="absolute top-2.5 right-2.5">
-                              <span
-                                className="text-[10px] font-semibold px-2 py-0.5 rounded-full backdrop-blur-sm flex items-center gap-1"
-                                style={{
-                                  background: "rgba(0,0,0,0.65)",
-                                  color: "rgba(255,255,255,0.85)",
-                                  border: "1px solid rgba(255,255,255,0.12)",
-                                }}
-                              >
-                                <Zap className="w-2.5 h-2.5" style={{ color: tool.accentColor }} />
-                                {tool.creditCost}cr
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Info */}
-                          <div className="px-3 pt-2.5 pb-3 flex flex-col flex-1">
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <div
-                                className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
-                                style={{
-                                  background: `${tool.accentColor}22`,
-                                  border: `1px solid ${tool.accentColor}40`,
-                                }}
-                              >
-                                <Sparkles className="w-2.5 h-2.5" style={{ color: tool.accentColor }} />
-                              </div>
-                              <h3
-                                className="font-bold text-[13px] leading-tight flex-1"
-                                style={{ color: "rgba(255,255,255,0.95)" }}
-                              >
-                                {tool.label}
-                              </h3>
-                              <ArrowUpRight
-                                className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
-                                style={{ color: tool.accentColor }}
-                              />
-                            </div>
-                            <p
-                              className="text-[11px] leading-relaxed line-clamp-2 hidden sm:block"
-                              style={{ color: "rgba(255,255,255,0.58)" }}
-                            >
-                              {tool.description}
-                            </p>
-                            {/* Bottom accent line on hover */}
-                            <div
-                              className="absolute bottom-0 left-0 right-0 h-px opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                              style={{ background: `linear-gradient(to right, transparent, ${tool.accentColor}80, transparent)` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </Link>
+                <FadeIn key={tool.id} delay={i * 0.07} className="h-72">
+                  <GradientCard
+                    gradient={GRADIENT_CYCLE[i % GRADIENT_CYCLE.length]}
+                    badgeText={tool.badge ?? `${tool.creditCost} credit${tool.creditCost > 1 ? "s" : ""}`}
+                    badgeColor={tool.accentColor}
+                    title={tool.label}
+                    description={tool.description}
+                    ctaText="Try it free"
+                    ctaHref={tool.href}
+                    imageUrl={tool.cardImage}
+                  />
                 </FadeIn>
               ))}
             </div>

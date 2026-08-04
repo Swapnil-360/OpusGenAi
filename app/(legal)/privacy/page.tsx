@@ -58,7 +58,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="text-sm" style={{ color: S.muted }}>
-          Last updated: June 10, 2026 &nbsp;·&nbsp; Effective: June 10, 2026
+          Last updated: August 4, 2026 &nbsp;·&nbsp; Effective: August 4, 2026
         </p>
       </div>
 
@@ -70,8 +70,9 @@ export default function PrivacyPage() {
       <Section title="1. Information We Collect">
         <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>a) Information you provide directly</strong></P>
         <UL items={[
-          "Account information: name, email address, and password when you register.",
-          "Payment information: billing address and payment method details processed securely via Stripe. We never store your full card number.",
+          "Account information: name, email address, and password (or your Google account identifier, if you sign in with Google) when you register.",
+          "Two-factor authentication: if you enable it, an authenticator app secret is stored to verify sign-in codes. We never see or store the codes themselves.",
+          "Payment information: the Service currently operates on a Free tier only — we do not collect or process any payment information today. If paid plans launch, billing details will be handled by a PCI-compliant payment processor, and this policy will be updated first.",
           "Profile information: optional website URL, company name, or profile photo.",
           "Communications: messages you send us via support channels or email.",
         ]} />
@@ -95,8 +96,8 @@ export default function PrivacyPage() {
       <Section title="2. How We Use Your Information">
         <P>We use the information we collect for the following purposes:</P>
         <UL items={[
-          "To create and manage your account and authenticate you.",
-          "To process payments and manage your credit balance.",
+          "To create and manage your account, authenticate you, and (if enabled) verify two-factor sign-in codes.",
+          "To manage your credit balance and, once paid plans launch, to process payments.",
           "To deliver AI-generated images and run the tools you request.",
           "To improve the quality, performance, and reliability of our models and infrastructure.",
           "To send transactional emails (receipts, generation notifications, password resets).",
@@ -113,8 +114,8 @@ export default function PrivacyPage() {
       <Section title="3. How We Share Your Information">
         <P>We do not sell your personal information. We may share it only in these limited circumstances:</P>
         <UL items={[
-          "Service providers: trusted third parties who assist in operating our platform (cloud hosting, payment processing via Stripe, email delivery via Resend, analytics via PostHog). These providers are contractually bound to protect your data.",
-          "AI inference providers: images and prompts are transmitted to AI inference APIs (e.g., Replicate, Stability AI) to generate results. These are governed by their respective data processing agreements.",
+          "Service providers: trusted third parties who assist in operating our platform — Supabase (database, authentication, and file storage), Vercel (hosting and cookie-free web analytics), and, as our email capability comes online, Resend (transactional email delivery). These providers are contractually bound to protect your data.",
+          "AI inference providers: images and prompts are transmitted to fal.ai (image generation and editing models, including Flux and Gemini image models) and, for caption generation, Hugging Face-hosted models, to produce your results. These are governed by their respective data processing agreements.",
           "Legal requirements: if required by law, court order, or to protect the rights, property, or safety of OpusGen AI, our users, or the public.",
           "Business transfers: in the event of a merger, acquisition, or sale of assets, your data may be transferred. We will provide notice before your information is transferred.",
         ]} />
@@ -135,10 +136,9 @@ export default function PrivacyPage() {
         <P>We use the following types of cookies:</P>
         <UL items={[
           "Essential cookies: required for authentication, session management, and security. Cannot be disabled.",
-          "Analytics cookies: help us understand how the Service is used (e.g., PostHog). You may opt out via our cookie settings.",
-          "Preference cookies: remember your settings such as language and display preferences.",
+          "Analytics: we use Vercel Web Analytics, which is cookie-free by design — it does not set tracking cookies or build a cross-site profile of you.",
         ]} />
-        <P>You can manage cookie preferences through your browser settings or our Cookie Preferences panel. Note that disabling essential cookies will prevent you from using core features of the Service.</P>
+        <P>See our <a href="/cookie-policy" style={{ color: S.red }}>Cookie Policy</a> for the full list of cookies we use. You can manage cookies through your browser settings; note that disabling essential cookies will prevent you from using core features of the Service.</P>
       </Section>
 
       <Section title="6. Your Privacy Rights">
@@ -163,11 +163,10 @@ export default function PrivacyPage() {
       <Section title="8. Security">
         <P>We implement industry-standard technical and organisational measures to protect your information, including:</P>
         <UL items={[
-          "AES-256 encryption for data at rest.",
-          "TLS 1.3 for all data in transit.",
-          "Role-based access controls limiting employee access to personal data.",
-          "Regular security audits and penetration testing.",
-          "SOC 2 Type II certified infrastructure.",
+          "Encryption in transit (TLS/HTTPS) for all traffic, and encryption at rest provided by our infrastructure providers (Supabase/Postgres).",
+          "Row Level Security (database-enforced access policies) restricting which rows a user's session can read or write, in addition to application-level checks.",
+          "Optional two-factor authentication (TOTP) you can enable on your account for an additional sign-in factor.",
+          "Server-side admin allowlisting for any privileged action — administrative access is never granted based on client-supplied data.",
         ]} />
         <P>Despite these measures, no security system is impenetrable. In the event of a data breach that poses a risk to your rights, we will notify you as required by applicable law.</P>
       </Section>

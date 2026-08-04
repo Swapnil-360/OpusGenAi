@@ -71,22 +71,26 @@ export default function RefundPolicyPage() {
           Refund Policy
         </h1>
         <p className="text-sm" style={{ color: S.muted }}>
-          Last updated: June 13, 2026 &nbsp;·&nbsp; Effective: June 13, 2026
+          Last updated: August 4, 2026 &nbsp;·&nbsp; Effective: August 4, 2026
         </p>
       </div>
 
+      <InfoBox color="green" title="Nothing to refund today">
+        <p>OpusGen AI is currently Free-tier only — we do not collect payment information or charge anyone. Paid plans (Basic and Pro) are announced on our pricing page but are not yet available for purchase. The policy below describes how refunds will work once billing launches, and it will take effect (with advance notice) before any payment is ever collected.</p>
+      </InfoBox>
+
       {/* Quick summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-12">
-        <InfoBox color="green" title="✓ Eligible for refund">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-12 mt-3">
+        <InfoBox color="green" title="✓ Will be eligible for refund">
           <p>Billing errors · Duplicate charges · Technical failures preventing service use · First-time subscribers within 7 days</p>
         </InfoBox>
-        <InfoBox color="red" title="✗ Not eligible for refund">
+        <InfoBox color="red" title="✗ Will not be eligible for refund">
           <p>Used credits · Partially used subscription periods · Change of mind after use · Violating our Terms of Service</p>
         </InfoBox>
       </div>
 
       <Section title="1. Subscription Refunds">
-        <P>OpusGen AI offers monthly subscription plans (Basic at $9.99/month and Pro at $18/month). Please read the following carefully before requesting a refund:</P>
+        <P>Once paid plans launch, OpusGen AI intends to offer monthly subscription plans (Basic and Pro, priced as shown on our pricing page at that time). The following will apply from that point on:</P>
 
         <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>7-day satisfaction guarantee (first-time subscribers):</strong> If you are a first-time subscriber to a paid plan and are not satisfied with the Service, you may request a full refund within 7 days of your initial payment. This applies to your first subscription charge only.</P>
 
@@ -133,7 +137,7 @@ export default function RefundPolicyPage() {
           "Step 3: Our team will review your request and respond within 3 business days.",
           "Step 4: Approved refunds are processed back to your original payment method within 5–10 business days.",
         ]} />
-        <P>Refunds are processed via Stripe and will appear on your statement as a reversal of the original charge. Processing times may vary depending on your bank or card issuer.</P>
+        <P>Once billing is live, approved refunds will be processed through our payment processor and will appear on your statement as a reversal of the original charge. Processing times may vary depending on your bank or card issuer.</P>
       </Section>
 
       <Section title="6. Chargebacks">

@@ -58,7 +58,7 @@ export default function TermsPage() {
           Terms of Service
         </h1>
         <p className="text-sm" style={{ color: S.muted }}>
-          Last updated: June 10, 2026 &nbsp;·&nbsp; Effective: June 10, 2026
+          Last updated: August 4, 2026 &nbsp;·&nbsp; Effective: August 4, 2026
         </p>
       </div>
 
@@ -92,19 +92,13 @@ export default function TermsPage() {
           "Accept responsibility for all activity that occurs under your account.",
         ]} />
         <P>We reserve the right to suspend or terminate accounts that violate these Terms, contain false information, or are associated with fraudulent activity.</P>
+        <P>Optional two-factor authentication (TOTP, via an authenticator app) is available from Account → Security. We strongly recommend enabling it.</P>
       </Section>
 
-      <Section title="4. Credits, Plans, and Billing">
+      <Section title="4. Credits and Plans">
         <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Credits system:</strong> The Service operates on a credit-based system. Each generation or tool usage consumes a defined number of credits based on the operation performed. Credits are non-transferable between accounts.</P>
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Plans:</strong> We offer the following subscription tiers:</P>
-        <UL items={[
-          "Free: 10 credits upon registration, standard quality, JPG download.",
-          "Basic ($9.99/month): 35 credits per month, HD quality, PNG and JPG downloads, all templates.",
-          "Pro ($18/month): 100 credits per month, 4K upscale, batch processing, priority queue, full caption studio.",
-        ]} />
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Billing:</strong> Paid plans are billed monthly in advance. All payments are processed securely by Stripe. By providing payment details, you authorise us to charge your payment method for all fees incurred.</P>
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Refunds:</strong> Monthly subscription fees are non-refundable except where required by applicable law. Unused credits do not roll over between billing cycles and expire at period end. Credits purchased as one-time add-ons do not expire.</P>
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Price changes:</strong> We reserve the right to change pricing with at least 30 days&apos; notice to existing subscribers. Continued use after the effective date constitutes acceptance.</P>
+        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Current plan:</strong> The Service is currently available on a Free tier only (10 credits upon registration, standard quality, JPG download). Paid plans (Basic and Pro) are announced on our pricing page but are <strong style={{ color: "rgba(255,255,255,0.88)" }}>not yet available for purchase</strong> — no payment is collected or processed at this time.</P>
+        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>When billing launches:</strong> Once paid plans go live, they will be billed monthly in advance through a PCI-compliant payment processor, and we will update these Terms (and our <a href="/refund" style={{ color: S.red }}>Refund Policy</a>) with the applicable billing, refund, and cancellation terms before any charges begin. Unused monthly credits will not roll over between billing cycles; one-time credit packs, if introduced, will not expire.</P>
       </Section>
 
       <Section title="5. Acceptable Use Policy">

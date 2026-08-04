@@ -84,7 +84,7 @@ export default function CookiePolicyPage() {
           Cookie Policy
         </h1>
         <p className="text-sm" style={{ color: S.muted }}>
-          Last updated: June 13, 2026 &nbsp;·&nbsp; Effective: June 13, 2026
+          Last updated: August 4, 2026 &nbsp;·&nbsp; Effective: August 4, 2026
         </p>
       </div>
 
@@ -99,43 +99,28 @@ export default function CookiePolicyPage() {
       </Section>
 
       <Section title="2. Types of Cookies We Use">
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Essential cookies</strong> — These are strictly necessary for the website to function. They enable core features such as user authentication, session management, and security. You cannot opt out of these cookies.</P>
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Performance &amp; analytics cookies</strong> — These help us understand how visitors interact with our platform by collecting aggregated, anonymous data. We use this information to improve our product and user experience.</P>
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Preference cookies</strong> — These remember your settings and choices (such as language, display mode, and notification preferences) so you do not have to re-enter them on each visit.</P>
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Marketing cookies</strong> — These track your browsing habits to display relevant advertisements and measure campaign effectiveness. We use these only with your explicit consent.</P>
+        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Essential cookies</strong> — These are strictly necessary for the website to function. They enable core features such as user authentication and session management. You cannot opt out of these cookies.</P>
+        <P>We do not currently set any analytics, preference, or marketing cookies. Our product analytics (Vercel Web Analytics) is cookie-free by design — it measures aggregate traffic without placing a cookie on your device or building a profile of you.</P>
       </Section>
 
       <Section title="3. Specific Cookies We Use">
         <CookieTable rows={[
-          { name: "session_id", type: "Essential", purpose: "Maintains your login session securely", duration: "Session" },
-          { name: "csrf_token", type: "Essential", purpose: "Prevents cross-site request forgery attacks", duration: "Session" },
-          { name: "user_prefs", type: "Preference", purpose: "Stores your display and notification preferences", duration: "1 year" },
-          { name: "_posthog", type: "Analytics", purpose: "Tracks product usage for feature improvements (PostHog)", duration: "1 year" },
-          { name: "_ga", type: "Analytics", purpose: "Google Analytics — measures site traffic (anonymous)", duration: "2 years" },
-          { name: "cookie_consent", type: "Essential", purpose: "Records your cookie consent choices", duration: "1 year" },
+          { name: "sb-access-token", type: "Essential", purpose: "Supabase authentication — keeps you signed in", duration: "Session / up to 1 hour" },
+          { name: "sb-refresh-token", type: "Essential", purpose: "Supabase authentication — silently renews your session", duration: "Up to 30 days" },
         ]} />
+        <P>That is the complete list. If that changes — for example, if we introduce optional analytics or a live chat widget — we will update this table and the &quot;Last updated&quot; date above before doing so.</P>
       </Section>
 
       <Section title="4. Third-Party Cookies">
-        <P>Some cookies are placed by third-party services that appear on our pages. These include:</P>
-        <UL items={[
-          "PostHog — analytics and product telemetry. See posthog.com/privacy for their policy.",
-          "Google Analytics — aggregated traffic statistics. See policies.google.com/privacy.",
-          "Stripe — payment processing cookies used on checkout pages. See stripe.com/privacy.",
-          "Intercom — customer support widget (if enabled). See intercom.com/legal/privacy.",
-        ]} />
-        <P>We do not control these third-party cookies. Please review their respective privacy policies for more information.</P>
+        <P>We do not currently embed any third-party service on our pages that sets its own cookies (no ad networks, no chat widgets, no third-party analytics). The only cookies in use are the essential Supabase authentication cookies listed above, which are set by our own domain.</P>
       </Section>
 
       <Section title="5. How to Manage Cookies">
-        <P>You have several options to control or delete cookies:</P>
+        <P>Since we only use essential authentication cookies, there is no non-essential cookie consent to manage today. You can still control cookies at the browser level if you wish:</P>
         <UL items={[
-          "Cookie banner: When you first visit OpusGen AI, you will be presented with a cookie consent banner allowing you to accept or reject non-essential cookies.",
           "Browser settings: Most web browsers allow you to manage cookies through their settings. You can block all cookies, delete existing cookies, or be notified when cookies are set.",
-          "Opt-out tools: For analytics cookies, you can use the Google Analytics opt-out browser add-on (tools.google.com/dlpage/gaoptout).",
-          "Do Not Track: We respect browser Do Not Track (DNT) signals for analytics cookies.",
         ]} />
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Please note:</strong> Disabling essential cookies will prevent you from logging in and using core features of the platform.</P>
+        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Please note:</strong> Blocking the essential Supabase authentication cookies will prevent you from logging in and using the platform.</P>
         <div className="mt-3 p-4 rounded-xl text-xs leading-relaxed" style={{ background: S.glass, border: `1px solid ${S.border}`, color: S.muted }}>
           <p className="font-bold mb-1" style={{ color: "rgba(255,255,255,0.7)" }}>Browser cookie settings quick links:</p>
           <p>Chrome: Settings → Privacy and Security → Cookies</p>

@@ -17,6 +17,7 @@ import { TOOLS } from "@/lib/tools-config";
 import { GradientCard, type GradientCardProps } from "@/components/ui/gradient-card";
 import { PLANS, MOCK_CURRENT_USER, type Plan } from "@/lib/mock-data";
 import { useTemplates } from "@/lib/hooks/use-templates";
+import { useHeroImages } from "@/lib/hooks/use-hero-images";
 import { FeaturedCarousel } from "@/components/templates/featured-carousel";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
@@ -46,48 +47,9 @@ const CAPABILITIES = [
   "One-Click Export",
 ];
 
-const HERO_IMAGES = [
-  {
-    src: "https://picsum.photos/seed/heroprod1/280/380",
-    alt: "Studio product",
-    rotation: -14,
-  },
-  {
-    src: "https://picsum.photos/seed/heroprod2/280/380",
-    alt: "Cosmetic campaign",
-    rotation: 6,
-  },
-  {
-    src: "https://picsum.photos/seed/heroprod3/280/380",
-    alt: "Fashion shoot",
-    rotation: -9,
-  },
-  {
-    src: "https://picsum.photos/seed/heroprod4/280/380",
-    alt: "E-commerce visual",
-    rotation: 13,
-  },
-  {
-    src: "https://picsum.photos/seed/heroprod5/280/380",
-    alt: "Luxury product",
-    rotation: -11,
-  },
-  {
-    src: "https://picsum.photos/seed/heroprod6/280/380",
-    alt: "Brand creative",
-    rotation: 5,
-  },
-  {
-    src: "https://picsum.photos/seed/heroprod7/280/380",
-    alt: "Social media asset",
-    rotation: -7,
-  },
-  {
-    src: "https://picsum.photos/seed/heroprod8/280/380",
-    alt: "Marketing visual",
-    rotation: 10,
-  },
-];
+// Cosmetic tilt per orbit position — cycled by index since the actual
+// images now come from useHeroImages() (real template photos), not this list.
+const HERO_ROTATIONS = [-14, 6, -9, 13, -11, 5, -7, 10];
 
 // ─── Helper components ───────────────────────────────────────────────────────
 
@@ -487,6 +449,7 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
 export default function LandingPage() {
   const router = useRouter();
   const { templates: ALL_TEMPLATES, loading: templatesLoading } = useTemplates();
+  const { images: heroImages } = useHeroImages(8);
   const orbitAngle = useMotionValue(0);
   useAnimationFrame((t) => {
     orbitAngle.set((t * 0.015) % 360);
@@ -667,15 +630,17 @@ export default function LandingPage() {
                   }}
                 />
 
-                {/* Orbiting cards */}
-                {HERO_IMAGES.map((img, i) => (
+                {/* Orbiting cards — real template photos (admin-configurable:
+                    random from templates, specific templates, or uploaded
+                    custom photos — see useHeroImages). */}
+                {heroImages.map((img, i) => (
                   <OrbitCard
-                    key={i}
+                    key={img.src}
                     src={img.src}
                     alt={img.alt}
-                    rotation={img.rotation}
+                    rotation={HERO_ROTATIONS[i % HERO_ROTATIONS.length]}
                     orbitAngle={orbitAngle}
-                    offset={(i * 360) / HERO_IMAGES.length}
+                    offset={(i * 360) / heroImages.length}
                   />
                 ))}
 

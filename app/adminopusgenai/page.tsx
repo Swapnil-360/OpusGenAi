@@ -29,6 +29,8 @@ import {
   Plus,
   Trash2,
   ImagePlus,
+  Images,
+  Shuffle,
 } from "lucide-react";
 import {
   BANNER_KEY,
@@ -95,6 +97,12 @@ type AdminStats = {
   totalCreditsSpent: number;
   falBalance: number | null;
   falCurrency: string;
+};
+
+type HeroSettings = {
+  mode: "random" | "selected" | "custom";
+  templateIds: string[];
+  customImageUrls: string[];
 };
 
 // id set = editing that template; id null = creating a new one.
@@ -184,7 +192,7 @@ const BANNER_MODES: { mode: BannerMode; label: string; icon: React.ElementType; 
 export default function AdminPage() {
   const router = useRouter();
   const [adminEmail, setAdminEmail] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "messages" | "feedback" | "users" | "templates">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "messages" | "feedback" | "users" | "templates" | "hero">("overview");
   const [banner, setBanner] = useState<BannerConfig>(DEFAULT_BANNER);
   const [welcome, setWelcome] = useState<WelcomeConfig>(DEFAULT_WELCOME);
   const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
@@ -203,6 +211,25 @@ export default function AdminPage() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
+
+  // ── hero images tab state ────────────────────────────────────────────────────
+  const [heroSettings, setHeroSettings] = useState<HeroSettings>({ mode: "random", templateIds: [], customImageUrls: [] });
+  const [heroLoading, setHeroLoading] = useState(true);
+  const [savingHero, setSavingHero] = useState(false);
+  const [uploadingHero, setUploadingHero] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("site_settings")
+      .select("value")
+      .eq("id", "hero_images")
+      .single()
+      .then(({ data }) => {
+        if (data?.value) setHeroSettings((prev) => ({ ...prev, ...(data.value as Partial<HeroSettings>) }));
+        setHeroLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -345,6 +372,61 @@ export default function AdminPage() {
     else toast.success(`Generated ${missing.length} preview${missing.length === 1 ? "" : "s"}.`);
   }
 
+  // ── hero image actions ───────────────────────────────────────────────────────
+  function toggleHeroTemplate(id: string) {
+    setHeroSettings((s) => {
+      const already = s.templateIds.includes(id);
+      if (already) return { ...s, templateIds: s.templateIds.filter((t) => t !== id) };
+      if (s.templateIds.length >= 8) { toast.error("Up to 8 templates for the hero."); return s; }
+      return { ...s, templateIds: [...s.templateIds, id] };
+    });
+  }
+
+  async function uploadHeroPhoto(file: File) {
+    if (heroSettings.customImageUrls.length >= 8) {
+      toast.error("Up to 8 custom photos for the hero.");
+      return;
+    }
+    setUploadingHero(true);
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch("/api/admin/hero-images/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl }),
+    });
+    setUploadingHero(false);
+    if (!res.ok) {
+      toast.error("Upload failed.");
+      return;
+    }
+    const { url } = await res.json();
+    setHeroSettings((s) => ({ ...s, mode: "custom", customImageUrls: [...s.customImageUrls, url] }));
+  }
+
+  function removeHeroPhoto(url: string) {
+    setHeroSettings((s) => ({ ...s, customImageUrls: s.customImageUrls.filter((u) => u !== url) }));
+  }
+
+  async function saveHeroSettings() {
+    setSavingHero(true);
+    const res = await fetch("/api/admin/hero-images", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(heroSettings),
+    });
+    setSavingHero(false);
+    if (!res.ok) {
+      toast.error("Failed to save hero settings.");
+      return;
+    }
+    toast.success("Hero settings saved.");
+  }
+
   const filteredFeedback = feedbackList.filter((f) => {
     if (fbFilter === "all") return true;
     if (fbFilter === "unread") return f.status === "new";
@@ -366,6 +448,7 @@ export default function AdminPage() {
     { id: "feedback", label: "Feedback", icon: MessageSquare },
     { id: "users", label: "Users", icon: Users },
     { id: "templates", label: "Templates", icon: Layers },
+    { id: "hero", label: "Hero", icon: Images },
   ] as const;
 
   return (
@@ -962,6 +1045,112 @@ export default function AdminPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── HERO TAB ───────────────────────────────────────────────────── */}
+        {activeTab === "hero" && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <div className="p-6 rounded-2xl mb-6" style={{ background: T.card, border: `1px solid ${T.border}` }}>
+              <h2 className="text-sm font-black mb-1" style={{ color: T.text }}>Landing Page Hero Photos</h2>
+              <p className="text-xs mb-6" style={{ color: T.muted }}>Controls the orbiting photos on the homepage hero.</p>
+
+              {heroLoading ? (
+                <p className="text-xs" style={{ color: T.dim }}>Loading…</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                    {([
+                      { mode: "random" as const, label: "Random", icon: Shuffle, desc: "A fresh random sample of template photos on every load" },
+                      { mode: "selected" as const, label: "Choose templates", icon: Layers, desc: "Pick specific templates to feature, in order" },
+                      { mode: "custom" as const, label: "Upload photos", icon: ImagePlus, desc: "Use your own uploaded photos instead" },
+                    ]).map(({ mode, label, icon: Icon, desc }) => {
+                      const active = heroSettings.mode === mode;
+                      return (
+                        <button key={mode} onClick={() => setHeroSettings((s) => ({ ...s, mode }))}
+                          className="p-4 rounded-xl text-left transition-all"
+                          style={{
+                            background: active ? T.redBg : "rgba(255,255,255,0.02)",
+                            border: `1.5px solid ${active ? T.redBorder : T.border}`,
+                          }}>
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <Icon className="w-4 h-4" style={{ color: active ? T.red : T.dim }} />
+                            <span className="text-sm font-bold" style={{ color: active ? T.red : T.muted }}>{label}</span>
+                            {active && <Check className="w-3.5 h-3.5 ml-auto" style={{ color: T.red }} />}
+                          </div>
+                          <p className="text-[11px] leading-relaxed" style={{ color: T.dim }}>{desc}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {heroSettings.mode === "selected" && (
+                    <div className="mb-6">
+                      <p className="text-xs mb-3" style={{ color: T.muted }}>{heroSettings.templateIds.length}/8 selected</p>
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+                        {templates.map((tpl) => {
+                          const selected = heroSettings.templateIds.includes(tpl.id);
+                          return (
+                            <button key={tpl.id} onClick={() => toggleHeroTemplate(tpl.id)}
+                              className="relative aspect-3/4 rounded-xl overflow-hidden transition-all"
+                              style={{ border: `2px solid ${selected ? T.red : T.border}`, opacity: selected ? 1 : 0.6 }}>
+                              {tpl.coverImageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={tpl.coverImageUrl} alt={tpl.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full" style={{ background: `${tpl.accentColor}30` }} />
+                              )}
+                              <div className="absolute inset-0 flex items-end p-1.5" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75), transparent 60%)" }}>
+                                <span className="text-[9px] font-semibold text-white truncate">{tpl.name}</span>
+                              </div>
+                              {selected && (
+                                <div className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center" style={{ background: T.redPrimary }}>
+                                  <Check className="w-2.5 h-2.5 text-white" />
+                                </div>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {heroSettings.mode === "custom" && (
+                    <div className="mb-6">
+                      <p className="text-xs mb-3" style={{ color: T.muted }}>{heroSettings.customImageUrls.length}/8 photos</p>
+                      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5 mb-3">
+                        {heroSettings.customImageUrls.map((url) => (
+                          <div key={url} className="relative aspect-3/4 rounded-xl overflow-hidden" style={{ border: `1px solid ${T.border}` }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                            <button onClick={() => removeHeroPhoto(url)}
+                              className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
+                              style={{ background: "rgba(0,0,0,0.75)" }}>
+                              <X className="w-3 h-3 text-white" />
+                            </button>
+                          </div>
+                        ))}
+                        {heroSettings.customImageUrls.length < 8 && (
+                          <label className="aspect-3/4 rounded-xl flex flex-col items-center justify-center gap-1.5 cursor-pointer transition-opacity hover:opacity-80"
+                            style={{ border: `1.5px dashed ${T.border}`, background: "rgba(255,255,255,0.02)" }}>
+                            <input type="file" accept="image/*" className="hidden" disabled={uploadingHero}
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadHeroPhoto(f); e.target.value = ""; }} />
+                            <ImagePlus className="w-4 h-4" style={{ color: T.dim }} />
+                            <span className="text-[10px] font-semibold" style={{ color: T.dim }}>{uploadingHero ? "Uploading…" : "Upload"}</span>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <motion.button whileTap={{ scale: 0.97 }} onClick={saveHeroSettings} disabled={savingHero}
+                    className="flex items-center gap-2 h-9 px-5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
+                    style={{ background: T.redPrimary }}>
+                    {savingHero ? "Saving…" : "Save"}
+                  </motion.button>
+                </>
+              )}
             </div>
           </motion.div>
         )}

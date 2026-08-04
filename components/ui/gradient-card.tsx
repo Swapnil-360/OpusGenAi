@@ -57,13 +57,17 @@ const GradientCard = React.forwardRef<HTMLDivElement, GradientCardProps>(
           className={cn(cardVariants({ gradient }), className)}
           {...props}
         >
+          {/* Contained thumbnail, not a full-bleed background graphic — a real
+              screenshot needs its edges intact (text near the border shouldn't
+              get clipped), unlike an abstract decorative icon. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <motion.img
             src={imageUrl}
-            alt={`${title} background graphic`}
+            alt={`${title} preview`}
             variants={imageAnimation}
             transition={{ type: "spring", stiffness: 400, damping: 15 }}
-            className="absolute -right-1/4 -bottom-1/4 w-3/4 opacity-80 pointer-events-none dark:opacity-30"
+            className="absolute right-4 bottom-4 w-2/5 aspect-video rounded-lg object-cover shadow-lg pointer-events-none"
+            style={{ border: "1px solid rgba(255,255,255,0.4)" }}
           />
 
           <div className="z-10 flex flex-col h-full">

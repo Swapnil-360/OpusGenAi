@@ -486,7 +486,7 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
 
 export default function LandingPage() {
   const router = useRouter();
-  const { templates: ALL_TEMPLATES } = useTemplates();
+  const { templates: ALL_TEMPLATES, loading: templatesLoading } = useTemplates();
   const orbitAngle = useMotionValue(0);
   useAnimationFrame((t) => {
     orbitAngle.set((t * 0.015) % 360);
@@ -832,16 +832,27 @@ export default function LandingPage() {
             </FadeIn>
 
             <FadeIn>
-              <FeaturedCarousel
-                items={ALL_TEMPLATES}
-                onSelect={() => router.push("/templates")}
-              />
-              <p
-                className="text-center text-[11px] sm:text-xs mt-2"
-                style={{ color: "rgba(255,255,255,0.35)" }}
-              >
-                Drag to browse · {ALL_TEMPLATES.length} templates
-              </p>
+              {templatesLoading ? (
+                <div className="flex items-center justify-center h-56 sm:h-72 lg:h-80">
+                  <div
+                    className="w-6 h-6 rounded-full animate-spin"
+                    style={{ border: "2px solid rgba(255,255,255,0.15)", borderTopColor: "#f87171" }}
+                  />
+                </div>
+              ) : ALL_TEMPLATES.length > 0 ? (
+                <>
+                  <FeaturedCarousel
+                    items={ALL_TEMPLATES}
+                    onSelect={() => router.push("/templates")}
+                  />
+                  <p
+                    className="text-center text-[11px] sm:text-xs mt-2"
+                    style={{ color: "rgba(255,255,255,0.35)" }}
+                  >
+                    Drag to browse · {ALL_TEMPLATES.length} templates
+                  </p>
+                </>
+              ) : null}
             </FadeIn>
           </div>
         </section>

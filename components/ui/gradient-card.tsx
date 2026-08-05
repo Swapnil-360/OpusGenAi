@@ -6,7 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const cardVariants = cva(
-  "relative flex flex-col justify-between h-full w-full overflow-hidden rounded-2xl p-8 shadow-sm transition-shadow duration-300 hover:shadow-lg",
+  "relative flex flex-col h-full w-full overflow-hidden rounded-2xl shadow-sm transition-shadow duration-300 hover:shadow-lg",
   {
     variants: {
       gradient: {
@@ -35,13 +35,13 @@ export interface GradientCardProps extends React.HTMLAttributes<HTMLDivElement>,
 const GradientCard = React.forwardRef<HTMLDivElement, GradientCardProps>(
   ({ className, gradient, badgeText, badgeColor, title, description, ctaText, ctaHref, imageUrl, ...props }, ref) => {
     const cardAnimation = {
-      rest: { scale: 1, y: 0 },
-      hover: { scale: 1.03, y: -4 },
+      rest: { y: 0 },
+      hover: { y: -4 },
     };
 
     const imageAnimation = {
-      rest: { scale: 1, rotate: 0 },
-      hover: { scale: 1.1, rotate: 3 },
+      rest: { scale: 1 },
+      hover: { scale: 1.06 },
     };
 
     return (
@@ -57,36 +57,38 @@ const GradientCard = React.forwardRef<HTMLDivElement, GradientCardProps>(
           className={cn(cardVariants({ gradient }), className)}
           {...props}
         >
-          {/* Contained thumbnail, not a full-bleed background graphic — a real
-              screenshot needs its edges intact (text near the border shouldn't
-              get clipped), unlike an abstract decorative icon. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <motion.img
-            src={imageUrl}
-            alt={`${title} preview`}
-            variants={imageAnimation}
-            transition={{ type: "spring", stiffness: 400, damping: 15 }}
-            className="absolute right-4 bottom-4 w-2/5 aspect-video rounded-lg object-cover shadow-lg pointer-events-none"
-            style={{ border: "1px solid rgba(255,255,255,0.4)" }}
-          />
+          {/* Image banner — its own slot in normal document flow, full card
+              width. A real screenshot needs dedicated space, not a floating
+              corner overlay that text can run into at narrow widths. */}
+          <div className="relative w-full aspect-video overflow-hidden shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <motion.img
+              src={imageUrl}
+              alt={`${title} preview`}
+              variants={imageAnimation}
+              transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+          </div>
 
-          <div className="z-10 flex flex-col h-full">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-background/50 px-3 py-1 text-sm font-medium text-foreground/80 backdrop-blur-sm w-fit">
+          {/* Content — height follows its own content; the grid row stretches
+              every card in a row to match the tallest, so sizing stays even
+              without a guessed fixed height. */}
+          <div className="z-10 flex flex-col flex-1 p-5 sm:p-6">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-background/60 px-2.5 py-1 text-xs sm:text-sm font-medium text-foreground/80 backdrop-blur-sm w-fit">
               <span
-                className="h-2 w-2 rounded-full"
+                className="h-2 w-2 rounded-full shrink-0"
                 style={{ backgroundColor: badgeColor }}
               />
               {badgeText}
             </div>
 
-            <div className="flex-grow">
-              <h3 className="text-2xl font-bold text-foreground mb-2">{title}</h3>
-              <p className="text-foreground/70 max-w-xs">{description}</p>
-            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-foreground mb-1.5 leading-tight">{title}</h3>
+            <p className="text-sm text-foreground/70 flex-1">{description}</p>
 
             <a
               href={ctaHref}
-              className="group mt-6 inline-flex items-center gap-2 text-sm font-semibold text-foreground"
+              className="group mt-5 inline-flex items-center gap-2 text-sm font-semibold text-foreground"
             >
               {ctaText}
               <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />

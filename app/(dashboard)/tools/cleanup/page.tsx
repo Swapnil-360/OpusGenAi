@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eraser, Info, RotateCcw, Wand2 } from "lucide-react";
 import { ToolPageShell, ResultPanel } from "@/components/tools/ToolPageShell";
-import { fileToDataUrl, extractMaskDataUrl, hasMaskPaint } from "@/lib/mask-canvas";
+import { fileToDataUrl, extractMaskDataUrl, hasMaskPaint, resizeDataUrlToMaxPixels } from "@/lib/mask-canvas";
 import { toast } from "sonner";
 
 const TOOL_COLOR = "#f59e0b";
@@ -129,8 +129,15 @@ export default function CleanupPage() {
     try {
       const imageRes = await fetch(input);
       const imageBlob = await imageRes.blob();
-      const imageDataUrl = await fileToDataUrl(new File([imageBlob], "input.png", { type: imageBlob.type }));
-      const maskDataUrl = extractMaskDataUrl(canvas);
+      const rawImageDataUrl = await fileToDataUrl(new File([imageBlob], "input.png", { type: imageBlob.type }));
+      const rawMaskDataUrl = extractMaskDataUrl(canvas);
+      // fal-ai/flux-pro/v1/fill bills per megapixel — cap both to the same
+      // resolution so they stay pixel-aligned.
+      const MAX_PIXELS = 1_048_576;
+      const [imageDataUrl, maskDataUrl] = await Promise.all([
+        resizeDataUrlToMaxPixels(rawImageDataUrl, MAX_PIXELS),
+        resizeDataUrlToMaxPixels(rawMaskDataUrl, MAX_PIXELS),
+      ]);
 
       const res = await fetch("/api/cleanup", {
         method: "POST",
@@ -173,7 +180,7 @@ export default function CleanupPage() {
   }
 
   return (
-    <ToolPageShell title="Cleanup" description="Paint over objects, blemishes and distractions to remove them" creditCost={1} accentColor={TOOL_COLOR}>
+    <ToolPageShell title="Cleanup" description="Paint over objects, blemishes and distractions to remove them" creditCost={3} accentColor={TOOL_COLOR}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: W.dim }}>Paint over what to remove</p>
@@ -264,7 +271,7 @@ export default function CleanupPage() {
                 >
                   {status === "processing"
                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Cleaning up…</>
-                    : <><Eraser className="w-4 h-4" />Clean Image · 1 credit</>}
+                    : <><Eraser className="w-4 h-4" />Clean Image · 3 credits</>}
                 </motion.button>
               </motion.div>
             )}

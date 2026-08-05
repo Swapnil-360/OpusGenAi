@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, hasUnlimitedCredits } from "@/lib/credits";
 
-const CREDIT_COST = 1;
+const CREDIT_COST = 3;
 
 export async function POST(req: NextRequest) {
   try {

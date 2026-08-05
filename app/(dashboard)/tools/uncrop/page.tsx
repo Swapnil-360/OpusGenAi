@@ -98,7 +98,7 @@ export default function UncropPage() {
   }
 
   return (
-    <ToolPageShell title="Uncrop / Expand" description="Extend your image to any aspect ratio using AI" creditCost={1} accentColor={TOOL_COLOR}>
+    <ToolPageShell title="Uncrop / Expand" description="Extend your image to any aspect ratio using AI" creditCost={3} accentColor={TOOL_COLOR}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: W.dim }}>Input Image</p>
@@ -190,7 +190,7 @@ export default function UncropPage() {
                 >
                   {status === "processing"
                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Expanding image…</>
-                    : <><Frame className="w-4 h-4" />Expand to {ratio} · 1 credit</>}
+                    : <><Frame className="w-4 h-4" />Expand to {ratio} · 3 credits</>}
                 </motion.button>
               </motion.div>
             )}

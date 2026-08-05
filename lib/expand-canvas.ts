@@ -4,6 +4,10 @@ import { loadImageEl } from "@/lib/image-composite";
 
 export type ExpandDirection = "all" | "top-bottom" | "left-right" | "top" | "bottom";
 
+// fal-ai/flux-pro/v1/fill bills per megapixel of the canvas sent to it — cap the
+// expanded canvas here so an oversized upload can't blow up per-operation cost.
+const MAX_PIXELS = 1_048_576; // ~1 megapixel
+
 function parseRatio(ratioId: string): number {
   const [w, h] = ratioId.split(":").map(Number);
   return w / h;
@@ -55,7 +59,19 @@ export async function buildExpandedImageAndMask(
   direction: ExpandDirection
 ): Promise<{ image: string; mask: string }> {
   const img = await loadImageEl(src);
-  const { canvasW, canvasH, offsetX, offsetY } = computeExpandLayout(img.width, img.height, ratioId, direction);
+  let { canvasW, canvasH, offsetX, offsetY } = computeExpandLayout(img.width, img.height, ratioId, direction);
+
+  let drawW = img.width;
+  let drawH = img.height;
+  if (canvasW * canvasH > MAX_PIXELS) {
+    const scale = Math.sqrt(MAX_PIXELS / (canvasW * canvasH));
+    canvasW = Math.round(canvasW * scale);
+    canvasH = Math.round(canvasH * scale);
+    offsetX = Math.round(offsetX * scale);
+    offsetY = Math.round(offsetY * scale);
+    drawW = Math.round(drawW * scale);
+    drawH = Math.round(drawH * scale);
+  }
 
   const imageCanvas = document.createElement("canvas");
   imageCanvas.width = canvasW;
@@ -63,7 +79,7 @@ export async function buildExpandedImageAndMask(
   const imageCtx = imageCanvas.getContext("2d")!;
   imageCtx.fillStyle = "#808080";
   imageCtx.fillRect(0, 0, canvasW, canvasH);
-  imageCtx.drawImage(img, offsetX, offsetY, img.width, img.height);
+  imageCtx.drawImage(img, offsetX, offsetY, drawW, drawH);
 
   const maskCanvas = document.createElement("canvas");
   maskCanvas.width = canvasW;
@@ -72,7 +88,7 @@ export async function buildExpandedImageAndMask(
   maskCtx.fillStyle = "#ffffff";
   maskCtx.fillRect(0, 0, canvasW, canvasH);
   maskCtx.fillStyle = "#000000";
-  maskCtx.fillRect(offsetX, offsetY, img.width, img.height);
+  maskCtx.fillRect(offsetX, offsetY, drawW, drawH);
 
   return { image: imageCanvas.toDataURL("image/png"), mask: maskCanvas.toDataURL("image/png") };
 }

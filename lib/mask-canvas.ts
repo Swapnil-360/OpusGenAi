@@ -35,6 +35,31 @@ export function extractMaskDataUrl(canvas: HTMLCanvasElement): string {
   return out.toDataURL("image/png");
 }
 
+/** Downscales a data URL so width*height doesn't exceed maxPixels — fal-ai's
+ * flux-pro/v1/fill bills per megapixel, so this caps per-operation cost on
+ * oversized uploads. No-op if already under the cap. */
+export function resizeDataUrlToMaxPixels(dataUrl: string, maxPixels: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const { width, height } = img;
+      if (width * height <= maxPixels) {
+        resolve(dataUrl);
+        return;
+      }
+      const scale = Math.sqrt(maxPixels / (width * height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(height * scale);
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
 /** True if the painted-overlay canvas has at least one painted pixel. */
 export function hasMaskPaint(canvas: HTMLCanvasElement): boolean {
   const { data } = canvas.getContext("2d")!.getImageData(0, 0, canvas.width, canvas.height);

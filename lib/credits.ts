@@ -1,4 +1,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ADMIN_EMAILS } from "@/lib/admin-config";
+
+/** Admins get unlimited use across every credit-gated tool, for testing —
+ *  never blocked by balance, never actually charged. */
+export function hasUnlimitedCredits(email: string | null | undefined): boolean {
+  return !!email && (ADMIN_EMAILS as readonly string[]).includes(email.toLowerCase());
+}
 
 // Credit balance/charging always goes through the service-role client, never
 // the end-user session client. This is money-moving logic — it must not

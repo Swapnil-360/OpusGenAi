@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
-import { getUserCredits, chargeCredits } from "@/lib/credits";
+import { getUserCredits, chargeCredits, hasUnlimitedCredits } from "@/lib/credits";
 
 const CREDIT_COST = 1;
 
@@ -19,8 +19,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sign in to use this tool." }, { status: 401 });
     }
 
+    const isUnlimited = hasUnlimitedCredits(user.email);
     const credits = await getUserCredits(user.id);
-    if (credits < CREDIT_COST) {
+    if (!isUnlimited && credits < CREDIT_COST) {
       return NextResponse.json(
         { error: "You're out of credits. Upgrade your plan to keep generating." },
         { status: 402 }
@@ -57,7 +58,9 @@ export async function POST(req: NextRequest) {
     });
     if (insertError) console.error("generations insert failed:", insertError.message);
 
-    const newCredits = await chargeCredits(user.id, CREDIT_COST, credits, "Cleanup / object removal");
+    const newCredits = isUnlimited
+      ? credits
+      : await chargeCredits(user.id, CREDIT_COST, credits, "Cleanup / object removal");
 
     return NextResponse.json({ image: outputUrl, credits: newCredits });
   } catch (e) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
-import { getUserCredits, chargeCredits } from "@/lib/credits";
+import { getUserCredits, chargeCredits, hasUnlimitedCredits } from "@/lib/credits";
 import { buildScenePrompt, buildProductEditPrompt, buildPortraitEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
 
 const CREDIT_COST = 1;
@@ -32,8 +32,9 @@ export async function POST(req: NextRequest) {
     const isPremium = mode === "premium";
     const cost = isPremium ? PREMIUM_CREDIT_COST : CREDIT_COST;
 
+    const isUnlimited = hasUnlimitedCredits(user.email);
     const credits = await getUserCredits(user.id);
-    if (credits < cost) {
+    if (!isUnlimited && credits < cost) {
       return NextResponse.json(
         { error: "You're out of credits. Upgrade your plan to keep generating." },
         { status: 402 }
@@ -108,7 +109,9 @@ export async function POST(req: NextRequest) {
       .single();
     if (insertError) console.error("generations insert failed:", insertError.message);
 
-    const newCredits = await chargeCredits(user.id, cost, credits, isPremium ? "Premium AI product photo" : "Image generation");
+    const newCredits = isUnlimited
+      ? credits
+      : await chargeCredits(user.id, cost, credits, isPremium ? "Premium AI product photo" : "Image generation");
 
     return NextResponse.json({ image, credits: newCredits, generationId: insertedRow?.id ?? null });
   } catch (e) {

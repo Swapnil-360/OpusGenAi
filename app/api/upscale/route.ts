@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getUserCredits, chargeCredits, hasUnlimitedCredits } from "@/lib/credits";
+import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 
 const HF_KEY = process.env.HUGGINGFACE_API_KEY!;
 const HF_BASE = "https://router.huggingface.co/hf-inference/models";
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
     if (insertError) console.error("generations insert failed:", insertError.message);
 
     const newCredits = isUnlimited
-      ? credits
+      ? UNLIMITED_CREDITS_DISPLAY
       : await chargeCredits(user.id, CREDIT_COST, credits, "Upscale 4×");
 
     return NextResponse.json({ image, credits: newCredits });

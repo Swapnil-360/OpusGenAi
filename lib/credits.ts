@@ -7,6 +7,11 @@ export function hasUnlimitedCredits(email: string | null | undefined): boolean {
   return !!email && (ADMIN_EMAILS as readonly string[]).includes(email.toLowerCase());
 }
 
+/** Sent to the client instead of the real (low, never-charged) stored balance
+ * for unlimited accounts — the real number would trip low-credit warnings
+ * that don't apply to them. */
+export const UNLIMITED_CREDITS_DISPLAY = 999999;
+
 // Credit balance/charging always goes through the service-role client, never
 // the end-user session client. This is money-moving logic — it must not
 // depend on RLS grants for the "authenticated" role, which silently broke at

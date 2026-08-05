@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
-import { getUserCredits, chargeCredits, hasUnlimitedCredits } from "@/lib/credits";
+import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { buildScenePrompt, buildProductEditPrompt, buildPortraitEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
 
 const CREDIT_COST = 1;
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     if (insertError) console.error("generations insert failed:", insertError.message);
 
     const newCredits = isUnlimited
-      ? credits
+      ? UNLIMITED_CREDITS_DISPLAY
       : await chargeCredits(user.id, cost, credits, isPremium ? "Premium AI product photo" : "Image generation");
 
     return NextResponse.json({ image, credits: newCredits, generationId: insertedRow?.id ?? null });

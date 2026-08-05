@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
-import { getUserCredits, chargeCredits, hasUnlimitedCredits } from "@/lib/credits";
+import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 
 const CREDIT_COST = 3;
 
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     if (insertError) console.error("generations insert failed:", insertError.message);
 
     const newCredits = isUnlimited
-      ? credits
+      ? UNLIMITED_CREDITS_DISPLAY
       : await chargeCredits(user.id, CREDIT_COST, credits, "Cleanup / object removal");
 
     return NextResponse.json({ image: outputUrl, credits: newCredits });

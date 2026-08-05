@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
+  ArrowLeft,
   BarChart3,
   Bell,
   Check,
@@ -494,10 +496,15 @@ export default function AdminPage() {
             <Avatar name={adminEmail} size={28} />
             <span className="text-xs hidden sm:block" style={{ color: T.muted }}>{adminEmail}</span>
           </div>
-          <button onClick={handleSignOut}
+          <Link href="/generate"
             className="flex items-center gap-1.5 text-xs px-3 h-7 rounded-lg transition-opacity hover:opacity-70"
             style={{ color: T.muted, border: `1px solid ${T.border}` }}>
-            <LogOut className="w-3 h-3" /> Sign out
+            <ArrowLeft className="w-3 h-3" /> Exit admin
+          </Link>
+          <button onClick={handleSignOut} title="Sign out"
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70"
+            style={{ color: T.muted, border: `1px solid ${T.border}` }}>
+            <LogOut className="w-3 h-3" />
           </button>
         </div>
       </div>

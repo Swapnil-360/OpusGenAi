@@ -40,6 +40,7 @@ function mapRow(row: TemplateRow): Template {
 export function useTemplates() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -47,8 +48,9 @@ export function useTemplates() {
 
     async function load(isRetry = false) {
       setLoading(true);
+      setError(false);
       const supabase = createClient();
-      const { data, error } = await withQueryTimeout(
+      const { data, error: queryError } = await withQueryTimeout(
         supabase
           .from("templates")
           .select("id, name, template_type, category, description, tags, prompt, cover_image_url, accent_color, is_pro, sort_order")
@@ -56,15 +58,16 @@ export function useTemplates() {
       );
 
       if (cancelled) return;
-      if (error) {
+      if (queryError) {
         // A hung request usually means a stuck local auth session — the
         // timeout already cleared it, so one clean retry recovers silently.
-        if (!isRetry && error.message === "Request timed out.") {
+        if (!isRetry && queryError.message === "Request timed out.") {
           load(true);
           return;
         }
-        console.error("Failed to load templates:", error.message);
+        console.error("Failed to load templates:", queryError.message);
         setLoading(false);
+        setError(true);
         return;
       }
       setTemplates(((data ?? []) as TemplateRow[]).map(mapRow));
@@ -77,5 +80,5 @@ export function useTemplates() {
 
   const refetch = () => setReloadKey((k) => k + 1);
 
-  return { templates, loading, refetch };
+  return { templates, loading, error, refetch };
 }

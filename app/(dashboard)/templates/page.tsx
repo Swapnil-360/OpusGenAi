@@ -35,7 +35,7 @@ const TYPES: { id: TemplateType; label: string; hint: string }[] = [
 
 export default function TemplatesPage() {
   const router = useRouter();
-  const { templates, loading } = useTemplates();
+  const { templates, loading, error, refetch } = useTemplates();
   const [activeType, setActiveType] = useState<TemplateType>("production");
   const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");
@@ -172,6 +172,11 @@ export default function TemplatesPage() {
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: W.border, borderTopColor: W.red }} />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center text-center py-20">
+            <p className="text-sm font-semibold mb-3" style={{ color: W.muted }}>Couldn&apos;t load templates.</p>
+            <button onClick={refetch} className="text-xs hover:underline" style={{ color: W.red }}>Try again</button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center text-center py-20">

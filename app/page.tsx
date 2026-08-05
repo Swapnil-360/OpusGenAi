@@ -448,7 +448,7 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
 
 export default function LandingPage() {
   const router = useRouter();
-  const { templates: ALL_TEMPLATES, loading: templatesLoading } = useTemplates();
+  const { templates: ALL_TEMPLATES, loading: templatesLoading, error: templatesError, refetch: refetchTemplates } = useTemplates();
   const { images: heroImages } = useHeroImages(8);
   const orbitAngle = useMotionValue(0);
   useAnimationFrame((t) => {
@@ -819,6 +819,19 @@ export default function LandingPage() {
                     Drag to browse · {ALL_TEMPLATES.length} templates
                   </p>
                 </>
+              ) : templatesError ? (
+                <div className="flex flex-col items-center justify-center gap-3 h-56 sm:h-72 lg:h-80">
+                  <p className="text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>Couldn&apos;t load templates.</p>
+                  <button
+                    onClick={refetchTemplates}
+                    className="text-xs font-semibold px-4 py-2 rounded-lg transition-all"
+                    style={{ border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.75)" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    Try again
+                  </button>
+                </div>
               ) : null}
             </FadeIn>
           </div>

@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { fal } from "@/lib/fal";
 
-const HF_KEY = process.env.HUGGINGFACE_API_KEY!;
-const HF_BASE = "https://router.huggingface.co/hf-inference/models";
-const MODEL = "HuggingFaceH4/zephyr-7b-beta";
+const SYSTEM_PROMPT = "You are an expert social media copywriter for product photography.";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,8 +19,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sign in to use this tool." }, { status: 401 });
     }
 
-    const input = `<|system|>You are an expert social media copywriter for product photography.</s>
-<|user|>Write 2 different ${platform} captions for a product photo described as: "${prompt}"
+    const instruction = `Write 2 different ${platform} captions for a product photo described as: "${prompt}"
 
 Tone: ${tone}
 Requirements: platform-native style, include relevant emojis where fitting, no hashtags inside the captions.
@@ -29,35 +27,24 @@ Requirements: platform-native style, include relevant emojis where fitting, no h
 Return in EXACTLY this format, nothing else:
 CAPTION 1: <first caption>
 CAPTION 2: <second caption>
-HASHTAGS: <8-15 relevant hashtags, space-separated, each starting with #></s>
-<|assistant|>`;
+HASHTAGS: <8-15 relevant hashtags, space-separated, each starting with #>`;
 
-    const res = await fetch(`${HF_BASE}/${MODEL}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${HF_KEY}`,
-        "Content-Type": "application/json",
-        "x-wait-for-model": "true",
+    const result = await fal.subscribe("openrouter/router/vision", {
+      input: {
+        image_urls: [],
+        prompt: instruction,
+        system_prompt: SYSTEM_PROMPT,
+        model: "google/gemini-2.5-flash",
+        temperature: 0.8,
+        max_tokens: 400,
       },
-      body: JSON.stringify({
-        inputs: input,
-        parameters: {
-          max_new_tokens: 400,
-          temperature: 0.8,
-          return_full_text: false,
-          stop: ["<|user|>", "</s>"],
-        },
-      }),
     });
 
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("HF caption error:", err);
-      return NextResponse.json({ error: "Caption generation failed", detail: err }, { status: res.status });
+    const text = ((result.data as { output?: string })?.output ?? "").trim();
+    if (!text) {
+      console.error("fal caption returned no output:", result);
+      return NextResponse.json({ error: "Caption generation failed" }, { status: 502 });
     }
-
-    const data = await res.json();
-    const text: string = Array.isArray(data) ? data[0]?.generated_text ?? "" : data?.generated_text ?? "";
 
     const captionMatches = [...text.matchAll(/CAPTION \d+:\s*([\s\S]*?)(?=\nCAPTION \d+:|\nHASHTAGS:|$)/g)]
       .map((m) => m[1].trim())

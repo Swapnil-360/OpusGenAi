@@ -52,6 +52,7 @@ type SidebarUser = {
   avatarUrl: string | null;
   credits: number;
   plan: "free" | "pro";
+  isAdmin: boolean;
 };
 
 type SidebarProps = {
@@ -241,7 +242,7 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
                     </span>
                     <div className="flex items-center gap-1 text-xs font-bold" style={{ color: S.activeText }}>
                       <Zap className="w-3 h-3" />
-                      {user.credits}
+                      {user.isAdmin ? "Unlimited" : user.credits}
                     </div>
                   </div>
                   <div
@@ -252,11 +253,11 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
                       className="h-full rounded-full"
                       style={{ background: "linear-gradient(to right, #dc2626, #f97316)" }}
                       initial={{ width: 0 }}
-                      animate={{ width: `${Math.min((user.credits / 10) * 100, 100)}%` }}
+                      animate={{ width: user.isAdmin ? "100%" : `${Math.min((user.credits / 10) * 100, 100)}%` }}
                       transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
                     />
                   </div>
-                  {user.plan === "free" && (
+                  {user.plan === "free" && !user.isAdmin && (
                     <Link href="/account">
                       <motion.button
                         whileHover={{ scale: 1.02, boxShadow: "0 0 20px rgba(220,38,38,0.3)" }}
@@ -344,6 +345,7 @@ const DEFAULT_USER: SidebarUser = {
   avatarUrl: null,
   credits: 0,
   plan: "free",
+  isAdmin: false,
 };
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -387,7 +389,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       const credits = typeof profile?.credits === "number" ? (profile.credits as number) : 0;
 
-      setSidebarUser({ name, email: user.email ?? "", avatarUrl, credits, plan: "free" });
+      // Server-only allowlist check — never trust a client-side email list.
+      const isAdmin = await fetch("/api/admin/check").then((res) => res.ok).catch(() => false);
+
+      setSidebarUser({ name, email: user.email ?? "", avatarUrl, credits, plan: "free", isAdmin });
     }
     loadUser();
 
@@ -501,7 +506,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             style={{ background: "rgba(220,38,38,0.12)", border: "1px solid rgba(220,38,38,0.2)", color: S.activeText }}
           >
             <Zap className="w-3 h-3" />
-            {sidebarUser.credits}
+            {sidebarUser.isAdmin ? "Unlimited" : sidebarUser.credits}
           </div>
         </div>
 

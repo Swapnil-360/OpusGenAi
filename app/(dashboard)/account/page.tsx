@@ -256,7 +256,7 @@ export default function AccountPage() {
             className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
             style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.muted }}
           >
-            {planLabel("free")}
+            {isAdmin ? "Unlimited" : planLabel("free")}
           </span>
           {isAdmin && (
             <a
@@ -345,7 +345,7 @@ export default function AccountPage() {
                   <div className="grid grid-cols-3 gap-2 flex-1">
                     {[
                       { label: "Generations", value: totalGenerations },
-                      { label: "Credits left", value: credits },
+                      { label: "Credits left", value: isAdmin ? "∞" : credits },
                       { label: "Images", value: totalGenerations },
                     ].map(({ label, value }) => (
                       <div
@@ -405,24 +405,24 @@ export default function AccountPage() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: W.red }} />
-                        <p className="text-xs font-semibold" style={{ color: W.text }}>{planLabel("free")} Plan</p>
+                        <p className="text-xs font-semibold" style={{ color: W.text }}>{isAdmin ? "Unlimited" : planLabel("free")} Plan</p>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: W.glass, color: W.muted }}>Current</span>
                       </div>
                       <p className="text-xl font-black" style={{ color: W.text }}>
-                        {credits} <span className="text-sm font-normal" style={{ color: W.muted }}>credits remaining</span>
+                        {isAdmin ? "∞" : credits} <span className="text-sm font-normal" style={{ color: W.muted }}>{isAdmin ? "unlimited for testing" : "credits remaining"}</span>
                       </p>
                       <p className="text-[11px] mt-0.5" style={{ color: W.dim }}>
-                        Resets monthly · Free forever
+                        {isAdmin ? "Admin account · never charged" : "Resets monthly · Free forever"}
                       </p>
                     </div>
                     <div className="shrink-0">
-                      <p className="text-[10px] mb-1 text-right" style={{ color: W.dim }}>{credits} / {currentPlan.credits}</p>
+                      <p className="text-[10px] mb-1 text-right" style={{ color: W.dim }}>{isAdmin ? "Unlimited" : `${credits} / ${currentPlan.credits}`}</p>
                       <div className="w-32 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
                         <motion.div
                           className="h-full rounded-full"
                           style={{ background: "linear-gradient(to right, #dc2626, #f97316)" }}
                           initial={{ width: 0 }}
-                          animate={{ width: `${creditsPercent}%` }}
+                          animate={{ width: isAdmin ? "100%" : `${creditsPercent}%` }}
                           transition={{ duration: 0.8, ease: "easeOut" }}
                         />
                       </div>

@@ -63,9 +63,12 @@ export default function UpscalePage() {
         setStatus("failed");
         return;
       }
-      const { image } = await res.json();
+      const { image, credits } = await res.json();
       setResult(image);
       setStatus("completed");
+      if (typeof credits === "number") {
+        window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
+      }
       toast.success(`Upscaled ${scale} successfully!`);
     } catch {
       toast.error("Network error. Check your connection.");

@@ -752,13 +752,11 @@ export default function LandingPage() {
               </div>
             </FadeIn>
 
-            {/* GradientCard per tool — image banner + content, height driven
-                by content rather than a fixed guess; the grid row stretches
-                each card in a row to match, so sizing stays even. Single
-                column on phones (a 2-up grid left barely 150px per card and
-                forced awkward text wraps), 2-up on larger phones/tablets,
+            {/* GradientCard per tool — compact card, image banner + content,
+                height driven by content; the grid row stretches every card
+                in a row to match, so sizing stays even. 2-up from mobile up,
                 3-up on desktop. */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 items-stretch">
               {TOOLS.map((tool, i) => (
                 <FadeIn key={tool.id} delay={i * 0.07}>
                   <GradientCard

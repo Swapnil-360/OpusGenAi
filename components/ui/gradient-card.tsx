@@ -71,27 +71,27 @@ const GradientCard = React.forwardRef<HTMLDivElement, GradientCardProps>(
             />
           </div>
 
-          {/* Content — height follows its own content; the grid row stretches
-              every card in a row to match the tallest, so sizing stays even
-              without a guessed fixed height. */}
-          <div className="z-10 flex flex-col flex-1 p-5 sm:p-6">
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-background/60 px-2.5 py-1 text-xs sm:text-sm font-medium text-foreground/80 backdrop-blur-sm w-fit">
+          {/* Content — compact, professional density (not oversized): small
+              type scale, tight padding, description capped to 2 lines so a
+              longer blurb can't balloon one card taller than its row-mates. */}
+          <div className="z-10 flex flex-col flex-1 p-3 sm:p-4">
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-background/60 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-foreground/80 backdrop-blur-sm w-fit">
               <span
-                className="h-2 w-2 rounded-full shrink-0"
+                className="h-1.5 w-1.5 rounded-full shrink-0"
                 style={{ backgroundColor: badgeColor }}
               />
               {badgeText}
             </div>
 
-            <h3 className="text-lg sm:text-xl font-bold text-foreground mb-1.5 leading-tight">{title}</h3>
-            <p className="text-sm text-foreground/70 flex-1">{description}</p>
+            <h3 className="text-sm sm:text-base font-bold text-foreground mb-1 leading-tight">{title}</h3>
+            <p className="text-xs sm:text-[13px] leading-relaxed text-foreground/70 flex-1 line-clamp-2">{description}</p>
 
             <a
               href={ctaHref}
-              className="group mt-5 inline-flex items-center gap-2 text-sm font-semibold text-foreground"
+              className="group mt-3 inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-foreground"
             >
               {ctaText}
-              <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+              <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-1" />
             </a>
           </div>
         </div>

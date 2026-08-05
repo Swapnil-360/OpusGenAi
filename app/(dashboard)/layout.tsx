@@ -14,6 +14,7 @@ import { LogoBrand } from "@/components/shared/LogoBrand";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FeedbackButton } from "@/components/shared/FeedbackModal";
 import { createClient } from "@/lib/supabase/client";
+import { withQueryTimeout } from "@/lib/supabase/session-recovery";
 import { cn } from "@/lib/utils";
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
@@ -356,13 +357,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarUser, setSidebarUser] = useState<SidebarUser>(DEFAULT_USER);
 
   useEffect(() => {
-    async function loadUser() {
+    async function loadUser(isRetry = false) {
       const supabase = createClient();
       // getSession() reads the already-verified local session (no network round trip);
       // getUser() would re-hit Supabase's auth server on every mount just for display data.
       // Every actual data query below is still RLS-gated server-side, so this is safe.
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
+      //
+      // A corrupted local session can leave supabase-js's refresh lock stuck,
+      // hanging this call forever (only fixable before by manually clearing
+      // site data). withQueryTimeout clears that stale session on timeout so
+      // one retry recovers cleanly instead of leaving the whole dashboard stuck.
+      const { data, error } = await withQueryTimeout(supabase.auth.getSession());
+      if (error) {
+        if (!isRetry && error.message === "Request timed out.") { await loadUser(true); return; }
+        router.push("/login");
+        return;
+      }
+      const user = data?.session?.user;
       if (!user) { router.push("/login"); return; }
 
       // Pull display name: prefer profile full_name, then Google metadata, then email prefix

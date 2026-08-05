@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
-  Bell, Check, Clock, CreditCard, Crown, Globe, History,
+  Bell, Check, Clock, CreditCard, Crown, History,
   KeyRound, LogOut, Shield, ShieldCheck, Sparkles, User, X as XIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -372,10 +372,6 @@ export default function AccountPage() {
                   <div>
                     <SectionLabel>Email address</SectionLabel>
                     <FieldInput type="email" value={authUser?.email ?? ""} readOnly />
-                  </div>
-                  <div>
-                    <SectionLabel>Website</SectionLabel>
-                    <FieldInput icon={Globe} placeholder="https://yourstore.com" />
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.015 }}

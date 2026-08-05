@@ -8,10 +8,18 @@ import "./globals.css";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://opusgenai.vercel.app";
+const SITE_TITLE = "OpusGen AI — Studio-Quality Product Photography";
+const SITE_DESCRIPTION =
+  "Create stunning product content in minutes. AI-powered photography, background tools, and social media captions — built for e-commerce brands.";
+
 export const metadata: Metadata = {
-  title: "OpusGen AI — Studio-Quality Product Photography",
-  description:
-    "Create stunning product content in minutes. AI-powered photography, background tools, and social media captions — built for e-commerce brands.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TITLE,
+    template: "%s — OpusGen AI",
+  },
+  description: SITE_DESCRIPTION,
   keywords: "AI product photography, background removal, e-commerce images, product photos AI",
   icons: {
     icon: [
@@ -20,6 +28,21 @@ export const metadata: Metadata = {
     ],
     apple: "/logo/2-removebg-preview.png",
     shortcut: "/favicon.svg",
+  },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "OpusGen AI",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  alternates: {
+    canonical: "/",
   },
 };
 

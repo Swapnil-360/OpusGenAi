@@ -7,6 +7,7 @@ import {
   RefreshCw, Sparkles, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { fileToDataUrl } from "@/lib/mask-canvas";
 import { toast } from "sonner";
 
 /* ─── Tokens ───────────────────────────────────────────────────────── */
@@ -60,6 +61,7 @@ export default function StudioPage() {
   const [historyImages, setHistoryImages] = useState<{ src: string; prompt: string }[]>([]);
   const [selectedHistoryIdx, setSelectedHistoryIdx] = useState<number | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [platform, setPlatform] = useState<PlatformId>("instagram");
   const [tone, setTone] = useState<ToneId>("luxury");
   const [productName, setProductName] = useState("");
@@ -117,18 +119,21 @@ export default function StudioPage() {
   async function generate() {
     if (genStatus === "generating") return;
     if (!activeImageSrc) { toast.error("Upload an image first."); return; }
-    const name = productName.trim()
-      || activeImagePrompt?.split(" ").slice(0, 4).join(" ")
-      || "this product";
     setGenStatus("generating");
     setUsedPlatform(platform);
     setUsedTone(tone);
 
     try {
+      // Freshly uploaded files need converting to a data URL the server can
+      // read; history images are already a real hosted URL — send as-is.
+      const image = uploadedFile
+        ? await fileToDataUrl(uploadedFile)
+        : (selectedHistoryIdx !== null ? historyImages[selectedHistoryIdx]?.src : undefined);
+
       const res = await fetch("/api/caption", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: name, platform, tone: activeTone.label }),
+        body: JSON.stringify({ prompt: productName.trim() || undefined, image, platform, tone: activeTone.label }),
       });
 
       if (!res.ok) {
@@ -198,7 +203,7 @@ export default function StudioPage() {
               <p className="text-[10px]" style={{ color: W.dim }}>JPG, PNG, WebP</p>
               <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) { setSelectedHistoryIdx(null); setUploadedImage(URL.createObjectURL(f)); }
+                if (f) { setSelectedHistoryIdx(null); setUploadedFile(f); setUploadedImage(URL.createObjectURL(f)); }
               }} />
             </label>
           ) : (
@@ -209,7 +214,7 @@ export default function StudioPage() {
                 return (
                   <button
                     key={i}
-                    onClick={() => { setSelectedHistoryIdx(i); setUploadedImage(null); }}
+                    onClick={() => { setSelectedHistoryIdx(i); setUploadedImage(null); setUploadedFile(null); }}
                     className="relative w-14 h-14 rounded-xl overflow-hidden shrink-0 transition-all"
                     title={img.prompt}
                     style={{
@@ -238,7 +243,7 @@ export default function StudioPage() {
                   <img src={uploadedImage} alt="upload" className="w-full h-full rounded-xl object-cover"
                     style={{ border: "2px solid #f87171" }} />
                   <button
-                    onClick={() => setUploadedImage(null)}
+                    onClick={() => { setUploadedImage(null); setUploadedFile(null); }}
                     className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
                     style={{ background: W.card, border: `1px solid ${W.border}`, color: W.muted }}
                   >

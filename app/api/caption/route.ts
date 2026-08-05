@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { fal } from "@/lib/fal";
+import { fal, uploadDataUrlToFal } from "@/lib/fal";
 
-const SYSTEM_PROMPT = "You are an expert social media copywriter for product photography.";
+const SYSTEM_PROMPT =
+  "You are an expert social media copywriter. Look at the photo and write captions for what it actually " +
+  "shows — a product, a person/portrait, a scene, whatever it is. Don't assume it's a product shot unless it is one.";
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, platform = "instagram", tone = "Casual" } = await req.json();
+    const { prompt, image, platform = "instagram", tone = "Casual" } = await req.json();
 
-    if (!prompt?.trim()) {
+    if (!prompt?.trim() && !image) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
@@ -19,7 +21,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Sign in to use this tool." }, { status: 401 });
     }
 
-    const instruction = `Write 2 different ${platform} captions for a product photo described as: "${prompt}"
+    // History images are already hosted (a real https URL) — pass through as-is.
+    // A freshly uploaded file arrives as a data: URL and needs fal's own storage first.
+    const imageUrls: string[] = [];
+    if (image) {
+      imageUrls.push(typeof image === "string" && image.startsWith("data:") ? await uploadDataUrlToFal(image) : image);
+    }
+
+    const context = prompt?.trim() ? `\n\nAdditional context (product/subject name, if relevant): "${prompt.trim()}"` : "";
+    const instruction = `Write 2 different ${platform} captions for this photo.${context}
 
 Tone: ${tone}
 Requirements: platform-native style, include relevant emojis where fitting, no hashtags inside the captions.
@@ -31,12 +41,12 @@ HASHTAGS: <8-15 relevant hashtags, space-separated, each starting with #>`;
 
     const result = await fal.subscribe("openrouter/router/vision", {
       input: {
-        image_urls: [],
+        image_urls: imageUrls,
         prompt: instruction,
         system_prompt: SYSTEM_PROMPT,
         model: "google/gemini-2.5-flash",
         temperature: 0.8,
-        max_tokens: 400,
+        max_tokens: 800,
       },
     });
 

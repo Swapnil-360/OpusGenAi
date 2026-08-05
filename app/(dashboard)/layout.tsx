@@ -400,10 +400,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       const credits = typeof profile?.credits === "number" ? (profile.credits as number) : 0;
 
-      // Server-only allowlist check — never trust a client-side email list.
-      const isAdmin = await fetch("/api/admin/check").then((res) => res.ok).catch(() => false);
+      // Paint the sidebar as soon as we have the profile — don't make the
+      // user stare at "Loading…" for an extra round trip just for the admin
+      // badge. isAdmin fills in a beat later, non-blocking.
+      setSidebarUser({ name, email: user.email ?? "", avatarUrl, credits, plan: "free", isAdmin: false });
 
-      setSidebarUser({ name, email: user.email ?? "", avatarUrl, credits, plan: "free", isAdmin });
+      // Server-only allowlist check — never trust a client-side email list.
+      fetch("/api/admin/check")
+        .then((res) => { if (res.ok) setSidebarUser((prev) => ({ ...prev, isAdmin: true })); })
+        .catch(() => {});
     }
     loadUser();
 

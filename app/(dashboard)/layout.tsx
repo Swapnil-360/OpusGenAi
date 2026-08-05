@@ -14,7 +14,6 @@ import { LogoBrand } from "@/components/shared/LogoBrand";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FeedbackButton } from "@/components/shared/FeedbackModal";
 import { createClient } from "@/lib/supabase/client";
-import { withQueryTimeout } from "@/lib/supabase/session-recovery";
 import { cn } from "@/lib/utils";
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
@@ -357,58 +356,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarUser, setSidebarUser] = useState<SidebarUser>(DEFAULT_USER);
 
   useEffect(() => {
-    async function loadUser(isRetry = false) {
-      const supabase = createClient();
-      // getSession() reads the already-verified local session (no network round trip);
-      // getUser() would re-hit Supabase's auth server on every mount just for display data.
-      // Every actual data query below is still RLS-gated server-side, so this is safe.
-      //
-      // A corrupted local session can leave supabase-js's refresh lock stuck,
-      // hanging this call forever (only fixable before by manually clearing
-      // site data). withQueryTimeout clears that stale session on timeout so
-      // one retry recovers cleanly instead of leaving the whole dashboard stuck.
-      const { data, error } = await withQueryTimeout(supabase.auth.getSession());
-      if (error) {
-        if (!isRetry && error.message === "Request timed out.") { await loadUser(true); return; }
-        router.push("/login");
-        return;
+    // One server round trip for everything the sidebar shows. Middleware has
+    // already validated/refreshed the session cookie, so this never waits on a
+    // client-side token refresh — which is what used to leave this stuck on
+    // "Loading…" when returning with an expired access token.
+    async function loadUser() {
+      try {
+        const res = await fetch("/api/me", { cache: "no-store" });
+        if (res.status === 401) { router.push("/login"); return; }
+        if (!res.ok) return;
+        const me = await res.json();
+        setSidebarUser({
+          name: me.name,
+          email: me.email,
+          avatarUrl: me.avatarUrl,
+          credits: me.credits,
+          plan: "free",
+          isAdmin: me.isAdmin,
+        });
+      } catch {
+        // Network blip — leave the placeholder rather than bouncing to /login.
       }
-      const user = data?.session?.user;
-      if (!user) { router.push("/login"); return; }
-
-      // Pull display name: prefer profile full_name, then Google metadata, then email prefix
-      const meta = user.user_metadata ?? {};
-      const metaName: string = meta.full_name ?? meta.name ?? "";
-
-      // Load credits and plan from profiles table
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name, credits, avatar_url")
-        .eq("id", user.id)
-        .single();
-
-      const name =
-        (profile?.full_name as string | null) ||
-        metaName ||
-        (user.email?.split("@")[0] ?? "User");
-
-      const avatarUrl: string | null =
-        (profile?.avatar_url as string | null) ||
-        (meta.avatar_url as string | null) ||
-        (meta.picture as string | null) ||
-        null;
-
-      const credits = typeof profile?.credits === "number" ? (profile.credits as number) : 0;
-
-      // Paint the sidebar as soon as we have the profile — don't make the
-      // user stare at "Loading…" for an extra round trip just for the admin
-      // badge. isAdmin fills in a beat later, non-blocking.
-      setSidebarUser({ name, email: user.email ?? "", avatarUrl, credits, plan: "free", isAdmin: false });
-
-      // Server-only allowlist check — never trust a client-side email list.
-      fetch("/api/admin/check")
-        .then((res) => { if (res.ok) setSidebarUser((prev) => ({ ...prev, isAdmin: true })); })
-        .catch(() => {});
     }
     loadUser();
 

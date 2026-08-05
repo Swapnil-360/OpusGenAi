@@ -99,46 +99,34 @@ export default function AccountPage() {
   const [verifyCode, setVerifyCode] = useState("");
 
   useEffect(() => {
+    // Profile/credits/plan all arrive in one server round trip. Doing this
+    // client-side meant waiting on getSession() — which blocks on a token
+    // refresh when returning with an expired session — before four more
+    // queries could even start, so the page sat on placeholder values.
     async function load() {
-      // getSession() reads the local session (no network round trip) — RLS still
-      // gates every query below, so this is just as safe as getUser() here.
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (!user) { router.push("/login"); return; }
-      setAuthUser({ email: user.email ?? "", id: user.id });
+      try {
+        const res = await fetch("/api/me", { cache: "no-store" });
+        if (res.status === 401) { router.push("/login"); return; }
+        if (!res.ok) return;
+        const me = await res.json();
 
-      // Server-only allowlist check — never trust a client-side email list.
-      fetch("/api/admin/check").then((res) => setIsAdmin(res.ok)).catch(() => {});
-
-      const [{ data: profile }, { count }, { data: factors }, prefsResult] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("full_name, credits, avatar_url")
-          .eq("id", user.id)
-          .single(),
-        supabase
-          .from("generations")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", user.id)
-          .eq("status", "completed"),
-        supabase.auth.mfa.listFactors(),
-        // Isolated from the query above: older schemas without this column
-        // shouldn't break the rest of profile loading, just fall back to defaults.
-        supabase.from("profiles").select("notification_prefs").eq("id", user.id).single(),
-      ]);
-
-      if (profile) {
-        setName(profile.full_name ?? user.email?.split("@")[0] ?? "");
-        setCredits(profile.credits ?? 10);
-        setAvatarUrl(profile.avatar_url ?? null);
+        setAuthUser({ email: me.email, id: me.id });
+        setName(me.name ?? "");
+        setCredits(me.credits);
+        setAvatarUrl(me.avatarUrl);
+        setTotalGenerations(me.totalGenerations);
+        setIsAdmin(me.isAdmin);
+        if (me.notificationPrefs) {
+          setNotifications((prev) => ({ ...prev, ...(me.notificationPrefs as Partial<typeof notifications>) }));
+        }
+      } catch {
+        return;
       }
-      setTotalGenerations(count ?? 0);
 
-      const verifiedFactor = factors?.totp.find((f) => f.status === "verified");
-      setMfaFactorId(verifiedFactor?.id ?? null);
-
-      const savedPrefs = prefsResult.data?.notification_prefs as Partial<typeof notifications> | null;
-      if (savedPrefs) setNotifications((prev) => ({ ...prev, ...savedPrefs }));
+      // Needs the auth client (no server equivalent) and only drives the
+      // Security tab, so it loads separately rather than blocking the page.
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      setMfaFactorId(factors?.totp.find((f) => f.status === "verified")?.id ?? null);
     }
     load();
   }, []);

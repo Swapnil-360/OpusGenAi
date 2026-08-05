@@ -43,17 +43,29 @@ interface FeaturedCarouselProps {
   onSelect: (tpl: Template) => void;
 }
 
+// A tap never lands on a perfect pixel — especially with a finger — so allow
+// this much travel between pointerdown and click before calling it a drag.
+const TAP_SLOP_PX = 10;
+
 export function FeaturedCarousel({ items, onSelect }: FeaturedCarouselProps) {
   const scrollProgress = useMotionValue(0);
   const startProgress = React.useRef(0);
   const [windowWidth, setWindowWidth] = React.useState(0);
-  const draggedRef = React.useRef(false);
+  // Where the current interaction started. Recorded fresh on every pointerdown
+  // and compared against the click that ends it, so "was this a drag?" is
+  // decided per interaction and can never carry over from a previous one.
+  const pointerDownAt = React.useRef<{ x: number; y: number } | null>(null);
 
   const total = items.length;
 
+  // Keyed on the actual template set, not the array identity: the parent
+  // rebuilds `items` on every render, so depending on it snapped the deck
+  // back to the first card on any unrelated state change (closing the modal,
+  // typing in search…).
+  const itemsKey = items.map((t) => t.id).join(",");
   React.useEffect(() => {
     scrollProgress.set(0);
-  }, [items, scrollProgress]);
+  }, [itemsKey, scrollProgress]);
 
   React.useEffect(() => {
     setWindowWidth(window.innerWidth);
@@ -65,8 +77,18 @@ export function FeaturedCarousel({ items, onSelect }: FeaturedCarouselProps) {
   const config = React.useMemo(() => getCarouselConfig(windowWidth), [windowWidth]);
 
   const handleDragStart = () => {
-    draggedRef.current = false;
     startProgress.current = scrollProgress.get();
+  };
+
+  /** True when the pointer travelled far enough between press and release that
+   *  this was a swipe rather than a tap. */
+  const wasDrag = (e: React.MouseEvent) => {
+    // detail === 0 means a synthetic/keyboard-driven click, which carries no
+    // meaningful coordinates — always treat those as a tap.
+    if (e.detail === 0) return false;
+    const start = pointerDownAt.current;
+    if (!start) return false;
+    return Math.hypot(e.clientX - start.x, e.clientY - start.y) > TAP_SLOP_PX;
   };
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
@@ -97,9 +119,11 @@ export function FeaturedCarousel({ items, onSelect }: FeaturedCarouselProps) {
         drag={total > 1 ? "x" : false}
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.15}
+        onPointerDownCapture={(e) => {
+          pointerDownAt.current = { x: e.clientX, y: e.clientY };
+        }}
         onDragStart={handleDragStart}
         onDrag={(_, info) => {
-          if (Math.abs(info.offset.x) > 4) draggedRef.current = true;
           const delta = -info.delta.x / config.sensitivity;
           scrollProgress.set(scrollProgress.get() + delta);
         }}
@@ -117,7 +141,7 @@ export function FeaturedCarousel({ items, onSelect }: FeaturedCarouselProps) {
             total={total}
             progress={scrollProgress}
             config={config}
-            onSelect={() => { if (!draggedRef.current) onSelect(tpl); }}
+            onSelect={(e) => { if (!wasDrag(e)) onSelect(tpl); }}
           />
         ))}
       </motion.div>
@@ -154,7 +178,7 @@ interface CardProps {
   total: number;
   progress: MotionValue<number>;
   config: CarouselConfig;
-  onSelect: () => void;
+  onSelect: (e: React.MouseEvent) => void;
 }
 
 const Card = ({ tpl, index, total, progress, config, onSelect }: CardProps) => {

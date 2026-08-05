@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { withQueryTimeout } from "@/lib/supabase/session-recovery";
+import { selectPublic } from "@/lib/supabase/public-rest";
 import type { Template, TemplateType } from "@/lib/templates-data";
 
 interface TemplateRow {
@@ -49,29 +48,22 @@ export function useTemplates() {
     async function load(isRetry = false) {
       setLoading(true);
       setError(false);
-      const supabase = createClient();
-      const { data, error: queryError } = await withQueryTimeout(
-        supabase
-          .from("templates")
-          .select("id, name, template_type, category, description, tags, prompt, cover_image_url, accent_color, is_pro, sort_order")
-          .order("sort_order", { ascending: true })
-      );
-
-      if (cancelled) return;
-      if (queryError) {
-        // A hung request usually means a stuck local auth session — the
-        // timeout already cleared it, so one clean retry recovers silently.
-        if (!isRetry && queryError.message === "Request timed out.") {
-          load(true);
-          return;
-        }
-        console.error("Failed to load templates:", queryError.message);
+      try {
+        const rows = await selectPublic<TemplateRow>(
+          "templates",
+          "select=id,name,template_type,category,description,tags,prompt,cover_image_url,accent_color,is_pro,sort_order&order=sort_order.asc"
+        );
+        if (cancelled) return;
+        setTemplates(rows.map(mapRow));
+        setLoading(false);
+      } catch (err) {
+        if (cancelled) return;
+        // One retry covers a transient network blip / aborted timeout.
+        if (!isRetry) { load(true); return; }
+        console.error("Failed to load templates:", err);
         setLoading(false);
         setError(true);
-        return;
       }
-      setTemplates(((data ?? []) as TemplateRow[]).map(mapRow));
-      setLoading(false);
     }
 
     load();

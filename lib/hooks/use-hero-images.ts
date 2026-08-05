@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { selectPublic } from "@/lib/supabase/public-rest";
 
 export interface HeroImage {
   src: string;
@@ -28,15 +28,27 @@ export function useHeroImages(count = 8) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const supabase = createClient();
-      const [{ data: settingsRow }, { data: templateRows }] = await Promise.all([
-        supabase.from("site_settings").select("value").eq("id", "hero_images").single(),
-        supabase.from("templates").select("id, name, cover_image_url").not("cover_image_url", "is", null),
-      ]);
+      let settingsRows: { value: HeroSettings }[] = [];
+      let templates: { id: string; name: string; cover_image_url: string }[] = [];
+      try {
+        [settingsRows, templates] = await Promise.all([
+          selectPublic<{ value: HeroSettings }>("site_settings", "select=value&id=eq.hero_images"),
+          selectPublic<{ id: string; name: string; cover_image_url: string }>(
+            "templates",
+            "select=id,name,cover_image_url&cover_image_url=not.is.null"
+          ),
+        ]);
+      } catch (err) {
+        // Leave the orbit empty rather than hanging on a spinner forever —
+        // it's decorative, so a failure here must not stall the hero.
+        if (cancelled) return;
+        console.error("Failed to load hero images:", err);
+        setLoading(false);
+        return;
+      }
       if (cancelled) return;
 
-      const templates = (templateRows ?? []) as { id: string; name: string; cover_image_url: string }[];
-      const settings = (settingsRow?.value ?? { mode: "random" }) as HeroSettings;
+      const settings = (settingsRows[0]?.value ?? { mode: "random" }) as HeroSettings;
 
       let resolved: HeroImage[] = [];
 

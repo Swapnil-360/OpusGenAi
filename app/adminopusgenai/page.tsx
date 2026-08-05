@@ -354,6 +354,29 @@ export default function AdminPage() {
     refetchTemplates();
   }
 
+  async function uploadCoverImage(id: string, file: File) {
+    setRegeneratingId(id);
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch(`/api/admin/templates/${id}/cover-image`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dataUrl }),
+    });
+    setRegeneratingId(null);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      toast.error(err.error || "Upload failed.");
+      return;
+    }
+    toast.success("Photo uploaded.");
+    refetchTemplates();
+  }
+
   async function generateAllPreviews() {
     const missing = templates.filter((t) => !t.coverImageUrl);
     if (missing.length === 0) {
@@ -1024,8 +1047,15 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <label title="Upload a real photo (e.g. an actual tool output) instead of an AI-generated preview"
+                      className="w-8 h-8 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70 cursor-pointer"
+                      style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, opacity: regeneratingId === tpl.id ? 0.5 : 1 }}>
+                      <input type="file" accept="image/*" className="hidden" disabled={regeneratingId === tpl.id}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCoverImage(tpl.id, f); e.target.value = ""; }} />
+                      <ImagePlus className="w-3.5 h-3.5" style={{ color: T.muted }} />
+                    </label>
                     <button onClick={() => regeneratePreview(tpl.id)} disabled={regeneratingId === tpl.id}
-                      title="Regenerate preview"
+                      title="Regenerate AI preview"
                       className="w-8 h-8 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-50"
                       style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
                       <RefreshCw className={`w-3.5 h-3.5 ${regeneratingId === tpl.id ? "animate-spin" : ""}`} style={{ color: T.muted }} />

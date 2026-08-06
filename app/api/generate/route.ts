@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { buildScenePrompt, buildProductEditPrompt, buildPortraitEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
+import { rejectIfBot } from "@/lib/bot-protect";
 
 const CREDIT_COST = 1;
 // Premium path regenerates the whole image via a paid model — priced higher
@@ -28,6 +29,9 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Sign in to generate images." }, { status: 401 });
     }
+
+    const botResponse = await rejectIfBot();
+    if (botResponse) return botResponse;
 
     const isPremium = mode === "premium";
     const cost = isPremium ? PREMIUM_CREDIT_COST : CREDIT_COST;

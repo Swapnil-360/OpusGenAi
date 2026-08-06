@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
+import { rejectIfBot } from "@/lib/bot-protect";
 
 const CREDIT_COST = 3;
 
@@ -18,6 +19,9 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Sign in to use this tool." }, { status: 401 });
     }
+
+    const botResponse = await rejectIfBot();
+    if (botResponse) return botResponse;
 
     const isUnlimited = hasUnlimitedCredits(user.email);
     const credits = await getUserCredits(user.id);

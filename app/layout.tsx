@@ -1,9 +1,24 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { BotIdClient } from "botid/client";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/app/providers";
 import { AnalyticsClient } from "@/components/shared/AnalyticsClient";
 import "./globals.css";
+
+// Every route that spends real money per call (fal.ai / Hugging Face) — kept
+// in sync with the Vercel Firewall rate-limit rule covering the same paths.
+// BotID collects an invisible challenge for these before the request lands,
+// which checkBotId() verifies server-side in each route.
+const BOTID_PROTECTED_ROUTES = [
+  { path: "/api/generate", method: "POST" },
+  { path: "/api/cleanup", method: "POST" },
+  { path: "/api/uncrop", method: "POST" },
+  { path: "/api/replace-bg", method: "POST" },
+  { path: "/api/upscale", method: "POST" },
+  { path: "/api/caption", method: "POST" },
+  { path: "/api/enhance-prompt", method: "POST" },
+];
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -54,6 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <body suppressHydrationWarning className="min-h-full flex flex-col bg-background text-foreground">
+        <BotIdClient protect={BOTID_PROTECTED_ROUTES} />
         <Providers>
           {children}
           <Toaster />

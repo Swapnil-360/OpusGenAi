@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
+import { rejectIfBot } from "@/lib/bot-protect";
 
 const SYSTEM_PROMPT =
   "You are a professional product photography art director for an e-commerce AI image generator. " +
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Sign in to use this." }, { status: 401 });
     }
+
+    const botResponse = await rejectIfBot();
+    if (botResponse) return botResponse;
 
     const imageUrls: string[] = [];
     if (image) {

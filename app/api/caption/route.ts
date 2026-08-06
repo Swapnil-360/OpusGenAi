@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
+import { rejectIfBot } from "@/lib/bot-protect";
 
 const SYSTEM_PROMPT =
   "You are an expert social media copywriter. Look at the photo and write captions for what it actually " +
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Sign in to use this tool." }, { status: 401 });
     }
+
+    const botResponse = await rejectIfBot();
+    if (botResponse) return botResponse;
 
     // History images are already hosted (a real https URL) — pass through as-is.
     // A freshly uploaded file arrives as a data: URL and needs fal's own storage first.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
+import { rejectIfBot } from "@/lib/bot-protect";
 
 const HF_KEY = process.env.HUGGINGFACE_API_KEY!;
 const HF_BASE = "https://router.huggingface.co/hf-inference/models";
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Sign in to use this tool." }, { status: 401 });
     }
+
+    const botResponse = await rejectIfBot();
+    if (botResponse) return botResponse;
 
     // The tool UI has always advertised "2 credits" (ToolPageShell, the
     // upscale button label) — this just makes the charge match what was

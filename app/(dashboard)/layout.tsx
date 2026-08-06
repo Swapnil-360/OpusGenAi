@@ -8,9 +8,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Aperture, Zap, Clock, User, LogOut,
   Menu, Layers, PenSquare, Scissors, Replace, Eraser, Maximize2, Frame,
-  PanelLeftClose, PanelLeftOpen,
+  PanelLeftClose, PanelLeftOpen, Lightbulb,
 } from "lucide-react";
 import { LogoBrand } from "@/components/shared/LogoBrand";
+import { WelcomeGuide, shouldAutoOpenGuide } from "@/components/onboarding/WelcomeGuide";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FeedbackButton } from "@/components/shared/FeedbackModal";
 import { createClient } from "@/lib/supabase/client";
@@ -61,6 +62,7 @@ type SidebarProps = {
   setMobileOpen: (v: boolean) => void;
   user: SidebarUser;
   onSignOut: () => void;
+  onOpenGuide: () => void;
 };
 
 function getInitials(name: string): string {
@@ -72,7 +74,7 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }: SidebarProps) {
+function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, onOpenGuide }: SidebarProps) {
   return (
     <div className="flex flex-col h-full" style={{ color: S.textPrimary }}>
 
@@ -204,6 +206,26 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut }:
         className="px-2 pb-3 shrink-0 pt-3 space-y-1"
         style={{ borderTop: `1px solid ${S.border}` }}
       >
+        {/* Replay the welcome guide — lives here so it's reachable from both
+            the desktop sidebar and the mobile drawer, which share this tree. */}
+        <div className={cn("px-2 mb-1.5", collapsed && "px-0 flex justify-center")}>
+          <button
+            onClick={onOpenGuide}
+            title="How it works"
+            aria-label="How it works"
+            className={cn(
+              "flex items-center rounded-xl transition-all text-xs font-medium",
+              collapsed ? "w-9 h-9 justify-center" : "w-full gap-2 px-3 h-9",
+            )}
+            style={{ border: `1px solid ${S.border}`, background: "transparent", color: S.textMuted }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = S.hoverBg; e.currentTarget.style.color = S.textPrimary; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = S.textMuted; }}
+          >
+            <Lightbulb className="w-4 h-4 shrink-0" />
+            {!collapsed && <span>How it works</span>}
+          </button>
+        </div>
+
         {/* Feedback */}
         <AnimatePresence initial={false}>
           {!collapsed && (
@@ -354,6 +376,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarUser, setSidebarUser] = useState<SidebarUser>(DEFAULT_USER);
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  // Checked after mount, never during render — localStorage isn't available on
+  // the server and reading it inline would desync hydration.
+  useEffect(() => {
+    if (shouldAutoOpenGuide()) setGuideOpen(true);
+  }, []);
 
   useEffect(() => {
     // One server round trip for everything the sidebar shows. Middleware has
@@ -414,6 +443,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           setMobileOpen={setMobileOpen}
           user={sidebarUser}
           onSignOut={handleSignOut}
+                onOpenGuide={() => { setGuideOpen(true); setMobileOpen(false); }}
         />
 
         {/* Collapse toggle */}
@@ -459,6 +489,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 setMobileOpen={setMobileOpen}
                 user={sidebarUser}
                 onSignOut={handleSignOut}
+                onOpenGuide={() => { setGuideOpen(true); setMobileOpen(false); }}
               />
             </motion.aside>
           </div>
@@ -509,6 +540,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </AnimatePresence>
         </main>
       </div>
+
+      <WelcomeGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
     </div>
   );
 }

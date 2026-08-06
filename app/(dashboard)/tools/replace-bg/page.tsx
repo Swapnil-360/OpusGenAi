@@ -46,7 +46,7 @@ export default function ReplaceBgPage() {
     setStatus("processing");
 
     try {
-      toast.info("Keeping your product untouched — generating background…", { id: "replace-bg-progress", duration: 30000 });
+      toast.loading("Keeping your product untouched — generating background…", { id: "replace-bg-progress", duration: 60000 });
 
       const [{ removeBackground }, bgRes] = await Promise.all([
         import("@imgly/background-removal"),

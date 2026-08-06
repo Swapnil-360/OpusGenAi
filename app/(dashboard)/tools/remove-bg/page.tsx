@@ -59,7 +59,7 @@ export default function RemoveBgPage() {
       // Dynamic import keeps WASM out of SSR bundle
       // publicPath must point to CDN so WASM files match the JS wrapper version
       const { removeBackground } = await import("@imgly/background-removal");
-      toast.info("AI model loading… (first run ~45s)", { duration: 45000, id: "bg-load" });
+      toast.loading("AI model loading… (first run ~45s)", { duration: 90000, id: "bg-load" });
       const blob = await removeBackground(inputFile, {
         publicPath: "https://unpkg.com/@imgly/background-removal-data@1.4.5/dist/",
         model: "medium",

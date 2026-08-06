@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/app/providers";
 import { AnalyticsClient } from "@/components/shared/AnalyticsClient";
 import "./globals.css";
@@ -56,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning className="min-h-full flex flex-col bg-background text-foreground">
         <Providers>
           {children}
-          <Toaster richColors position="top-right" />
+          <Toaster />
         </Providers>
         <AnalyticsClient />
       </body>

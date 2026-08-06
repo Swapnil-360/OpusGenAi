@@ -209,7 +209,8 @@ function GeneratePageInner() {
       return;
     }
     setIsEnhancing(true);
-    toast.info("Analyzing…", { id: "enhance-progress" });
+    // duration acts purely as a backstop — every exit path dismisses by id.
+    toast.loading("Analyzing…", { id: "enhance-progress", duration: 60000 });
 
     try {
       const image = refFile ? await fileToDataUrl(refFile) : undefined;
@@ -264,7 +265,7 @@ function GeneratePageInner() {
   // it does not guarantee pixel-identical product pixels, but in testing it
   // reliably preserved shape/logo/text and correctly followed scene prompts.
   async function generateWithProduct(productFile: File) {
-    toast.info("Generating with premium AI…", { id: "gen-progress", duration: 30000 });
+    toast.loading("Generating with premium AI…", { id: "gen-progress", duration: 60000 });
 
     const imageDataUrl = await fileToDataUrl(productFile);
 

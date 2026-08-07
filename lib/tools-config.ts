@@ -37,7 +37,9 @@ export const TOOLS: Tool[] = [
     beforeSeed: "product2",
     afterSeed: "product3",
     accentColor: "#3b82f6",
-    apiCost: 0.013,
+    // Runs client-side (@imgly/background-removal, WASM) — no per-call API
+    // cost, the 1 credit is pure margin.
+    apiCost: 0,
   },
   {
     id: "replace-bg",

@@ -54,6 +54,19 @@ export default function RemoveBgPage() {
 
   async function process() {
     if (!inputFile) { toast.error("Upload an image first."); return; }
+
+    // Checked before the (slow, ~45s first run) client-side WASM work starts —
+    // otherwise an out-of-credits user would still get a free result, since
+    // the actual charge only happens after processing succeeds. The real
+    // enforcement is still server-side in POST /api/remove-bg below; this is
+    // just to avoid running expensive work for someone who can't pay for it.
+    const me = await fetch("/api/me", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!me) { toast.error("Sign in to use this tool."); return; }
+    if (!me.isAdmin && me.credits < 1) {
+      toast.error("You're out of credits. Upgrade your plan to keep generating.");
+      return;
+    }
+
     setStatus("processing");
     try {
       // Dynamic import keeps WASM out of SSR bundle
@@ -76,6 +89,22 @@ export default function RemoveBgPage() {
       setResult(resultUrl);
       setStatus("completed");
       toast.success("Background removed!");
+
+      const chargeRes = await fetch("/api/remove-bg", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: resultUrl }),
+      });
+      if (chargeRes.ok) {
+        const { credits } = await chargeRes.json();
+        if (typeof credits === "number") {
+          window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
+        }
+      } else {
+        // Result already delivered client-side — a failed charge shouldn't
+        // take that away, just surface that the balance wasn't updated.
+        console.error("Failed to record/charge remove-bg usage:", await chargeRes.text());
+      }
     } catch (err) {
       console.error("Background removal error:", err);
       toast.dismiss("bg-load");
@@ -150,7 +179,7 @@ export default function RemoveBgPage() {
                 >
                   {status === "processing"
                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Removing background…</>
-                    : <><Scissors className="w-4 h-4" />Remove Background · Free (AI)</>}
+                    : <><Scissors className="w-4 h-4" />Remove Background · 1 credit</>}
                 </motion.button>
               </motion.div>
             )}

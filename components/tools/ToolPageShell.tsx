@@ -50,7 +50,7 @@ export function ToolPageShell({ title, description, creditCost, accentColor, chi
             <div className="hidden sm:flex items-center gap-1.5 text-xs rounded-full px-2.5 py-1"
               style={{ color: S.muted, border: `1px solid ${S.border}` }}>
               <Zap className="w-3 h-3" style={{ color: accentColor }} />
-              {creditCost} credit{creditCost > 1 ? "s" : ""}
+              {creditCost === 0 ? "Free" : `${creditCost} credit${creditCost > 1 ? "s" : ""}`}
             </div>
             <div className="hidden md:block">
               <CreditBadge credits={user.credits} compact />

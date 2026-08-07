@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withBotId } from "botid/next/config";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Template preview images live in Supabase Storage (public bucket) — derive
 // the project hostname from the existing env var instead of hardcoding it.
@@ -69,4 +70,16 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withBotId(nextConfig);
+export default withSentryConfig(withBotId(nextConfig), {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: true,
+  // Routes client-side event delivery through our own origin instead of
+  // directly to Sentry's ingest host — keeps the CSP connect-src limited to
+  // 'self' and avoids ad blockers dropping a third-party sentry.io request.
+  tunnelRoute: "/monitoring",
+  webpack: {
+    automaticVercelMonitors: true,
+  },
+});

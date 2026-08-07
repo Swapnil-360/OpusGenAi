@@ -143,7 +143,7 @@ export default function CookiePolicyPage() {
         <P>If you have questions about our use of cookies or this policy, please contact us:</P>
         <div className="mt-4 p-5 rounded-2xl text-sm" style={{ background: S.glass, border: `1px solid ${S.border}` }}>
           <p className="font-bold mb-1" style={{ color: "rgba(255,255,255,0.88)" }}>OpusGen AI, Inc.</p>
-          <p style={{ color: S.muted }}>Email: <a href="mailto:opusgenai.official@gmail.com" style={{ color: S.red }}>opusgenai.official@gmail.com</a></p>
+          <p style={{ color: S.muted }}>Email: <a href="mailto:support@opusgenai.com" style={{ color: S.red }}>support@opusgenai.com</a></p>
           <p style={{ color: S.muted }}>Privacy: <a href="mailto:privacy@opusgenai.com" style={{ color: S.red }}>privacy@opusgenai.com</a></p>
         </div>
       </Section>

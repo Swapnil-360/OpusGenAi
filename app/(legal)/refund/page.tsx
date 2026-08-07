@@ -121,18 +121,18 @@ export default function RefundPolicyPage() {
           "Outages exceeding 24 hours: pro-rated refund or credit at your choice.",
           "Scheduled maintenance windows published in advance do not qualify for refunds.",
         ]} />
-        <P>To report an issue, email <a href="mailto:opusgenai.official@gmail.com" style={{ color: S.red }}>opusgenai.official@gmail.com</a> with your account email and a description of the problem.</P>
+        <P>To report an issue, email <a href="mailto:support@opusgenai.com" style={{ color: S.red }}>support@opusgenai.com</a> with your account email and a description of the problem.</P>
       </Section>
 
       <Section title="4. Billing Errors">
         <P>If you were charged an incorrect amount (e.g., charged twice, wrong plan amount), we will investigate and correct the error promptly. Billing errors are eligible for a full refund regardless of when they are reported, provided you notify us within 90 days of the charge.</P>
-        <P>To report a billing error, email <a href="mailto:opusgenai.official@gmail.com" style={{ color: S.red }}>opusgenai.official@gmail.com</a> with your account details and the relevant charge information.</P>
+        <P>To report a billing error, email <a href="mailto:support@opusgenai.com" style={{ color: S.red }}>support@opusgenai.com</a> with your account details and the relevant charge information.</P>
       </Section>
 
       <Section title="5. How to Request a Refund">
         <P>To request a refund, follow these steps:</P>
         <UL items={[
-          "Step 1: Email opusgenai.official@gmail.com with the subject line 'Refund Request — [your account email]'.",
+          "Step 1: Email support@opusgenai.com with the subject line 'Refund Request — [your account email]'.",
           "Step 2: Include your account email, the charge date, the amount, and the reason for your request.",
           "Step 3: Our team will review your request and respond within 3 business days.",
           "Step 4: Approved refunds are processed back to your original payment method within 5–10 business days.",
@@ -158,7 +158,7 @@ export default function RefundPolicyPage() {
         <P>For refund requests, billing questions, or disputes:</P>
         <div className="mt-4 p-5 rounded-2xl text-sm" style={{ background: S.glass, border: `1px solid ${S.border}` }}>
           <p className="font-bold mb-1" style={{ color: "rgba(255,255,255,0.88)" }}>OpusGen AI, Inc.</p>
-          <p style={{ color: S.muted }}>Email: <a href="mailto:opusgenai.official@gmail.com" style={{ color: S.red }}>opusgenai.official@gmail.com</a></p>
+          <p style={{ color: S.muted }}>Email: <a href="mailto:support@opusgenai.com" style={{ color: S.red }}>support@opusgenai.com</a></p>
           <p style={{ color: S.muted }}>Response time: within 3 business days</p>
           <p className="mt-2 text-xs" style={{ color: S.dim }}>Please include your account email and transaction details for faster processing.</p>
         </div>

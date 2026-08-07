@@ -1,19 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
-  Check,
   ExternalLink,
   Instagram,
   Mail,
-  Send,
   Twitter,
 } from "lucide-react";
 import { LogoBrand } from "@/components/shared/LogoBrand";
 import { FeedbackButton } from "@/components/shared/FeedbackModal";
-import { toast } from "sonner";
 
 function FacebookIcon({ className }: { className?: string }) {
   return (
@@ -79,8 +75,8 @@ const CONNECT: {
   },
   {
     icon: Mail,
-    label: "opusgenai.official@gmail.com",
-    href: "https://mail.google.com/mail/?view=cm&to=opusgenai.official@gmail.com&su=OpusGen+AI+Inquiry",
+    label: "support@opusgenai.com",
+    href: "mailto:support@opusgenai.com",
   },
   {
     icon: ExternalLink,
@@ -91,22 +87,6 @@ const CONNECT: {
 ];
 
 export function LandingFooter() {
-  const [email, setEmail] = useState("");
-  const [done, setDone] = useState(false);
-
-  function subscribe(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error("Please enter a valid email address.");
-      return;
-    }
-    setDone(true);
-    setEmail("");
-    toast.success("You're on the list!");
-    setTimeout(() => setDone(false), 4000);
-  }
-
   return (
     <footer
       style={{
@@ -149,62 +129,27 @@ export function LandingFooter() {
               ))}
             </div>
 
-            {/* Newsletter */}
+            {/* Contact */}
             <p
               className="text-[11px] font-bold uppercase tracking-widest mb-2.5"
               style={{ color: W.dim }}
             >
-              Get tips &amp; updates
+              Get in touch
             </p>
-            <form onSubmit={subscribe} className="flex gap-2">
-              <input
-                id="newsletter-email"
-                name="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                className="flex-1 min-w-0 h-10 px-3 rounded-xl text-sm outline-none transition-all"
-                style={{
-                  background: W.glassMid,
-                  border: `1px solid ${W.border}`,
-                  color: W.text,
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = "rgba(220,38,38,0.4)";
-                  e.currentTarget.style.boxShadow =
-                    "0 0 0 3px rgba(220,38,38,0.08)";
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = W.border;
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-              />
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                type="submit"
-                aria-label="Subscribe to newsletter"
-                className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 text-white transition-all"
-                style={{
-                  background: "#dc2626",
-                  boxShadow: "0 0 12px rgba(220,38,38,0.2)",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow =
-                    "0 0 22px rgba(220,38,38,0.5)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow =
-                    "0 0 12px rgba(220,38,38,0.2)";
-                }}
-              >
-                {done ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-              </motion.button>
-            </form>
+            <a
+              href="mailto:support@opusgenai.com"
+              className="inline-flex items-center gap-2 text-sm font-medium transition-colors"
+              style={{ color: W.text }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.color = W.red;
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.color = W.text;
+              }}
+            >
+              <Mail className="w-3.5 h-3.5 shrink-0" />
+              support@opusgenai.com
+            </a>
           </div>
 
           {/* ── Product links ──────────────────────────────────────── */}

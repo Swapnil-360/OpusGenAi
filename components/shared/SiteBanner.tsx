@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { X, Wrench, Clock, Sparkles, Megaphone } from "lucide-react";
+import { selectPublic } from "@/lib/supabase/public-rest";
 import {
-  BANNER_KEY,
   DEFAULT_BANNER,
   type BannerConfig,
   type BannerMode,
@@ -55,11 +55,14 @@ export function SiteBanner() {
   const [dismissed, setDismissed] = useState(false);
   const prevKey = useRef("");
 
-  function load() {
+  async function load() {
     try {
-      const raw = localStorage.getItem(BANNER_KEY);
-      if (!raw) return;
-      const parsed: BannerConfig = JSON.parse(raw);
+      const rows = await selectPublic<{ value: BannerConfig }>(
+        "site_settings",
+        "select=value&id=eq.site_banner"
+      );
+      const parsed = rows[0]?.value;
+      if (!parsed) return;
       // reset dismissed state when config actually changes
       const key = JSON.stringify(parsed);
       if (key !== prevKey.current) {
@@ -67,14 +70,15 @@ export function SiteBanner() {
         setDismissed(false);
       }
       setConfig(parsed);
-    } catch { /* ignore */ }
+    } catch { /* ignore — keep showing whatever was last loaded */ }
   }
 
   useEffect(() => {
     load();
-    // cross-tab updates
-    window.addEventListener("storage", load);
-    return () => window.removeEventListener("storage", load);
+    // Cheap poll for an already-open tab to pick up a new admin-published
+    // banner without a reload — this table is tiny and public-read.
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   const style = MODES[config.mode];

@@ -32,5 +32,4 @@ export const DEFAULT_WELCOME: WelcomeConfig = {
   message: "Welcome back! Ready to create something amazing?",
 };
 
-export const BANNER_KEY = "opusgenai_banner";
 export const WELCOME_KEY = "opusgenai_welcome";

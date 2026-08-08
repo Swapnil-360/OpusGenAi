@@ -1,6 +1,43 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { get as getEdgeConfig } from "@vercel/edge-config";
 import { ADMIN_EMAILS } from "@/lib/admin-config";
+
+// Paths that stay reachable during a maintenance-mode outage — the admin
+// panel (so an admin can turn it back off) and the login flow that gets
+// them there. Everything else gets the maintenance response, unconditionally,
+// checked before any Supabase call: maintenance mode must keep working even
+// if Supabase itself is what's down.
+const MAINTENANCE_ALLOWED = ["/adminopusgenai", "/api/admin", "/login", "/auth/callback"];
+
+const MAINTENANCE_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpusGen AI — Down for maintenance</title>
+</head>
+<body style="margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:#0f0404; color:rgba(255,255,255,0.9); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <div style="text-align:center; padding:24px; max-width:420px;">
+    <img src="https://www.opusgenai.com/logo/OpusGen%20Ai(Orange).png" alt="OpusGen AI" width="150" style="display:block; margin:0 auto 28px; max-width:150px; height:auto;">
+    <h1 style="margin:0 0 10px; font-size:20px; font-weight:800;">We&#39;ll be back shortly</h1>
+    <p style="margin:0; font-size:14px; line-height:1.6; color:rgba(255,255,255,0.55);">
+      OpusGen AI is temporarily down for maintenance. We&#39;re working on it — check back in a few minutes.
+    </p>
+  </div>
+</body>
+</html>`;
+
+function maintenanceResponse() {
+  return new NextResponse(MAINTENANCE_HTML, {
+    status: 503,
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+      "Retry-After": "1800",
+      "Cache-Control": "no-store",
+    },
+  });
+}
 
 const PROTECTED_PATHS = [
   "/generate",
@@ -17,6 +54,18 @@ const AUTH_PATHS = ["/login", "/signup"];
 const MFA_CHALLENGE_PATH = "/mfa-challenge";
 
 export async function middleware(request: NextRequest) {
+  const { pathname: requestPath } = request.nextUrl;
+  if (!MAINTENANCE_ALLOWED.some((p) => requestPath.startsWith(p))) {
+    let underMaintenance = false;
+    try {
+      underMaintenance = (await getEdgeConfig<boolean>("maintenance")) === true;
+    } catch {
+      // Edge Config unreachable — fail open rather than taking the whole
+      // site down over a flag-store hiccup unrelated to the app itself.
+    }
+    if (underMaintenance) return maintenanceResponse();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

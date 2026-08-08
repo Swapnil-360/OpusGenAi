@@ -35,7 +35,6 @@ import {
   Shuffle,
 } from "lucide-react";
 import {
-  BANNER_KEY,
   WELCOME_KEY,
   DEFAULT_BANNER,
   DEFAULT_WELCOME,
@@ -225,6 +224,18 @@ export default function AdminPage() {
     supabase
       .from("site_settings")
       .select("value")
+      .eq("id", "site_banner")
+      .single()
+      .then(({ data }) => {
+        if (data?.value) setBanner((prev) => ({ ...prev, ...(data.value as Partial<BannerConfig>) }));
+      });
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("site_settings")
+      .select("value")
       .eq("id", "hero_images")
       .single()
       .then(({ data }) => {
@@ -238,8 +249,6 @@ export default function AdminPage() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setAdminEmail(user?.email ?? "");
     });
-    const savedBanner = localStorage.getItem(BANNER_KEY);
-    if (savedBanner) setBanner(JSON.parse(savedBanner));
     const savedWelcome = localStorage.getItem(WELCOME_KEY);
     if (savedWelcome) setWelcome(JSON.parse(savedWelcome));
 
@@ -264,10 +273,31 @@ export default function AdminPage() {
   }
 
   // ── banner save ──────────────────────────────────────────────────────────────
-  const saveBanner = useCallback(() => {
-    localStorage.setItem(BANNER_KEY, JSON.stringify(banner));
-    setBannerSaved(true);
-    setTimeout(() => setBannerSaved(false), 2000);
+  // Writes to the shared site_settings row (real for every visitor, not just
+  // this browser) and, when mode is "maintenance", flips the Edge Config flag
+  // middleware.ts checks on every request — the actual site-lock, not just
+  // a banner announcing one.
+  const saveBanner = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/site-banner", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(banner),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "Failed to save banner.");
+        return;
+      }
+      if (data.maintenanceSwitch === false) {
+        toast.error(`Banner saved, but the maintenance lock did not switch: ${data.error}`);
+        return;
+      }
+      setBannerSaved(true);
+      setTimeout(() => setBannerSaved(false), 2000);
+    } catch {
+      toast.error("Network error — banner not saved.");
+    }
   }, [banner]);
 
   const saveWelcome = useCallback(() => {

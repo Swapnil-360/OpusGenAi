@@ -31,5 +31,3 @@ export const DEFAULT_WELCOME: WelcomeConfig = {
   useDefault: true,
   message: "Welcome back! Ready to create something amazing?",
 };
-
-export const WELCOME_KEY = "opusgenai_welcome";

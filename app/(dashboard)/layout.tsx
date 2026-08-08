@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { LogoBrand } from "@/components/shared/LogoBrand";
 import { WelcomeGuide, shouldAutoOpenGuide } from "@/components/onboarding/WelcomeGuide";
+import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FeedbackButton } from "@/components/shared/FeedbackModal";
 import { createClient } from "@/lib/supabase/client";
@@ -526,6 +527,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <main className="flex-1 overflow-y-auto">
+          {sidebarUser.name !== DEFAULT_USER.name && <WelcomeBanner name={sidebarUser.name} />}
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}

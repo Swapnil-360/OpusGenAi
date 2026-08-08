@@ -35,7 +35,6 @@ import {
   Shuffle,
 } from "lucide-react";
 import {
-  WELCOME_KEY,
   DEFAULT_BANNER,
   DEFAULT_WELCOME,
   type BannerConfig,
@@ -246,11 +245,21 @@ export default function AdminPage() {
 
   useEffect(() => {
     const supabase = createClient();
+    supabase
+      .from("site_settings")
+      .select("value")
+      .eq("id", "welcome_message")
+      .single()
+      .then(({ data }) => {
+        if (data?.value) setWelcome((prev) => ({ ...prev, ...(data.value as Partial<WelcomeConfig>) }));
+      });
+  }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       setAdminEmail(user?.email ?? "");
     });
-    const savedWelcome = localStorage.getItem(WELCOME_KEY);
-    if (savedWelcome) setWelcome(JSON.parse(savedWelcome));
 
     fetch("/api/admin/overview")
       .then((res) => { if (!res.ok) throw new Error("Failed"); return res.json(); })
@@ -300,11 +309,43 @@ export default function AdminPage() {
     }
   }, [banner]);
 
-  const saveWelcome = useCallback(() => {
-    localStorage.setItem(WELCOME_KEY, JSON.stringify(welcome));
-    setWelcomeSaved(true);
-    setTimeout(() => setWelcomeSaved(false), 2000);
+  const saveWelcome = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/welcome-message", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(welcome),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to save message.");
+        return;
+      }
+      setWelcomeSaved(true);
+      setTimeout(() => setWelcomeSaved(false), 2000);
+    } catch {
+      toast.error("Network error — message not saved.");
+    }
   }, [welcome]);
+
+  const [syncingVersion, setSyncingVersion] = useState(false);
+  async function syncVersionFromDeploy() {
+    setSyncingVersion(true);
+    try {
+      const res = await fetch("/api/admin/version-sync");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "Failed to sync deploy info.");
+        return;
+      }
+      setBanner((b) => ({ ...b, versionLabel: data.versionLabel, message: data.message }));
+      toast.success("Synced from latest deploy — review before publishing.");
+    } catch {
+      toast.error("Network error — sync failed.");
+    } finally {
+      setSyncingVersion(false);
+    }
+  }
 
   // ── feedback actions ─────────────────────────────────────────────────────────
   async function updateFeedbackStatus(id: string, status: "read" | "archived") {
@@ -713,12 +754,23 @@ export default function AdminPage() {
               {/* Version input */}
               {banner.mode === "new_version" && (
                 <div className="mb-4">
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Version label</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-medium" style={{ color: T.muted }}>Version label</label>
+                    <button onClick={syncVersionFromDeploy} disabled={syncingVersion}
+                      className="flex items-center gap-1.5 text-xs px-2.5 h-6 rounded-lg transition-opacity hover:opacity-70 disabled:opacity-50"
+                      style={{ color: T.red, border: `1px solid ${T.redBorder}`, background: T.redBg }}>
+                      <RefreshCw className={`w-3 h-3 ${syncingVersion ? "animate-spin" : ""}`} />
+                      Sync from latest deploy
+                    </button>
+                  </div>
                   <input type="text" placeholder="e.g. 2.1.0"
                     value={banner.versionLabel}
                     onChange={(e) => setBanner((b) => ({ ...b, versionLabel: e.target.value }))}
                     className="h-10 px-3 rounded-xl text-sm outline-none w-48"
                     style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
+                  <p className="text-[11px] mt-1.5" style={{ color: T.dim }}>
+                    Sync pulls the commit SHA + message from the live deployment — edit before publishing.
+                  </p>
                 </div>
               )}
 
@@ -784,13 +836,11 @@ export default function AdminPage() {
                   style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
               )}
 
-              {!welcome.useDefault && (
-                <motion.button whileTap={{ scale: 0.97 }} onClick={saveWelcome}
-                  className="flex items-center gap-2 h-9 px-5 rounded-xl text-sm font-bold text-white mt-4"
-                  style={{ background: welcomeSaved ? "#16a34a" : T.redPrimary }}>
-                  {welcomeSaved ? <><Check className="w-4 h-4" /> Saved!</> : "Save Message"}
-                </motion.button>
-              )}
+              <motion.button whileTap={{ scale: 0.97 }} onClick={saveWelcome}
+                className="flex items-center gap-2 h-9 px-5 rounded-xl text-sm font-bold text-white mt-4"
+                style={{ background: welcomeSaved ? "#16a34a" : T.redPrimary }}>
+                {welcomeSaved ? <><Check className="w-4 h-4" /> Saved!</> : "Save Message"}
+              </motion.button>
             </div>
           </motion.div>
         )}

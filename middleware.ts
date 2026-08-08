@@ -3,12 +3,30 @@ import { NextResponse, type NextRequest } from "next/server";
 import { get as getEdgeConfig } from "@vercel/edge-config";
 import { ADMIN_EMAILS } from "@/lib/admin-config";
 
-// Paths that stay reachable during a maintenance-mode outage — the admin
-// panel (so an admin can turn it back off) and the login flow that gets
-// them there. Everything else gets the maintenance response, unconditionally,
-// checked before any Supabase call: maintenance mode must keep working even
-// if Supabase itself is what's down.
-const MAINTENANCE_ALLOWED = ["/adminopusgenai", "/api/admin", "/login", "/auth/callback"];
+// Path PREFIXES that stay reachable during a maintenance-mode outage: the
+// admin panel (so an admin can turn it back off), the login flow that gets
+// them there, and the static legal pages (informational, not "processing"
+// anything — no reason to hide them during an incident). Everything else —
+// every dashboard route, every tool, every API except /api/admin — gets the
+// maintenance response. Checked before any Supabase call: the switch must
+// keep working even if Supabase itself is what's down.
+const MAINTENANCE_ALLOWED_PREFIXES = [
+  "/adminopusgenai",
+  "/api/admin",
+  "/login",
+  "/auth/callback",
+  "/privacy",
+  "/terms",
+  "/cookie-policy",
+  "/refund",
+];
+
+// The landing page ("/") is the one bare-root exception — checked separately
+// since every path starts with "/", so it can't just join the prefix list
+// above without accidentally allowing everything through.
+function isAllowedDuringMaintenance(path: string): boolean {
+  return path === "/" || MAINTENANCE_ALLOWED_PREFIXES.some((p) => path.startsWith(p));
+}
 
 const MAINTENANCE_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -55,7 +73,7 @@ const MFA_CHALLENGE_PATH = "/mfa-challenge";
 
 export async function middleware(request: NextRequest) {
   const { pathname: requestPath } = request.nextUrl;
-  if (!MAINTENANCE_ALLOWED.some((p) => requestPath.startsWith(p))) {
+  if (!isAllowedDuringMaintenance(requestPath)) {
     let underMaintenance = false;
     try {
       underMaintenance = (await getEdgeConfig<boolean>("maintenance")) === true;

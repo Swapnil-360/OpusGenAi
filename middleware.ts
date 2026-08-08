@@ -15,6 +15,7 @@ const MAINTENANCE_ALLOWED_PREFIXES = [
   "/api/admin",
   "/login",
   "/auth/callback",
+  "/mfa-challenge", // admin recovery must survive 2FA step-up too
   "/privacy",
   "/terms",
   "/cookie-policy",

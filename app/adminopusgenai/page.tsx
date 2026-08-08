@@ -769,7 +769,7 @@ export default function AdminPage() {
                     className="h-10 px-3 rounded-xl text-sm outline-none w-48"
                     style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
                   <p className="text-[11px] mt-1.5" style={{ color: T.dim }}>
-                    Sync pulls the commit SHA + message from the live deployment — edit before publishing.
+                    Sync fills the version number from package.json and drafts a changelog line from the latest commit — rewrite the changelog in plain, user-friendly language before publishing.
                   </p>
                 </div>
               )}

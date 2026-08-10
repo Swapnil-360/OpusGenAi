@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PLANS } from "@/lib/mock-data";
+import { type Plan as PlanId } from "@/lib/plans";
 import { DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from "@/lib/notification-prefs";
 import { planLabel } from "@/lib/utils";
 import { toast } from "sonner";
@@ -91,6 +92,8 @@ export default function AccountPage() {
   const [newPwd, setNewPwd] = useState("");
   const [savingPwd, setSavingPwd] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userPlan, setUserPlan] = useState<PlanId>("free");
+  const [switchingPlan, setSwitchingPlan] = useState<PlanId | null>(null);
 
   // 2FA (Supabase TOTP)
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
@@ -116,6 +119,7 @@ export default function AccountPage() {
         setAvatarUrl(me.avatarUrl);
         setTotalGenerations(me.totalGenerations);
         setIsAdmin(me.isAdmin);
+        setUserPlan(me.plan ?? "free");
         if (me.notificationPrefs) {
           setNotifications((prev) => ({ ...prev, ...(me.notificationPrefs as Partial<typeof notifications>) }));
         }
@@ -187,10 +191,32 @@ export default function AccountPage() {
     setMfaFactorId(null);
   }
 
-  const currentPlan = PLANS.find((p) => p.id === "free")!;
+  const currentPlan = PLANS.find((p) => p.id === userPlan) ?? PLANS[0];
   const creditsPercent = Math.min(100, Math.round((credits / (currentPlan?.credits ?? 10)) * 100));
   const displayName = name || authUser?.email?.split("@")[0] || "User";
   const initials = displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
+
+  // Admin-only self-service switch, using the same route the admin panel's
+  // Users tab calls — real checkout doesn't exist yet, so this is how an
+  // admin actually tries a higher tier's UI/gating instead of editing the DB
+  // by hand. Non-admins never see an enabled button here; the "Coming soon"
+  // state is accurate for them until checkout ships.
+  async function switchPlan(plan: PlanId) {
+    if (!authUser) return;
+    setSwitchingPlan(plan);
+    const res = await fetch("/api/admin/user-plan", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: authUser.id, plan }),
+    });
+    setSwitchingPlan(null);
+    if (!res.ok) {
+      toast.error("Failed to switch plan.");
+      return;
+    }
+    setUserPlan(plan);
+    toast.success(`Switched to ${planLabel(plan)}.`);
+  }
 
   async function saveProfile() {
     if (!authUser) return;
@@ -244,7 +270,7 @@ export default function AccountPage() {
             className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
             style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.muted }}
           >
-            {isAdmin ? "Unlimited" : planLabel("free")}
+            {isAdmin ? "Unlimited" : planLabel(userPlan)}
           </span>
           {isAdmin && (
             <a
@@ -389,7 +415,7 @@ export default function AccountPage() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: W.red }} />
-                        <p className="text-xs font-semibold" style={{ color: W.text }}>{isAdmin ? "Unlimited" : planLabel("free")} Plan</p>
+                        <p className="text-xs font-semibold" style={{ color: W.text }}>{isAdmin ? "Unlimited" : planLabel(userPlan)} Plan</p>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: W.glass, color: W.muted }}>Current</span>
                       </div>
                       <p className="text-xl font-black" style={{ color: W.text }}>
@@ -415,20 +441,24 @@ export default function AccountPage() {
                 </div>
 
                 {/* Paid plans aren't purchasable yet — say so up front rather than
-                    letting an inviting CTA dead-end into a toast. */}
+                    letting an inviting CTA dead-end into a toast. Admin gets a
+                    different message since they CAN switch here, manually,
+                    to try each tier's gating before checkout exists. */}
                 <div
                   className="flex items-center gap-2.5 p-3 rounded-xl"
                   style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
                 >
                   <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: W.muted }} />
                   <p className="text-[11px]" style={{ color: W.muted }}>
-                    Paid plans are coming soon — checkout isn&apos;t live yet. Everyone stays on Free for now.
+                    {isAdmin
+                      ? "Checkout isn't live yet — as admin you can switch plans below to test each tier's gating. You stay unlimited regardless."
+                      : "Paid plans are coming soon — checkout isn't live yet. Everyone stays on Free for now."}
                   </p>
                 </div>
 
                 <div className="flex flex-col gap-2.5">
                   {PLANS.map((plan) => {
-                    const isCurrent = plan.id === "free";
+                    const isCurrent = plan.id === userPlan;
                     return (
                       <div
                         key={plan.id}
@@ -465,13 +495,24 @@ export default function AccountPage() {
                               ))}
                             </ul>
                           </div>
-                          <button
-                            className="mt-1 shrink-0 h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
-                            style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.dim, cursor: "default" }}
-                            disabled
-                          >
-                            {isCurrent ? "Current" : <><Clock className="w-3 h-3" />Coming soon</>}
-                          </button>
+                          {isAdmin && !isCurrent ? (
+                            <button
+                              onClick={() => switchPlan(plan.id)}
+                              disabled={switchingPlan !== null}
+                              className="mt-1 shrink-0 h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-white disabled:opacity-60"
+                              style={{ background: "#dc2626" }}
+                            >
+                              {switchingPlan === plan.id ? "Switching…" : "Switch (test)"}
+                            </button>
+                          ) : (
+                            <button
+                              className="mt-1 shrink-0 h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                              style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.dim, cursor: "default" }}
+                              disabled
+                            >
+                              {isCurrent ? "Current" : <><Clock className="w-3 h-3" />Coming soon</>}
+                            </button>
+                          )}
                         </div>
                       </div>
                     );

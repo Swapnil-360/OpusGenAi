@@ -345,11 +345,12 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
                 </div>
                 <button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSignOut(); }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg"
+                  className="shrink-0 opacity-60 hover:opacity-100 transition-opacity p-1.5 rounded-lg"
                   style={{ color: S.textMuted }}
                   title="Sign out"
-                  onMouseEnter={(e) => (e.currentTarget.style.color = S.textPrimary)}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = S.textMuted)}
+                  aria-label="Sign out"
+                  onMouseEnter={(e) => { e.currentTarget.style.color = S.textPrimary; e.currentTarget.style.background = S.hoverBg; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = S.textMuted; e.currentTarget.style.background = "transparent"; }}
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>

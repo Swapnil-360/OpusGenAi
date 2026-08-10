@@ -42,6 +42,7 @@ import {
   type WelcomeConfig,
 } from "@/lib/admin-config";
 import { PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, type Template, type TemplateType } from "@/lib/templates-data";
+import { type Plan } from "@/lib/plans";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -84,6 +85,7 @@ type AdminUser = {
   email: string;
   avatarUrl: string | null;
   credits: number;
+  plan: Plan;
   generations: number;
   joined: string;
   lastSignInAt: string | null;
@@ -279,6 +281,26 @@ export default function AdminPage() {
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
+  }
+
+  // ── plan assignment ─────────────────────────────────────────────────────────
+  // Manual assignment is how early access works before checkout exists — the
+  // route this calls is the only writer of profiles.plan besides a future
+  // checkout webhook, and it's admin-gated server-side (app/api/admin/user-plan).
+  async function updateUserPlan(userId: string, plan: Plan) {
+    const prev = users;
+    setUsers((cur) => cur.map((u) => (u.id === userId ? { ...u, plan } : u)));
+    const res = await fetch("/api/admin/user-plan", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, plan }),
+    });
+    if (!res.ok) {
+      setUsers(prev);
+      toast.error("Failed to update plan.");
+      return;
+    }
+    toast.success(`Plan updated to ${plan}.`);
   }
 
   // ── banner save ──────────────────────────────────────────────────────────────
@@ -936,9 +958,10 @@ export default function AdminPage() {
                 style={{ background: "rgba(255,255,255,0.03)", color: T.dim, borderBottom: `1px solid ${T.border}` }}>
                 <div className="col-span-4">User</div>
                 <div className="col-span-2 hidden sm:block">Credits</div>
-                <div className="col-span-2 hidden md:block">Joined</div>
-                <div className="col-span-2 hidden md:block">Generations</div>
-                <div className="col-span-2">Last active</div>
+                <div className="col-span-2 hidden sm:block">Plan</div>
+                <div className="col-span-2 hidden lg:block">Joined</div>
+                <div className="col-span-1 hidden xl:block">Gen.</div>
+                <div className="col-span-1">Active</div>
               </div>
 
               {dataLoading && <p className="text-xs text-center py-8" style={{ color: T.dim }}>Loading…</p>}
@@ -957,9 +980,12 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <div className="col-span-2 hidden sm:block"><CreditsBadge credits={u.credits} /></div>
-                  <div className="col-span-2 hidden md:block" style={{ color: T.muted }}>{new Date(u.joined).toLocaleDateString()}</div>
-                  <div className="col-span-2 hidden md:block" style={{ color: T.muted }}>{u.generations.toLocaleString()}</div>
-                  <div className="col-span-2">
+                  <div className="col-span-2 hidden sm:block">
+                    <PlanSelect value={u.plan} onChange={(plan) => updateUserPlan(u.id, plan)} />
+                  </div>
+                  <div className="col-span-2 hidden lg:block" style={{ color: T.muted }}>{new Date(u.joined).toLocaleDateString()}</div>
+                  <div className="col-span-1 hidden xl:block" style={{ color: T.muted }}>{u.generations.toLocaleString()}</div>
+                  <div className="col-span-1">
                     <span className="text-xs" style={{ color: T.dim }}>
                       {u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleDateString() : "Never"}
                     </span>
@@ -1278,6 +1304,22 @@ export default function AdminPage() {
 }
 
 // ─── sub-components ───────────────────────────────────────────────────────────
+function PlanSelect({ value, onChange }: { value: Plan; onChange: (plan: Plan) => void }) {
+  const color = value === "pro" ? "#a78bfa" : value === "basic" ? T.blue : T.dim;
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value as Plan)}
+      className="text-[11px] font-bold px-2 py-0.5 rounded-full capitalize outline-none cursor-pointer"
+      style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color }}
+    >
+      <option value="free">Free</option>
+      <option value="basic">Basic</option>
+      <option value="pro">Pro</option>
+    </select>
+  );
+}
+
 function CreditsBadge({ credits }: { credits: number }) {
   const color = credits === 0 ? T.red : credits <= 2 ? T.yellow : T.green;
   const bg = credits === 0 ? T.redBg : credits <= 2 ? T.yellowBg : T.greenBg;

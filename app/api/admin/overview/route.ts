@@ -34,7 +34,7 @@ export async function GET() {
 
     const [{ data: profiles, error: profilesError }, { data: authList, error: authError }, { data: generations, error: genError }, falBilling] =
       await Promise.all([
-        admin.from("profiles").select("id, full_name, avatar_url, credits, created_at").order("created_at", { ascending: false }),
+        admin.from("profiles").select("id, full_name, avatar_url, credits, plan, created_at").order("created_at", { ascending: false }),
         admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
         admin.from("generations").select("id, user_id, status, credit_cost, created_at"),
         fetchFalBalance(),
@@ -65,6 +65,7 @@ export async function GET() {
         email: authUser?.email ?? "",
         avatarUrl: p.avatar_url,
         credits: p.credits ?? 0,
+        plan: p.plan ?? "free",
         generations: genCountById.get(p.id) ?? 0,
         joined: p.created_at,
         lastSignInAt: authUser?.last_sign_in_at ?? null,

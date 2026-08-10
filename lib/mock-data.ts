@@ -1,3 +1,5 @@
+import { PLAN_LIMITS, type Plan as PlanId } from "@/lib/plans";
+
 export interface MockFeedback {
   id: string;
   name: string;
@@ -119,8 +121,14 @@ export const MOCK_CURRENT_USER = {
   avatar: picsumUrl("avatar1", 128, 128),
 };
 
+// PLANS used to be a hand-maintained array here, independent of any server
+// enforcement — "Batch processing" and "Priority queue" were advertised on
+// Pro without either ever being implemented. It's now derived from
+// lib/plans.ts's PLAN_LIMITS, the same table the server reads to gate
+// requests, so the landing page can't advertise a feature or price that
+// enforcement doesn't actually match.
 export interface Plan {
-  id: "free" | "basic" | "pro";
+  id: PlanId;
   name: string;
   price: number;
   originalPrice?: number;
@@ -130,36 +138,10 @@ export interface Plan {
   highlight: boolean;
 }
 
-export const PLANS: Plan[] = [
-  {
-    id: "free",
-    name: "Free",
-    price: 0,
-    credits: 10,
-    features: ["10 credits to start", "All 6 tools", "Standard quality", "JPG download", "8 templates"],
-    cta: "Get started free",
-    highlight: false,
-  },
-  {
-    id: "basic",
-    name: "Basic",
-    price: 9.99,
-    credits: 35,
-    features: ["35 credits/month", "All 6 tools", "HD quality", "PNG + JPG download", "All templates", "Social captions"],
-    cta: "Get Basic",
-    highlight: false,
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: 18,
-    originalPrice: 25,
-    credits: 100,
-    features: ["100 credits/month", "All 6 tools", "4K upscale", "Batch processing", "Priority queue", "Caption studio", "All templates"],
-    cta: "Get Pro",
-    highlight: true,
-  },
-];
+export const PLANS: Plan[] = (["free", "basic", "pro"] as const).map((id) => ({
+  id,
+  ...PLAN_LIMITS[id],
+}));
 
 export const MOCK_ADMIN_USERS: MockUser[] = [
   {

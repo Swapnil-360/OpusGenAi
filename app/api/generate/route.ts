@@ -2,21 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
+import { getUserPlan } from "@/lib/entitlements";
+import { QUALITY_TIERS, canUseQuality, type Quality } from "@/lib/plans";
 import { buildScenePrompt, buildProductEditPrompt, buildPortraitEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
 import { rejectIfBot } from "@/lib/bot-protect";
 
 const CREDIT_COST = 1;
-// Premium path regenerates the whole image via a paid model — priced higher
-// than the free flux/schnell path to cover the ~13x cost difference
-// ($0.039/image vs ~$0.003-0.006/mp).
-const PREMIUM_CREDIT_COST = 3;
 
-// Valid aspect ratios for fal-ai/gemini-25-flash-image/edit — our SIZE_MAP
-// keys (1:1, 4:5, 9:16, 16:9, 4:3) are all supported natively, no mapping needed.
+// Valid aspect ratios for the premium edit models — our SIZE_MAP keys
+// (1:1, 4:5, 9:16, 16:9, 4:3) are all supported natively, no mapping needed.
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, ratio = "1:1", templateId, templateType, mode, image: inputImage } = await req.json();
+    const { prompt, ratio = "1:1", templateId, templateType, mode, image: inputImage, quality: rawQuality } = await req.json();
 
     if (!prompt?.trim()) {
       return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
@@ -34,9 +32,26 @@ export async function POST(req: NextRequest) {
     if (botResponse) return botResponse;
 
     const isPremium = mode === "premium";
-    const cost = isPremium ? PREMIUM_CREDIT_COST : CREDIT_COST;
+    // Quality only applies to the premium (image-preserving edit) path —
+    // the free flux/schnell path has no quality ladder. Default to
+    // "standard" so existing clients that don't send `quality` keep
+    // behaving exactly as before.
+    const quality: Quality = isPremium && rawQuality in QUALITY_TIERS ? rawQuality : "standard";
+    const tier = QUALITY_TIERS[quality];
+    const cost = isPremium ? tier.creditCost : CREDIT_COST;
 
     const isUnlimited = hasUnlimitedCredits(user.email);
+
+    if (isPremium && !isUnlimited) {
+      const plan = await getUserPlan(user.id);
+      if (!canUseQuality(plan, quality)) {
+        return NextResponse.json(
+          { error: `Upgrade to ${tier.minPlan === "basic" ? "Basic" : "Pro"} to use ${quality.toUpperCase()} quality.` },
+          { status: 403 }
+        );
+      }
+    }
+
     const credits = await getUserCredits(user.id);
     if (!isUnlimited && credits < cost) {
       return NextResponse.json(
@@ -55,18 +70,19 @@ export async function POST(req: NextRequest) {
       const editPrompt = templateType === "universal"
         ? buildPortraitEditPrompt(prompt.trim())
         : buildProductEditPrompt(prompt.trim());
-      const result = await fal.subscribe("fal-ai/gemini-25-flash-image/edit", {
+      const result = await fal.subscribe(tier.model, {
         input: {
           image_urls: [imageUrl],
           prompt: editPrompt,
           aspect_ratio: ratio,
           num_images: 1,
           output_format: "png",
+          ...(tier.resolution ? { resolution: tier.resolution } : {}),
         },
       });
       image = (result.data as { images?: { url: string }[] })?.images?.[0]?.url;
       if (!image) {
-        console.error("fal gemini-25-flash-image/edit returned no image:", result);
+        console.error(`fal ${tier.model} returned no image:`, result);
         return NextResponse.json({ error: "Generation failed. Try again." }, { status: 502 });
       }
     } else {
@@ -106,7 +122,8 @@ export async function POST(req: NextRequest) {
           templateId: templateId ?? undefined,
           templateType: templateType ?? undefined,
           productPreserved: mode === "background" || undefined,
-          engine: isPremium ? "gemini-25-flash-image" : undefined,
+          engine: isPremium ? tier.model : undefined,
+          quality: isPremium ? quality : undefined,
         },
       })
       .select("id")
@@ -115,7 +132,7 @@ export async function POST(req: NextRequest) {
 
     const newCredits = isUnlimited
       ? UNLIMITED_CREDITS_DISPLAY
-      : await chargeCredits(user.id, cost, credits, isPremium ? "Premium AI product photo" : "Image generation");
+      : await chargeCredits(user.id, cost, credits, isPremium ? `Premium AI product photo (${quality})` : "Image generation");
 
     return NextResponse.json({ image, credits: newCredits, generationId: insertedRow?.id ?? null });
   } catch (e) {

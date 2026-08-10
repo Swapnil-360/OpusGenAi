@@ -24,7 +24,7 @@ export async function GET() {
   }
 
   const [{ data: profile }, { count }, prefsResult] = await Promise.all([
-    supabase.from("profiles").select("full_name, credits, avatar_url").eq("id", user.id).single(),
+    supabase.from("profiles").select("full_name, credits, avatar_url, plan").eq("id", user.id).single(),
     supabase
       .from("generations")
       .select("id", { count: "exact", head: true })
@@ -48,6 +48,7 @@ export async function GET() {
       "User",
     avatarUrl: profile?.avatar_url || meta.avatar_url || meta.picture || null,
     credits: typeof profile?.credits === "number" ? profile.credits : 0,
+    plan: profile?.plan ?? "free",
     totalGenerations: count ?? 0,
     isAdmin: !!user.email && (ADMIN_EMAILS as readonly string[]).includes(user.email.toLowerCase()),
     notificationPrefs: prefsResult.data?.notification_prefs ?? null,

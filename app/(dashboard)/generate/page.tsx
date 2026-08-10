@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Aperture, Check, ChevronDown, Download, ExternalLink,
-  ImagePlus, RefreshCw, ScanText,
+  ImagePlus, Lock, RefreshCw, ScanText,
   Sparkles, Wand2, X, Zap, Layers,
   Globe, ShoppingBag, Megaphone, LayoutTemplate, Heart,
   Droplets, Gem, Watch, Pill, Footprints, Briefcase, Smartphone, Flame,
@@ -16,6 +16,7 @@ import { useTemplates } from "@/lib/hooks/use-templates";
 import { fileToDataUrl } from "@/lib/mask-canvas";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_NOTIFICATION_PREFS, LOW_CREDIT_THRESHOLD, type NotificationPrefs } from "@/lib/notification-prefs";
+import { QUALITY_TIERS, canUseQuality, type Plan, type Quality } from "@/lib/plans";
 import { toast } from "sonner";
 
 /* ─── Static data ──────────────────────────────────────────────────── */
@@ -184,6 +185,11 @@ function GeneratePageInner() {
   const [refImage, setRefImage] = useState<string | null>(null);
   const [refFile, setRefFile] = useState<File | null>(null);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
+  const [quality, setQuality] = useState<Quality>("standard");
+  // UI affordance only — locking options here is purely so a Free/Basic user
+  // isn't surprised by a 403. The server re-derives entitlement from the DB
+  // independently on every request; this value is never trusted for cost.
+  const [userPlan, setUserPlan] = useState<Plan>("free");
 
   useEffect(() => {
     (async () => {
@@ -198,6 +204,10 @@ function GeneratePageInner() {
       const saved = data?.notification_prefs as Partial<NotificationPrefs> | null;
       if (saved) setNotifPrefs((prev) => ({ ...prev, ...saved }));
     })();
+    fetch("/api/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((me) => { if (me?.plan) setUserPlan(me.plan); })
+      .catch(() => {});
   }, []);
   const [fullViewSrc, setFullViewSrc] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -278,6 +288,7 @@ function GeneratePageInner() {
         templateId: selectedTemplate,
         templateType: appliedTemplate?.templateType,
         mode: "premium",
+        quality,
         image: imageDataUrl,
       }),
     });
@@ -449,6 +460,40 @@ function GeneratePageInner() {
                   <button onClick={() => { setRefImage(null); setRefFile(null); }} className="ml-auto shrink-0" style={{ color: W.dim }}>
                     <X className="w-3 h-3" />
                   </button>
+                </div>
+              )}
+
+              {refImage && (
+                <div className="flex items-center gap-1.5 px-4 pt-2.5">
+                  {(Object.keys(QUALITY_TIERS) as Quality[]).map((q) => {
+                    const tier = QUALITY_TIERS[q];
+                    const unlocked = canUseQuality(userPlan, q);
+                    const active = quality === q;
+                    return (
+                      <button
+                        key={q}
+                        onClick={() => {
+                          if (!unlocked) {
+                            toast.info(`${q.toUpperCase()} needs the ${tier.minPlan === "basic" ? "Basic" : "Pro"} plan.`, {
+                              action: { label: "Upgrade", onClick: () => { window.location.href = "/account"; } },
+                            });
+                            return;
+                          }
+                          setQuality(q);
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all"
+                        style={{
+                          border: `1px solid ${active ? W.redBorder : W.border}`,
+                          background: active ? W.redBg : W.glass,
+                          color: active ? W.red : unlocked ? W.muted : W.dim,
+                          opacity: unlocked ? 1 : 0.6,
+                        }}
+                      >
+                        {!unlocked && <Lock className="w-2.5 h-2.5" />}
+                        {q} · {tier.creditCost}cr
+                      </button>
+                    );
+                  })}
                 </div>
               )}
 

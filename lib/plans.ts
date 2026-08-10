@@ -5,6 +5,11 @@ export type Quality = "standard" | "hd" | "ultra";
 export interface QualityTier {
   /** fal.ai model endpoint. */
   model: string;
+  /** Nano Banana 2's `resolution` input param — undefined for models (like
+   *  the standard gemini path) that don't take one. Charging 5 or 6 credits
+   *  without actually requesting the matching resolution would be a real
+   *  billing bug, not just a missed feature — this field is what prevents that. */
+  resolution?: "1K" | "2K" | "4K";
   /** Real API cost per generation, USD — informational, drives the credit cost below. */
   apiCost: number;
   creditCost: number;
@@ -13,9 +18,9 @@ export interface QualityTier {
 }
 
 // Single source of truth for what a request at a given quality actually costs
-// and which model serves it. Server routes must resolve model + creditCost
-// from the SAME lookup so a client can never request the expensive model at
-// the cheap price — see app/api/generate/route.ts.
+// and which model (+ resolution) serves it. Server routes must resolve model,
+// resolution, and creditCost from the SAME lookup so a client can never
+// request the expensive output at the cheap price — see app/api/generate/route.ts.
 export const QUALITY_TIERS: Record<Quality, QualityTier> = {
   standard: {
     model: "fal-ai/gemini-25-flash-image/edit",
@@ -24,15 +29,15 @@ export const QUALITY_TIERS: Record<Quality, QualityTier> = {
     minPlan: "free",
   },
   hd: {
-    // Nano Banana 2 @ 2K
     model: "fal-ai/nano-banana-2/edit",
+    resolution: "2K",
     apiCost: 0.12,
     creditCost: 5,
     minPlan: "basic",
   },
   ultra: {
-    // Nano Banana 2 @ 4K
     model: "fal-ai/nano-banana-2/edit",
+    resolution: "4K",
     apiCost: 0.16,
     creditCost: 6,
     minPlan: "basic",

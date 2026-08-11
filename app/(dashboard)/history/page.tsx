@@ -8,7 +8,6 @@ import {
   ArrowUpRight, Check, Clock, Copy, Download, Expand, Grid3X3, History,
   List, Play, Search, SlidersHorizontal, Sparkles, Star, X,
 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { formatTimeAgo, truncate } from "@/lib/utils";
 import { toast } from "sonner";
@@ -46,37 +45,33 @@ export default function HistoryPage() {
   const [starred, setStarred] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [allGenerations, setAllGenerations] = useState<CombinedEntry[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase
-        .from("generations")
-        .select("id, prompt, status, metadata, credit_cost, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (!data) return;
-      setAllGenerations(
-        data.map((g) => {
-          const meta = g.metadata as { images?: string[]; videoUrl?: string; aspectRatio?: string; templateId?: string };
-          return {
-            id: g.id,
-            prompt: g.prompt ?? "",
-            status: g.status as "completed" | "processing" | "failed",
-            images: meta?.images ?? [],
-            videoUrl: meta?.videoUrl ?? null,
-            creditsUsed: g.credit_cost ?? 1,
-            aspectRatio: meta?.aspectRatio ?? "1:1",
-            createdAt: new Date(g.created_at),
-            templateId: meta?.templateId,
-          };
-        })
-      );
+      try {
+        const res = await fetch("/api/history", { cache: "no-store" });
+        if (!res.ok) return;
+        const { generations: data } = await res.json();
+        setAllGenerations(
+          (data ?? []).map((g: { id: string; prompt: string | null; status: string; metadata: unknown; credit_cost: number | null; created_at: string }) => {
+            const meta = g.metadata as { images?: string[]; videoUrl?: string; aspectRatio?: string; templateId?: string };
+            return {
+              id: g.id,
+              prompt: g.prompt ?? "",
+              status: g.status as "completed" | "processing" | "failed",
+              images: meta?.images ?? [],
+              videoUrl: meta?.videoUrl ?? null,
+              creditsUsed: g.credit_cost ?? 1,
+              aspectRatio: meta?.aspectRatio ?? "1:1",
+              createdAt: new Date(g.created_at),
+              templateId: meta?.templateId,
+            };
+          })
+        );
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
@@ -153,8 +148,12 @@ export default function HistoryPage() {
               <h1 className="text-sm font-semibold" style={{ color: W.text }}>History</h1>
             </div>
             <p className="text-[11px] ml-9" style={{ color: W.muted }}>
-              {allGenerations.length} generations · {allGenerations.reduce((a, g) => a + g.images.length, 0)} images
-              {allGenerations.some((g) => g.videoUrl) && ` · ${allGenerations.filter((g) => g.videoUrl).length} videos`}
+              {loading ? "Loading…" : (
+                <>
+                  {allGenerations.length} generations · {allGenerations.reduce((a, g) => a + g.images.length, 0)} images
+                  {allGenerations.some((g) => g.videoUrl) && ` · ${allGenerations.filter((g) => g.videoUrl).length} videos`}
+                </>
+              )}
             </p>
           </div>
 
@@ -248,7 +247,13 @@ export default function HistoryPage() {
 
       {/* Main content */}
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        {generations.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="rounded-xl overflow-hidden shimmer h-44" style={{ background: W.card, border: `1px solid ${W.border}` }} />
+            ))}
+          </div>
+        ) : generations.length === 0 ? (
           <div className="flex flex-col items-center text-center py-20">
             <Clock className="w-10 h-10 mb-3" style={{ color: W.dim }} />
             <p className="text-sm font-semibold mb-1" style={{ color: W.muted }}>No generations found</p>

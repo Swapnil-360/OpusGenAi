@@ -516,13 +516,13 @@ function GeneratePageInner() {
                 onChange={(e) => setPrompt(e.target.value)}
                 onFocus={() => setPromptFocused(true)}
                 onBlur={() => setPromptFocused(false)}
-                rows={4}
+                rows={6}
                 placeholder={refFile
                   ? "Describe the full scene you want — e.g. on white marble surface with soft morning light, e-commerce product photography…"
                   : "Describe your product scene — e.g. luxury perfume bottle on black marble with cinematic side lighting, editorial style…"}
                 className="w-full bg-transparent resize-none outline-none px-4 pt-4 pb-2 text-sm leading-relaxed placeholder:opacity-35"
                 style={{ color: W.text }}
-                maxLength={500}
+                maxLength={4000}
               />
 
               <div className="flex items-center justify-between px-4 pb-3">
@@ -594,9 +594,9 @@ function GeneratePageInner() {
                 </DropdownMenu>
                 <span
                   className="text-[10px] font-mono"
-                  style={{ color: prompt.length > 450 ? "#fbbf24" : W.dim }}
+                  style={{ color: prompt.length > 3600 ? "#fbbf24" : W.dim }}
                 >
-                  {prompt.length}/500
+                  {prompt.length}/4000
                 </span>
               </div>
             </div>

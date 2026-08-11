@@ -100,10 +100,21 @@ export interface VideoTier {
 
 // Three real, distinct options rather than one fixed config or a strict
 // price ladder — verified against fal's API docs (not recalled) before
-// picking numbers. Notably hd (Wan 2.5, 1080p) costs LESS than premium
-// (Seedance 2.5, 720p): a different, cheaper model happens to beat the
-// "premium" pick on resolution too. That's real, not a pricing mistake —
-// see the explicit test in lib/plans.test.ts asserting it stays that way.
+// picking numbers.
+//
+// Deliberately priced at ~50-68% margin, well below the ~85%+ band used for
+// images (QUALITY_TIERS) — video is Pro's headline feature, so the credit
+// cost was cut from an initial 85%-margin pass (29/28/88) down to this one
+// specifically to maximize how much video a Pro subscriber actually gets for
+// $29/150cr (now ~12-15 clips/month on Standard or HD, ~6 on Premium, versus
+// 3-5 before) rather than maximizing per-clip profit. Confirmed the resulting
+// worst-case blended Pro margin (a user who spends the whole month on nothing
+// but Premium video) still lands ~51% overall — profitable, not a giveaway.
+//
+// Note hd is priced ABOVE standard by credits despite a slightly LOWER real
+// API cost (Wan 2.5 1080p $0.75 vs Seedance 2.0 mini 720p $0.77) — that's
+// value-based pricing (sharper resolution commands a premium), not cost-based;
+// a deliberate choice, not the cost-ordering bug the phrasing might suggest.
 export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
   standard: {
     label: "Standard",
@@ -112,7 +123,7 @@ export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
     resolution: "720p",
     durationSeconds: 5,
     apiCost: 0.77,
-    creditCost: 29,
+    creditCost: 10,
     minPlan: "pro",
   },
   hd: {
@@ -122,7 +133,7 @@ export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
     resolution: "1080p",
     durationSeconds: 5,
     apiCost: 0.75,
-    creditCost: 28,
+    creditCost: 12,
     minPlan: "pro",
   },
   premium: {
@@ -132,7 +143,7 @@ export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
     resolution: "720p",
     durationSeconds: 5,
     apiCost: 2.37,
-    creditCost: 88,
+    creditCost: 25,
     minPlan: "pro",
   },
 };

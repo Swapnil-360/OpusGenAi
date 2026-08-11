@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canUseQuality, canUseVideoQuality, isPlanAtLeast, QUALITY_TIERS, VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
+import { canUseQuality, canUseVideoQuality, isPlanAtLeast, PLAN_LIMITS, QUALITY_TIERS, VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
 
 describe("isPlanAtLeast", () => {
   it("ranks pro above basic above free", () => {
@@ -48,17 +48,36 @@ describe("VIDEO_TIERS", () => {
     }
   });
 
-  it("every tier's credit cost stays in the same $/credit band as the rest of the app", () => {
+  // Deliberately NOT the same ~85%+ band as QUALITY_TIERS (images) — video is
+  // Pro's headline feature, priced at ~50-68% margin specifically to maximize
+  // clips-per-dollar for a Pro subscriber over per-clip profit. Still every
+  // tier must be genuinely profitable, just not at the image-tier margin.
+  it("every tier stays profitable but in a deliberately lower ~40-70% margin band than images", () => {
+    const revenuePerCredit = PLAN_LIMITS.pro.price / PLAN_LIMITS.pro.credits;
     for (const q of qualities) {
-      const perCredit = VIDEO_TIERS[q].apiCost / VIDEO_TIERS[q].creditCost;
-      expect(perCredit).toBeGreaterThan(0.005);
-      expect(perCredit).toBeLessThan(0.03);
+      const tier = VIDEO_TIERS[q];
+      const revenue = tier.creditCost * revenuePerCredit;
+      const margin = (revenue - tier.apiCost) / revenue;
+      expect(margin).toBeGreaterThan(0.4);
+      expect(margin).toBeLessThan(0.7);
     }
   });
 
-  it("hd is cheaper than premium despite being higher resolution — this is intentional, not a pricing bug", () => {
-    expect(VIDEO_TIERS.hd.resolution).toBe("1080p");
-    expect(VIDEO_TIERS.premium.resolution).toBe("720p");
-    expect(VIDEO_TIERS.hd.creditCost).toBeLessThan(VIDEO_TIERS.premium.creditCost);
+  it("worst-case Pro usage (100% Premium video, the priciest tier) still clears 45% blended margin", () => {
+    const revenuePerCredit = PLAN_LIMITS.pro.price / PLAN_LIMITS.pro.credits;
+    const clips = Math.floor(PLAN_LIMITS.pro.credits / VIDEO_TIERS.premium.creditCost);
+    const totalCost = clips * VIDEO_TIERS.premium.apiCost;
+    const margin = (PLAN_LIMITS.pro.price - totalCost) / PLAN_LIMITS.pro.price;
+    expect(margin).toBeGreaterThan(0.45);
+  });
+
+  it("hd is priced above standard despite a slightly lower real API cost — value-based pricing for sharper resolution, not a cost-ordering bug", () => {
+    expect(VIDEO_TIERS.hd.apiCost).toBeLessThan(VIDEO_TIERS.standard.apiCost);
+    expect(VIDEO_TIERS.hd.creditCost).toBeGreaterThan(VIDEO_TIERS.standard.creditCost);
+  });
+
+  it("premium costs more credits than either standard or hd", () => {
+    expect(VIDEO_TIERS.premium.creditCost).toBeGreaterThan(VIDEO_TIERS.standard.creditCost);
+    expect(VIDEO_TIERS.premium.creditCost).toBeGreaterThan(VIDEO_TIERS.hd.creditCost);
   });
 });

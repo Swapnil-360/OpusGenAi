@@ -27,6 +27,11 @@ const CSP = [
   `font-src 'self' data:`,
   `worker-src 'self' blob: https://unpkg.com`,
   `img-src 'self' data: blob: https://*.googleusercontent.com https://picsum.photos https://fastly.picsum.photos https://fal.media https://*.fal.media${supabaseHostname ? ` https://${supabaseHostname}` : ""}`,
+  // No media-src meant <video> fell back to default-src 'self', silently
+  // blocking every fal-hosted clip (verified real URL: v3b.fal.media/files/...,
+  // same host pattern as img-src) — video played as a stuck 0:00 player with
+  // no console CORS error, just a quietly dropped resource load.
+  `media-src 'self' blob: https://fal.media https://*.fal.media`,
   `connect-src 'self' https://unpkg.com https://va.vercel-scripts.com https://vitals.vercel-insights.com${supabaseHostname ? ` https://${supabaseHostname}` : ""}`,
   `upgrade-insecure-requests`,
 ].join("; ");

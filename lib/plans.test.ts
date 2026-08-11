@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canUseQuality, isPlanAtLeast, QUALITY_TIERS } from "@/lib/plans";
+import { canUseQuality, isPlanAtLeast, QUALITY_TIERS, VIDEO_TIER } from "@/lib/plans";
 
 describe("isPlanAtLeast", () => {
   it("ranks pro above basic above free", () => {
@@ -34,5 +34,19 @@ describe("QUALITY_TIERS", () => {
   it("credit cost climbs with resolution", () => {
     expect(QUALITY_TIERS.standard.creditCost).toBeLessThan(QUALITY_TIERS.hd.creditCost);
     expect(QUALITY_TIERS.hd.creditCost).toBeLessThan(QUALITY_TIERS.ultra.creditCost);
+  });
+});
+
+describe("VIDEO_TIER", () => {
+  it("is Pro-only", () => {
+    expect(VIDEO_TIER.minPlan).toBe("pro");
+    expect(isPlanAtLeast("basic", VIDEO_TIER.minPlan)).toBe(false);
+    expect(isPlanAtLeast("pro", VIDEO_TIER.minPlan)).toBe(true);
+  });
+
+  it("credit cost stays in the same $/credit band as every other tier", () => {
+    const perCredit = VIDEO_TIER.apiCost / VIDEO_TIER.creditCost;
+    expect(perCredit).toBeGreaterThan(0.005);
+    expect(perCredit).toBeLessThan(0.03);
   });
 });

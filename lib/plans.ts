@@ -82,6 +82,28 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   },
 };
 
+export interface VideoTier {
+  model: string;
+  resolution: "480p" | "720p";
+  durationSeconds: number;
+  apiCost: number;
+  creditCost: number;
+  minPlan: Plan;
+}
+
+// One fixed configuration for v1 — a duration/resolution matrix would
+// undercut the "easy to understand" goal for a first release. Priced the
+// same way as QUALITY_TIERS: real API cost drives the credit cost, landing
+// in the same $0.012-0.027/credit band as everything else.
+export const VIDEO_TIER: VideoTier = {
+  model: "bytedance/seedance-2.0/mini/image-to-video",
+  resolution: "720p",
+  durationSeconds: 5,
+  apiCost: 0.77,
+  creditCost: 29,
+  minPlan: "pro",
+};
+
 const PLAN_RANK: Record<Plan, number> = { free: 0, basic: 1, pro: 2 };
 
 /** True if `plan` meets or exceeds `required` — e.g. isPlanAtLeast("pro", "basic") === true. */

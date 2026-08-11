@@ -52,3 +52,35 @@ export async function chargeCredits(
 
   return rpcError ? currentCredits : Math.max(0, currentCredits - cost);
 }
+
+/** Adds credits back and logs a transaction. Returns the new balance. A plain
+ * update, not an RPC — unlike chargeCredits' floor at zero, a refund has no
+ * invariant to protect atomically, and after the decrement_credits RPC
+ * exposure (it was anon-callable with no ownership check), the fix is fewer
+ * RPC surfaces, not more. Used when an async job (image-to-video) is charged
+ * up front, at submit time, but then fails on fal's side. */
+export async function refundCredits(
+  userId: string,
+  amount: number,
+  currentCredits: number,
+  description: string
+): Promise<number> {
+  const admin = createAdminClient();
+  const newBalance = currentCredits + amount;
+
+  const { error: updateError } = await admin
+    .from("profiles")
+    .update({ credits: newBalance, updated_at: new Date().toISOString() })
+    .eq("id", userId);
+  if (updateError) console.error("refundCredits update failed:", updateError.message);
+
+  const { error: txError } = await admin.from("credit_transactions").insert({
+    user_id: userId,
+    amount,
+    type: "refund",
+    description,
+  });
+  if (txError) console.error("credit_transactions insert failed:", txError.message);
+
+  return updateError ? currentCredits : newBalance;
+}

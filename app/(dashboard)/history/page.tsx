@@ -6,7 +6,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpRight, Check, Clock, Copy, Download, Grid3X3, History,
-  List, Search, SlidersHorizontal, Sparkles, Star, X,
+  List, Play, Search, SlidersHorizontal, Sparkles, Star, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useTemplates } from "@/lib/hooks/use-templates";
@@ -32,7 +32,7 @@ type FilterStatus = "all" | "completed" | "failed";
 
 type CombinedEntry = {
   id: string; prompt: string; status: "completed" | "processing" | "failed";
-  images: string[]; creditsUsed: number; aspectRatio: string;
+  images: string[]; videoUrl: string | null; creditsUsed: number; aspectRatio: string;
   createdAt: Date; templateId?: string;
 };
 
@@ -61,16 +61,20 @@ export default function HistoryPage() {
 
       if (!data) return;
       setAllGenerations(
-        data.map((g) => ({
-          id: g.id,
-          prompt: g.prompt ?? "",
-          status: g.status as "completed" | "processing" | "failed",
-          images: (g.metadata as { images?: string[] })?.images ?? [],
-          creditsUsed: g.credit_cost ?? 1,
-          aspectRatio: (g.metadata as { aspectRatio?: string })?.aspectRatio ?? "1:1",
-          createdAt: new Date(g.created_at),
-          templateId: (g.metadata as { templateId?: string })?.templateId,
-        }))
+        data.map((g) => {
+          const meta = g.metadata as { images?: string[]; videoUrl?: string; aspectRatio?: string; templateId?: string };
+          return {
+            id: g.id,
+            prompt: g.prompt ?? "",
+            status: g.status as "completed" | "processing" | "failed",
+            images: meta?.images ?? [],
+            videoUrl: meta?.videoUrl ?? null,
+            creditsUsed: g.credit_cost ?? 1,
+            aspectRatio: meta?.aspectRatio ?? "1:1",
+            createdAt: new Date(g.created_at),
+            templateId: meta?.templateId,
+          };
+        })
       );
     }
     load();
@@ -111,7 +115,7 @@ export default function HistoryPage() {
     setTimeout(() => setCopiedId(null), 1800);
   }
 
-  async function downloadImage(src: string) {
+  async function downloadFile(src: string, extension: string = "png") {
     try {
       // data: URLs download directly; remote URLs (fal.media) need fetch+blob
       // or the browser just navigates instead of downloading.
@@ -119,7 +123,7 @@ export default function HistoryPage() {
       const url = isRemote ? URL.createObjectURL(await (await fetch(src)).blob()) : src;
       const a = document.createElement("a");
       a.href = url;
-      a.download = `opusgen-${Date.now()}.png`;
+      a.download = `opusgen-${Date.now()}.${extension}`;
       a.click();
       if (isRemote) URL.revokeObjectURL(url);
       toast.success("Downloading…");
@@ -143,6 +147,7 @@ export default function HistoryPage() {
             </div>
             <p className="text-[11px] ml-9" style={{ color: W.muted }}>
               {allGenerations.length} generations · {allGenerations.reduce((a, g) => a + g.images.length, 0)} images
+              {allGenerations.some((g) => g.videoUrl) && ` · ${allGenerations.filter((g) => g.videoUrl).length} videos`}
             </p>
           </div>
 
@@ -263,14 +268,26 @@ export default function HistoryPage() {
                   onMouseLeave={(e) => (e.currentTarget.style.borderColor = W.border)}
                   onClick={() => setSelected(gen.id)}
                 >
-                  {/* Image grid */}
+                  {/* Image grid (or a single video tile) */}
                   <div className="grid grid-cols-2 gap-0.5 h-36 relative">
-                    {gen.images.slice(0, 4).map((src, ii) => (
-                      <div key={ii} className="relative overflow-hidden" style={{ background: W.glass }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={src} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    {gen.videoUrl ? (
+                      <div className="col-span-2 relative overflow-hidden" style={{ background: W.glass }}>
+                        <video src={gen.videoUrl} muted preload="metadata" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center backdrop-blur-sm"
+                            style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)" }}>
+                            <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                          </div>
+                        </div>
                       </div>
-                    ))}
+                    ) : (
+                      gen.images.slice(0, 4).map((src, ii) => (
+                        <div key={ii} className="relative overflow-hidden" style={{ background: W.glass }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={src} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        </div>
+                      ))
+                    )}
                     <div className="absolute inset-0 bg-linear-to-t from-black/50 via-transparent to-transparent" />
                     <div className="absolute top-1.5 right-1.5 flex items-center gap-1.5">
                       <button
@@ -304,7 +321,7 @@ export default function HistoryPage() {
                         {formatTimeAgo(gen.createdAt)}
                       </div>
                       <span className="text-[10px]" style={{ color: W.dim }}>·</span>
-                      <span className="text-[10px]" style={{ color: W.dim }}>{gen.images.length} images</span>
+                      <span className="text-[10px]" style={{ color: W.dim }}>{gen.videoUrl ? "1 video" : `${gen.images.length} images`}</span>
                       <div className="ml-auto flex items-center gap-1">
                         <button
                           onClick={(e) => { e.stopPropagation(); copyPrompt(gen.prompt, gen.id); }}
@@ -349,14 +366,23 @@ export default function HistoryPage() {
                   onMouseLeave={(e) => { e.currentTarget.style.background = W.glassDim; e.currentTarget.style.borderColor = W.border; }}
                   onClick={() => setSelected(gen.id)}
                 >
-                  {/* Thumbnail strip */}
+                  {/* Thumbnail strip (or a single video thumbnail) */}
                   <div className="flex gap-1 shrink-0">
-                    {gen.images.slice(0, 2).map((src, ii) => (
-                      <div key={ii} className="w-11 h-11 rounded-lg overflow-hidden" style={{ background: W.glass }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={src} alt="" className="w-full h-full object-cover" />
+                    {gen.videoUrl ? (
+                      <div className="relative w-11 h-11 rounded-lg overflow-hidden" style={{ background: W.glass }}>
+                        <video src={gen.videoUrl} muted preload="metadata" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Play className="w-3.5 h-3.5 text-white fill-white" style={{ filter: "drop-shadow(0 0 2px rgba(0,0,0,0.8))" }} />
+                        </div>
                       </div>
-                    ))}
+                    ) : (
+                      gen.images.slice(0, 2).map((src, ii) => (
+                        <div key={ii} className="w-11 h-11 rounded-lg overflow-hidden" style={{ background: W.glass }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={src} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      ))
+                    )}
                   </div>
 
                   {/* Info */}
@@ -448,24 +474,40 @@ export default function HistoryPage() {
               </div>
 
               <div className="overflow-y-auto flex-1 p-5 space-y-4">
-                {/* Image grid */}
-                <div className="grid grid-cols-2 gap-2">
-                  {selectedGen.images.map((src, i) => (
-                    <div key={i} className="relative group aspect-square rounded-xl overflow-hidden" style={{ background: W.glass }}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={src} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-end justify-end p-2 opacity-0 group-hover:opacity-100">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); downloadImage(src); }}
-                          aria-label="Download image"
-                          className="w-7 h-7 rounded-lg bg-black/60 flex items-center justify-center transition-colors hover:bg-black/80"
-                        >
-                          <Download className="w-3.5 h-3.5 text-white" />
-                        </button>
+                {selectedGen.videoUrl ? (
+                  /* Video — always-visible download button, native controls
+                   * already occupy the bottom edge so hover-reveal (used for
+                   * images below) would fight the controls for the same space. */
+                  <div className="relative rounded-xl overflow-hidden" style={{ background: W.glass }}>
+                    <video src={selectedGen.videoUrl} controls loop muted autoPlay className="w-full rounded-xl" />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); downloadFile(selectedGen.videoUrl!, "mp4"); }}
+                      aria-label="Download video"
+                      className="absolute top-2 left-2 flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-white bg-black/60 hover:bg-black/80 transition-colors"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </button>
+                  </div>
+                ) : (
+                  /* Image grid */
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedGen.images.map((src, i) => (
+                      <div key={i} className="relative group aspect-square rounded-xl overflow-hidden" style={{ background: W.glass }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={src} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-end justify-end p-2 opacity-0 group-hover:opacity-100">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); downloadFile(src); }}
+                            aria-label="Download image"
+                            className="w-7 h-7 rounded-lg bg-black/60 flex items-center justify-center transition-colors hover:bg-black/80"
+                          >
+                            <Download className="w-3.5 h-3.5 text-white" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Prompt */}
                 <div className="p-3 rounded-xl" style={{ background: W.glass, border: `1px solid ${W.border}` }}>

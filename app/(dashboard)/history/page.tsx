@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  ArrowUpRight, Check, Clock, Copy, Download, Grid3X3, History,
+  ArrowUpRight, Check, Clock, Copy, Download, Expand, Grid3X3, History,
   List, Play, Search, SlidersHorizontal, Sparkles, Star, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -42,6 +42,7 @@ export default function HistoryPage() {
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [selected, setSelected] = useState<string | null>(null);
+  const [fullViewSrc, setFullViewSrc] = useState<string | null>(null);
   const [starred, setStarred] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [allGenerations, setAllGenerations] = useState<CombinedEntry[]>([]);
@@ -86,10 +87,16 @@ export default function HistoryPage() {
   }, [selected]);
 
   useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) { if (e.key === "Escape") setSelected(null); }
+    // Escape closes the lightbox first, then the detail drawer behind it —
+    // one press per layer, not both at once.
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (fullViewSrc) setFullViewSrc(null);
+      else setSelected(null);
+    }
     if (selected) document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [selected]);
+  }, [selected, fullViewSrc]);
 
   const generations = allGenerations.filter((g) => {
     if (filterStatus !== "all" && g.status !== filterStatus) return false;
@@ -492,10 +499,22 @@ export default function HistoryPage() {
                   /* Image grid */
                   <div className="grid grid-cols-2 gap-2">
                     {selectedGen.images.map((src, i) => (
-                      <div key={i} className="relative group aspect-square rounded-xl overflow-hidden" style={{ background: W.glass }}>
+                      <div
+                        key={i}
+                        className="relative group aspect-square rounded-xl overflow-hidden cursor-pointer"
+                        style={{ background: W.glass }}
+                        onClick={(e) => { e.stopPropagation(); setFullViewSrc(src); }}
+                      >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={src} alt={`Image ${i + 1}`} className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-end justify-end p-2 opacity-0 group-hover:opacity-100">
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-end justify-between p-2 opacity-0 group-hover:opacity-100">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setFullViewSrc(src); }}
+                            aria-label="View full size"
+                            className="w-7 h-7 rounded-lg bg-black/60 flex items-center justify-center transition-colors hover:bg-black/80"
+                          >
+                            <Expand className="w-3.5 h-3.5 text-white" />
+                          </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); downloadFile(src); }}
                             aria-label="Download image"
@@ -557,6 +576,49 @@ export default function HistoryPage() {
                     <Sparkles className="w-3.5 h-3.5" />Reuse prompt
                   </motion.button>
                 </Link>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Fullscreen lightbox — same pattern as /generate's own full-view */}
+      <AnimatePresence>
+        {fullViewSrc && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            className="fixed inset-0 z-60 flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.88)" }}
+            onClick={() => setFullViewSrc(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.92, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.92, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="relative max-w-2xl w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={fullViewSrc} alt="Full view" className="w-full rounded-2xl" style={{ border: `1px solid ${W.border}` }} />
+              <div className="absolute top-3 right-3 flex gap-2">
+                <button
+                  onClick={() => downloadFile(fullViewSrc)}
+                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold text-white transition-all"
+                  style={{ background: "#dc2626" }}
+                >
+                  <Download className="w-3.5 h-3.5" /> Download
+                </button>
+                <button
+                  onClick={() => setFullViewSrc(null)}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white transition-all"
+                  style={{ background: "rgba(0,0,0,0.6)", border: `1px solid ${W.border}` }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </motion.div>
           </motion.div>

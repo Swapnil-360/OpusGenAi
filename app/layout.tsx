@@ -19,6 +19,7 @@ const BOTID_PROTECTED_ROUTES = [
   { path: "/api/caption", method: "POST" },
   { path: "/api/enhance-prompt", method: "POST" },
   { path: "/api/remove-bg", method: "POST" },
+  { path: "/api/generate-video", method: "POST" },
 ];
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });

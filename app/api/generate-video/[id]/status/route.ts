@@ -3,9 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fal } from "@/lib/fal";
 import { getUserCredits, refundCredits, hasUnlimitedCredits } from "@/lib/credits";
-import { VIDEO_TIER } from "@/lib/plans";
+import { VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
 
 type VideoMetadata = {
+  quality?: VideoQuality;
   resolution: string;
   durationSeconds: number;
   requestId?: string;
@@ -24,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const admin = createAdminClient();
   const { data: row } = await admin
     .from("generations")
-    .select("id, user_id, status, error_message, metadata")
+    .select("id, user_id, status, error_message, credit_cost, metadata")
     .eq("id", id)
     .single();
 
@@ -46,14 +47,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ status: "pending" });
   }
 
+  // Which model this row's request_id belongs to — three possible models now,
+  // so this can't be a single hardcoded constant like it was for the v1
+  // single-tier version. Falls back to "standard" only for rows submitted
+  // before `quality` was recorded.
+  const model = VIDEO_TIERS[meta.quality ?? "standard"].model;
+
   try {
-    const queueStatus = await fal.queue.status(VIDEO_TIER.model, { requestId: meta.requestId, logs: false });
+    const queueStatus = await fal.queue.status(model, { requestId: meta.requestId, logs: false });
 
     if (queueStatus.status !== "COMPLETED") {
       return NextResponse.json({ status: "pending" });
     }
 
-    const result = await fal.queue.result(VIDEO_TIER.model, { requestId: meta.requestId });
+    const result = await fal.queue.result(model, { requestId: meta.requestId });
     const videoUrl = (result.data as { video?: { url: string } })?.video?.url;
     if (!videoUrl) throw new Error("No video URL in fal result");
 
@@ -78,7 +85,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     if (!hasUnlimitedCredits(user.email)) {
       const credits = await getUserCredits(user.id);
-      await refundCredits(user.id, VIDEO_TIER.creditCost, credits, "Image-to-video (generation failed)");
+      // Refunds exactly what this row actually charged — not a tier
+      // constant — so a failed Premium (88cr) job refunds 88, not whatever
+      // Standard costs.
+      await refundCredits(user.id, row.credit_cost, credits, "Image-to-video (generation failed)");
     }
 
     return NextResponse.json({ status: "failed", error: errorMessage });

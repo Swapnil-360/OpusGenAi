@@ -149,9 +149,13 @@ interface ResultPanelProps {
   result: string | null;
   accentColor: string;
   onDownload: () => void;
+  /** "video" renders the completed result with native <video> controls
+   *  instead of <img> — everything else (idle/processing/failed states) is
+   *  already media-agnostic. Defaults to "image". */
+  mediaType?: "image" | "video";
 }
 
-export function ResultPanel({ status, result, accentColor, onDownload }: ResultPanelProps) {
+export function ResultPanel({ status, result, accentColor, onDownload, mediaType = "image" }: ResultPanelProps) {
   if (status === "idle") {
     return (
       <div className="border-2 border-dashed rounded-2xl aspect-square w-full max-w-sm flex flex-col items-center justify-center text-center p-8"
@@ -193,6 +197,37 @@ export function ResultPanel({ status, result, accentColor, onDownload }: ResultP
         style={{ border: "1px solid rgba(220,38,38,0.3)", background: "rgba(220,38,38,0.05)" }}>
         <p className="text-sm font-semibold" style={{ color: "#f87171" }}>Processing failed</p>
         <p className="text-xs" style={{ color: S.muted }}>Try a different image or try again</p>
+      </div>
+    );
+  }
+
+  if (mediaType === "video") {
+    return (
+      <div
+        className="relative rounded-2xl overflow-hidden aspect-square w-full max-w-sm"
+        style={{ border: `1px solid ${accentColor}40` }}
+      >
+        <video src={result!} controls loop muted autoPlay className="w-full h-full object-cover" />
+        {/* Native video controls occupy the bottom edge — download stays
+         *  always-visible in a corner instead of the image variant's
+         *  hover-only overlay, which would fight the controls for the same space. */}
+        <button
+          onClick={onDownload}
+          className="absolute top-3 left-3 flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold text-white"
+          style={{ backgroundColor: accentColor }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.9"; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+        >
+          <Download className="w-3.5 h-3.5" />Download
+        </button>
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="absolute top-3 right-3 flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full text-white"
+          style={{ background: "rgba(0,0,0,0.65)", border: "1px solid rgba(255,255,255,0.2)" }}
+        >
+          <Check className="w-3 h-3" />Done
+        </motion.div>
       </div>
     );
   }

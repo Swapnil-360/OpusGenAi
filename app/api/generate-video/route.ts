@@ -1,25 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { fal } from "@/lib/fal";
+import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, refundCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { getUserPlan } from "@/lib/entitlements";
-import { VIDEO_TIER, isPlanAtLeast } from "@/lib/plans";
+import { VIDEO_TIERS, canUseVideoQuality, type VideoQuality } from "@/lib/plans";
 import { rejectIfBot } from "@/lib/bot-protect";
 
 const DEFAULT_MOTION_PROMPT = "smooth cinematic camera motion, subtle zoom, natural movement";
+const DATA_URL_RE = /^data:image\/[a-zA-Z0-9.+-]+;base64,/;
+const FAL_URL_RE = /^https:\/\/[^/]*fal\.(media|ai|run)\//;
 
 export async function POST(req: NextRequest) {
   try {
-    const { imageUrl, prompt } = await req.json();
+    const { imageUrl, prompt, quality: rawQuality } = await req.json();
 
-    // Scoped to images this app already generated (verified format:
-    // https://v3b.fal.media/files/...) — not a general image-to-video proxy
-    // for arbitrary URLs. This route never fetches imageUrl itself (fal's own
-    // servers do), so this isn't an SSRF control; it's what keeps credits
-    // tied to content actually produced through the product.
-    if (typeof imageUrl !== "string" || !/^https:\/\/[^/]*fal\.(media|ai|run)\//.test(imageUrl)) {
-      return NextResponse.json({ error: "A generated image is required." }, { status: 400 });
+    // Either an image this app already generated (https://*.fal.media/...,
+    // unchanged) or a fresh local upload (data:image/...;base64,) — the
+    // latter gets uploaded to fal storage below via the same
+    // uploadDataUrlToFal() call /api/generate's premium path already uses,
+    // no new validation surface. This route never fetches imageUrl itself
+    // (fal's own servers do for the https case), so this isn't an SSRF
+    // control; it's what keeps generated-image credits tied to content
+    // actually produced or uploaded through the product.
+    if (typeof imageUrl !== "string" || !(FAL_URL_RE.test(imageUrl) || DATA_URL_RE.test(imageUrl))) {
+      return NextResponse.json({ error: "An image is required." }, { status: 400 });
     }
 
     const supabase = await createClient();
@@ -31,15 +36,29 @@ export async function POST(req: NextRequest) {
     const botResponse = await rejectIfBot();
     if (botResponse) return botResponse;
 
+    const quality: VideoQuality = rawQuality in VIDEO_TIERS ? rawQuality : "standard";
+    const tier = VIDEO_TIERS[quality];
+
     const isUnlimited = hasUnlimitedCredits(user.email);
     if (!isUnlimited) {
       const plan = await getUserPlan(user.id);
-      if (!isPlanAtLeast(plan, VIDEO_TIER.minPlan)) {
+      if (!canUseVideoQuality(plan, quality)) {
         return NextResponse.json({ error: "Upgrade to Pro to unlock Image-to-Video." }, { status: 403 });
       }
     }
 
-    const cost = VIDEO_TIER.creditCost;
+    // Fresh uploads need a real URL before fal's queue can use them; a prior
+    // generation already has one. Resolved before any credit is charged, so
+    // a broken upload never costs the user anything.
+    let resolvedImageUrl: string;
+    try {
+      resolvedImageUrl = DATA_URL_RE.test(imageUrl) ? await uploadDataUrlToFal(imageUrl) : imageUrl;
+    } catch (uploadError) {
+      console.error("uploadDataUrlToFal failed:", uploadError);
+      return NextResponse.json({ error: "Failed to process the uploaded image." }, { status: 400 });
+    }
+
+    const cost = tier.creditCost;
     const credits = await getUserCredits(user.id);
     if (!isUnlimited && credits < cost) {
       return NextResponse.json(
@@ -54,7 +73,7 @@ export async function POST(req: NextRequest) {
     // status route if the job later fails on fal's side.
     const newCredits = isUnlimited
       ? UNLIMITED_CREDITS_DISPLAY
-      : await chargeCredits(user.id, cost, credits, "Image-to-video");
+      : await chargeCredits(user.id, cost, credits, `Image-to-video (${quality})`);
 
     const admin = createAdminClient();
     const motionPrompt = typeof prompt === "string" && prompt.trim() ? prompt.trim() : DEFAULT_MOTION_PROMPT;
@@ -66,9 +85,9 @@ export async function POST(req: NextRequest) {
         tool_id: "image-to-video",
         status: "pending",
         prompt: motionPrompt,
-        input_image_url: imageUrl,
+        input_image_url: resolvedImageUrl,
         credit_cost: cost,
-        metadata: { resolution: VIDEO_TIER.resolution, durationSeconds: VIDEO_TIER.durationSeconds },
+        metadata: { quality, resolution: tier.resolution, durationSeconds: tier.durationSeconds },
       })
       .select("id")
       .single();
@@ -80,19 +99,19 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const { request_id } = await fal.queue.submit(VIDEO_TIER.model, {
+      const { request_id } = await fal.queue.submit(tier.model, {
         input: {
           prompt: motionPrompt,
-          image_url: imageUrl,
-          resolution: VIDEO_TIER.resolution,
-          duration: String(VIDEO_TIER.durationSeconds),
+          image_url: resolvedImageUrl,
+          resolution: tier.resolution,
+          duration: String(tier.durationSeconds),
           generate_audio: true,
         },
       });
 
       await admin
         .from("generations")
-        .update({ metadata: { resolution: VIDEO_TIER.resolution, durationSeconds: VIDEO_TIER.durationSeconds, requestId: request_id } })
+        .update({ metadata: { quality, resolution: tier.resolution, durationSeconds: tier.durationSeconds, requestId: request_id } })
         .eq("id", row.id);
 
       return NextResponse.json({ generationId: row.id, credits: newCredits });

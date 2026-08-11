@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Aperture, Zap, Clock, User, LogOut,
   Menu, Layers, PenSquare, Scissors, Replace, Eraser, Maximize2, Frame,
-  PanelLeftClose, PanelLeftOpen, Lightbulb,
+  PanelLeftClose, PanelLeftOpen, Lightbulb, Clapperboard,
 } from "lucide-react";
 import { LogoBrand } from "@/components/shared/LogoBrand";
 import { WelcomeGuide, shouldAutoOpenGuide } from "@/components/onboarding/WelcomeGuide";
@@ -46,6 +46,7 @@ const TOOL_ITEMS = [
   { href: "/tools/cleanup", label: "Cleanup", icon: Eraser, color: "#fbbf24" },
   { href: "/tools/upscale", label: "Upscale 4×", icon: Maximize2, color: "#f87171" },
   { href: "/tools/uncrop", label: "Uncrop", icon: Frame, color: "#f472b6" },
+  { href: "/tools/image-to-video", label: "Image to Video", icon: Clapperboard, color: "#dc2626" },
 ];
 
 type SidebarUser = {

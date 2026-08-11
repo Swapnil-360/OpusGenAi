@@ -11,13 +11,13 @@ import {
   Sparkles, Wand2, X, Zap, Layers,
   Globe, ShoppingBag, Megaphone, LayoutTemplate, Heart,
   Droplets, Gem, Watch, Pill, Footprints, Briefcase, Smartphone, Flame,
-  Clapperboard, Crown,
 } from "lucide-react";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { fileToDataUrl } from "@/lib/mask-canvas";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_NOTIFICATION_PREFS, LOW_CREDIT_THRESHOLD, type NotificationPrefs } from "@/lib/notification-prefs";
-import { QUALITY_TIERS, VIDEO_TIER, canUseQuality, isPlanAtLeast, type Plan, type Quality } from "@/lib/plans";
+import { QUALITY_TIERS, canUseQuality, isPlanAtLeast, type Plan, type Quality } from "@/lib/plans";
+import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
 import { toast } from "sonner";
 
 /* ─── Static data ──────────────────────────────────────────────────── */
@@ -197,12 +197,6 @@ function GeneratePageInner() {
   // even though the server would let the request through.
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const [videoPrompt, setVideoPrompt] = useState("");
-  const [videoStatus, setVideoStatus] = useState<"idle" | "processing" | "done" | "failed">("idle");
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [videoError, setVideoError] = useState<string | null>(null);
-  const videoPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   useEffect(() => {
     (async () => {
       const supabase = createClient();
@@ -223,7 +217,6 @@ function GeneratePageInner() {
         if (typeof me?.isAdmin === "boolean") setIsAdmin(me.isAdmin);
       })
       .catch(() => {});
-    return () => { if (videoPollRef.current) clearInterval(videoPollRef.current); };
   }, []);
   const [fullViewSrc, setFullViewSrc] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -348,82 +341,12 @@ function GeneratePageInner() {
     return { image: image as string, credits: typeof credits === "number" ? credits : null };
   }
 
-  function resetVideoState() {
-    if (videoPollRef.current) { clearInterval(videoPollRef.current); videoPollRef.current = null; }
-    setVideoStatus("idle");
-    setVideoUrl(null);
-    setVideoError(null);
-    setVideoPrompt("");
-  }
-
-  function pollVideoStatus(generationId: string) {
-    if (videoPollRef.current) clearInterval(videoPollRef.current);
-    videoPollRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/generate-video/${generationId}/status`);
-        if (!res.ok) return; // transient — keep polling, next tick may succeed
-        const data = await res.json();
-        if (data.status === "completed") {
-          if (videoPollRef.current) { clearInterval(videoPollRef.current); videoPollRef.current = null; }
-          setVideoStatus("done");
-          setVideoUrl(data.videoUrl);
-          toast.success("Video ready!");
-        } else if (data.status === "failed") {
-          if (videoPollRef.current) { clearInterval(videoPollRef.current); videoPollRef.current = null; }
-          setVideoStatus("failed");
-          setVideoError(data.error || "Video generation failed.");
-          toast.error((data.error || "Video generation failed.") + " Credits refunded.");
-        }
-        // "pending" — keep polling
-      } catch {
-        // transient network hiccup — keep polling rather than failing the whole flow
-      }
-    }, 4000);
-  }
-
-  async function startVideoGeneration() {
-    if (!generatedImage) return;
-    if (!(isAdmin || isPlanAtLeast(userPlan, "pro"))) {
-      toast.info("Image-to-Video needs the Pro plan.", {
-        action: { label: "Upgrade", onClick: () => { window.location.href = "/account"; } },
-      });
-      return;
-    }
-    setVideoStatus("processing");
-    setVideoError(null);
-    setVideoUrl(null);
-
-    try {
-      const res = await fetch("/api/generate-video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: generatedImage, prompt: videoPrompt.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setVideoStatus("failed");
-        setVideoError(data.error || "Failed to start video generation.");
-        toast.error(data.error || "Failed to start video generation.");
-        return;
-      }
-      if (typeof data.credits === "number") {
-        window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: data.credits }));
-      }
-      pollVideoStatus(data.generationId);
-    } catch {
-      setVideoStatus("failed");
-      setVideoError("Network error. Check your connection.");
-      toast.error("Network error. Check your connection.");
-    }
-  }
-
   async function handleGenerate() {
     if (genStatus === "processing") return;
     if (!prompt.trim()) { toast.error("Type a prompt first."); return; }
     closeAll();
     setGenStatus("processing");
     setGeneratedImage(null);
-    resetVideoState();
 
     try {
       const { image: finalImage, credits: remaining } = refFile
@@ -1052,123 +975,12 @@ function GeneratePageInner() {
                 </motion.div>
               )}
 
-              {/* ── Image to Video (Pro) ── */}
               {imagesReady && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2, duration: 0.22 }}
-                  className="rounded-2xl p-4"
-                  style={{ border: `1px solid ${W.redBorder}`, background: "linear-gradient(180deg, rgba(220,38,38,0.06) 0%, transparent 60%)" }}
-                >
-                  <div className="flex items-center gap-2.5 mb-1">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                      style={{ background: W.redBg, border: `1px solid ${W.redBorder}` }}>
-                      <Clapperboard className="w-4 h-4" style={{ color: W.red }} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <p className="text-xs font-bold" style={{ color: W.text }}>Animate this image</p>
-                        <span className="flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style={{ background: "#dc2626" }}>
-                          <Crown className="w-2.5 h-2.5" /> PRO
-                        </span>
-                      </div>
-                      <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>
-                        5 seconds · 720p · {VIDEO_TIER.creditCost} credits
-                      </p>
-                    </div>
-                  </div>
-
-                  {videoStatus === "idle" && (
-                    <>
-                      <textarea
-                        value={videoPrompt}
-                        onChange={(e) => setVideoPrompt(e.target.value)}
-                        placeholder="Describe the motion — e.g. slow zoom in with soft camera drift…"
-                        rows={2}
-                        className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2.5 text-xs leading-relaxed placeholder:opacity-40 mt-3"
-                        style={{ color: W.text, border: `1px solid ${W.border}`, background: W.glassDim }}
-                      />
-                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                        {["Slow zoom in", "Gentle rotation", "Camera pan", "Subtle drift"].map((label) => (
-                          <button
-                            key={label}
-                            onClick={() => setVideoPrompt(label)}
-                            className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                            style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.redBorder; e.currentTarget.style.color = W.red; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.border; e.currentTarget.style.color = W.muted; }}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                      <motion.button
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={startVideoGeneration}
-                        className="w-full h-9 mt-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all"
-                        style={{ background: "#dc2626", boxShadow: "0 0 20px rgba(220,38,38,0.22)" }}
-                      >
-                        {!(isAdmin || isPlanAtLeast(userPlan, "pro")) && <Lock className="w-3.5 h-3.5" />}
-                        <Clapperboard className="w-3.5 h-3.5" />
-                        Generate Video
-                      </motion.button>
-                    </>
-                  )}
-
-                  {videoStatus === "processing" && (
-                    <div className="flex flex-col items-center justify-center py-6 mt-1">
-                      <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin mb-3" />
-                      <p className="text-xs font-semibold" style={{ color: W.text }}>Creating your video…</p>
-                      <p className="text-[10px] mt-1" style={{ color: W.dim }}>Usually takes 1–2 minutes</p>
-                    </div>
-                  )}
-
-                  {videoStatus === "done" && videoUrl && (
-                    <div className="mt-3">
-                      <video
-                        src={videoUrl}
-                        controls
-                        loop
-                        muted
-                        autoPlay
-                        className="w-full max-w-sm mx-auto rounded-xl block"
-                        style={{ border: `1px solid ${W.border}` }}
-                      />
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          onClick={() => handleDownload(videoUrl, "mp4")}
-                          className="flex-1 h-9 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1.5"
-                          style={{ background: "#dc2626" }}
-                        >
-                          <Download className="w-3.5 h-3.5" /> Download
-                        </button>
-                        <button
-                          onClick={resetVideoState}
-                          className="flex-1 h-9 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5"
-                          style={{ border: `1px solid ${W.border}`, background: W.glassDim, color: W.muted }}
-                        >
-                          <RefreshCw className="w-3.5 h-3.5" /> Try another motion
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {videoStatus === "failed" && (
-                    <div className="mt-3 rounded-xl p-3" style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}>
-                      <p className="text-xs font-semibold" style={{ color: W.text }}>{videoError || "Video generation failed."}</p>
-                      <p className="text-[10px] mt-1" style={{ color: W.dim }}>Your credits were refunded.</p>
-                      <button
-                        onClick={resetVideoState}
-                        className="mt-2.5 h-8 px-3 rounded-lg text-xs font-semibold"
-                        style={{ border: `1px solid ${W.border}`, background: W.glassDim, color: W.text }}
-                      >
-                        Try again
-                      </button>
-                    </div>
-                  )}
-                </motion.div>
+                <ImageToVideoPanel
+                  key={generatedImage}
+                  imageUrl={generatedImage}
+                  isEntitled={isAdmin || isPlanAtLeast(userPlan, "pro")}
+                />
               )}
             </motion.div>
           )}

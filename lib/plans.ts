@@ -82,26 +82,59 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
   },
 };
 
+export type VideoQuality = "standard" | "hd" | "premium";
+
 export interface VideoTier {
+  label: string;
+  /** Short trade-off copy for the UI picker — "fast & affordable" isn't the
+   *  same axis as "sharpest resolution" isn't the same axis as "best model
+   *  quality", so price alone doesn't tell the story between these three. */
+  blurb: string;
   model: string;
-  resolution: "480p" | "720p";
+  resolution: "480p" | "720p" | "1080p";
   durationSeconds: number;
   apiCost: number;
   creditCost: number;
   minPlan: Plan;
 }
 
-// One fixed configuration for v1 — a duration/resolution matrix would
-// undercut the "easy to understand" goal for a first release. Priced the
-// same way as QUALITY_TIERS: real API cost drives the credit cost, landing
-// in the same $0.012-0.027/credit band as everything else.
-export const VIDEO_TIER: VideoTier = {
-  model: "bytedance/seedance-2.0/mini/image-to-video",
-  resolution: "720p",
-  durationSeconds: 5,
-  apiCost: 0.77,
-  creditCost: 29,
-  minPlan: "pro",
+// Three real, distinct options rather than one fixed config or a strict
+// price ladder — verified against fal's API docs (not recalled) before
+// picking numbers. Notably hd (Wan 2.5, 1080p) costs LESS than premium
+// (Seedance 2.5, 720p): a different, cheaper model happens to beat the
+// "premium" pick on resolution too. That's real, not a pricing mistake —
+// see the explicit test in lib/plans.test.ts asserting it stays that way.
+export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
+  standard: {
+    label: "Standard",
+    blurb: "Fast & affordable",
+    model: "bytedance/seedance-2.0/mini/image-to-video",
+    resolution: "720p",
+    durationSeconds: 5,
+    apiCost: 0.77,
+    creditCost: 29,
+    minPlan: "pro",
+  },
+  hd: {
+    label: "HD 1080p",
+    blurb: "Sharpest resolution",
+    model: "fal-ai/wan-25-preview/image-to-video",
+    resolution: "1080p",
+    durationSeconds: 5,
+    apiCost: 0.75,
+    creditCost: 28,
+    minPlan: "pro",
+  },
+  premium: {
+    label: "Premium",
+    blurb: "Best model quality",
+    model: "bytedance/seedance-2.5/image-to-video",
+    resolution: "720p",
+    durationSeconds: 5,
+    apiCost: 2.37,
+    creditCost: 88,
+    minPlan: "pro",
+  },
 };
 
 const PLAN_RANK: Record<Plan, number> = { free: 0, basic: 1, pro: 2 };
@@ -113,4 +146,8 @@ export function isPlanAtLeast(plan: Plan, required: Plan): boolean {
 
 export function canUseQuality(plan: Plan, quality: Quality): boolean {
   return isPlanAtLeast(plan, QUALITY_TIERS[quality].minPlan);
+}
+
+export function canUseVideoQuality(plan: Plan, quality: VideoQuality): boolean {
+  return isPlanAtLeast(plan, VIDEO_TIERS[quality].minPlan);
 }

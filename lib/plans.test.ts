@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canUseQuality, isPlanAtLeast, QUALITY_TIERS, VIDEO_TIER } from "@/lib/plans";
+import { canUseQuality, canUseVideoQuality, isPlanAtLeast, QUALITY_TIERS, VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
 
 describe("isPlanAtLeast", () => {
   it("ranks pro above basic above free", () => {
@@ -37,16 +37,28 @@ describe("QUALITY_TIERS", () => {
   });
 });
 
-describe("VIDEO_TIER", () => {
-  it("is Pro-only", () => {
-    expect(VIDEO_TIER.minPlan).toBe("pro");
-    expect(isPlanAtLeast("basic", VIDEO_TIER.minPlan)).toBe(false);
-    expect(isPlanAtLeast("pro", VIDEO_TIER.minPlan)).toBe(true);
+describe("VIDEO_TIERS", () => {
+  const qualities: VideoQuality[] = ["standard", "hd", "premium"];
+
+  it("all three qualities are Pro-only", () => {
+    for (const q of qualities) {
+      expect(VIDEO_TIERS[q].minPlan).toBe("pro");
+      expect(canUseVideoQuality("basic", q)).toBe(false);
+      expect(canUseVideoQuality("pro", q)).toBe(true);
+    }
   });
 
-  it("credit cost stays in the same $/credit band as every other tier", () => {
-    const perCredit = VIDEO_TIER.apiCost / VIDEO_TIER.creditCost;
-    expect(perCredit).toBeGreaterThan(0.005);
-    expect(perCredit).toBeLessThan(0.03);
+  it("every tier's credit cost stays in the same $/credit band as the rest of the app", () => {
+    for (const q of qualities) {
+      const perCredit = VIDEO_TIERS[q].apiCost / VIDEO_TIERS[q].creditCost;
+      expect(perCredit).toBeGreaterThan(0.005);
+      expect(perCredit).toBeLessThan(0.03);
+    }
+  });
+
+  it("hd is cheaper than premium despite being higher resolution — this is intentional, not a pricing bug", () => {
+    expect(VIDEO_TIERS.hd.resolution).toBe("1080p");
+    expect(VIDEO_TIERS.premium.resolution).toBe("720p");
+    expect(VIDEO_TIERS.hd.creditCost).toBeLessThan(VIDEO_TIERS.premium.creditCost);
   });
 });

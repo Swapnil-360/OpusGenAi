@@ -5,6 +5,9 @@ export type Quality = "standard" | "hd" | "ultra";
 export interface QualityTier {
   /** fal.ai model endpoint. */
   model: string;
+  /** Human-readable model name for display — `model` is a raw fal endpoint
+   *  path, not something to show a user directly. */
+  modelLabel: string;
   /** Nano Banana 2's `resolution` input param — undefined for models (like
    *  the standard gemini path) that don't take one. Charging 5 or 6 credits
    *  without actually requesting the matching resolution would be a real
@@ -24,12 +27,14 @@ export interface QualityTier {
 export const QUALITY_TIERS: Record<Quality, QualityTier> = {
   standard: {
     model: "fal-ai/gemini-25-flash-image/edit",
+    modelLabel: "Gemini 2.5 Flash",
     apiCost: 0.039,
     creditCost: 3,
     minPlan: "free",
   },
   hd: {
     model: "fal-ai/nano-banana-2/edit",
+    modelLabel: "Nano Banana 2",
     resolution: "2K",
     apiCost: 0.12,
     creditCost: 5,
@@ -37,6 +42,7 @@ export const QUALITY_TIERS: Record<Quality, QualityTier> = {
   },
   ultra: {
     model: "fal-ai/nano-banana-2/edit",
+    modelLabel: "Nano Banana 2",
     resolution: "4K",
     apiCost: 0.16,
     creditCost: 6,

@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_NOTIFICATION_PREFS, LOW_CREDIT_THRESHOLD, type NotificationPrefs } from "@/lib/notification-prefs";
 import { QUALITY_TIERS, canUseQuality, isPlanAtLeast, type Plan, type Quality } from "@/lib/plans";
 import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
 /* ─── Static data ──────────────────────────────────────────────────── */
@@ -504,6 +505,9 @@ function GeneratePageInner() {
                       </button>
                     );
                   })}
+                  <span className="text-[10px] ml-1" style={{ color: W.dim }}>
+                    Powered by {QUALITY_TIERS[quality].modelLabel}
+                  </span>
                 </div>
               )}
 
@@ -522,66 +526,72 @@ function GeneratePageInner() {
               />
 
               <div className="flex items-center justify-between px-4 pb-3">
-                <div className="relative">
-                  <button
-                    disabled={isEnhancing}
-                    onClick={(e) => { e.stopPropagation(); setShowAiMenu(!showAiMenu); setShowSizePicker(false); setShowTemplatePicker(false); }}
-                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium transition-all disabled:opacity-60"
-                    style={showAiMenu
-                      ? { border: `1px solid ${W.redBorder}`, background: W.redBg, color: W.red }
-                      : { border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+                {/* Rendered via Radix's portal (DropdownMenuContent), not a
+                 * manually-positioned absolute div — this card has
+                 * overflow-hidden for its animated border glow, which was
+                 * clipping the old dropdown's top edge since it opened
+                 * upward from inside that same clipped container. */}
+                <DropdownMenu
+                  open={showAiMenu}
+                  onOpenChange={(open) => {
+                    setShowAiMenu(open);
+                    if (open) { setShowSizePicker(false); setShowTemplatePicker(false); }
+                  }}
+                >
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      disabled={isEnhancing}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium transition-all disabled:opacity-60"
+                      style={showAiMenu
+                        ? { border: `1px solid ${W.redBorder}`, background: W.redBg, color: W.red }
+                        : { border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+                    >
+                      {isEnhancing
+                        ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        : <Sparkles className="w-3 h-3" />}
+                      {isEnhancing ? "Analyzing…" : "Enhance"}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="start"
+                    side="top"
+                    sideOffset={8}
+                    className="w-60 rounded-2xl p-1.5"
+                    style={{ background: W.card, border: `1px solid ${W.border}`, boxShadow: "0 20px 50px rgba(0,0,0,0.7)" }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {isEnhancing
-                      ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      : <Sparkles className="w-3 h-3" />}
-                    {isEnhancing ? "Analyzing…" : "Enhance"}
-                  </button>
-                  <AnimatePresence>
-                    {showAiMenu && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 6, scale: 0.97 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 4, scale: 0.97 }}
-                        transition={{ duration: 0.13 }}
-                        className="absolute bottom-full mb-2 left-0 z-50 w-60 rounded-2xl overflow-hidden"
-                        style={{ background: W.card, border: `1px solid ${W.border}`, boxShadow: "0 20px 50px rgba(0,0,0,0.7)" }}
-                        onClick={(e) => e.stopPropagation()}
+                    {AI_ACTIONS.map(({ icon: Icon, label, desc }) => (
+                      <DropdownMenuItem
+                        key={label}
+                        disabled={isEnhancing}
+                        onSelect={() => {
+                          if (label === "Random Prompt") {
+                            const pick = ALL_PROMPTS[Math.floor(Math.random() * ALL_PROMPTS.length)];
+                            setPrompt(pick);
+                            toast.success("Random prompt applied!");
+                          } else if (label === "Improve Prompt") {
+                            improvePrompt();
+                          } else {
+                            toast.info(`${label} — coming soon!`);
+                          }
+                        }}
+                        className="flex items-start gap-3 px-3 py-2.5 rounded-xl cursor-pointer"
+                        style={{ color: W.text }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = W.glass)}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                       >
-                        {AI_ACTIONS.map(({ icon: Icon, label, desc }) => (
-                          <button
-                            key={label}
-                            disabled={isEnhancing}
-                            onClick={() => {
-                              if (label === "Random Prompt") {
-                                const pick = ALL_PROMPTS[Math.floor(Math.random() * ALL_PROMPTS.length)];
-                                setPrompt(pick);
-                                toast.success("Random prompt applied!");
-                                setShowAiMenu(false);
-                              } else if (label === "Improve Prompt") {
-                                setShowAiMenu(false);
-                                improvePrompt();
-                              } else {
-                                toast.info(`${label} — coming soon!`);
-                                setShowAiMenu(false);
-                              }
-                            }}
-                            className="w-full flex items-start gap-3 px-4 py-2.5 transition-colors text-left disabled:opacity-50"
-                            onMouseEnter={(e) => (e.currentTarget.style.background = W.glass)}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-                          >
-                            <Icon className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: W.red }} />
-                            <div>
-                              <p className="text-[12px] font-semibold" style={{ color: W.text }}>{label}</p>
-                              <p className="text-[10px]" style={{ color: W.muted }}>
-                                {label === "Improve Prompt" && refFile ? "Analyzes your photo + prompt" : desc}
-                              </p>
-                            </div>
-                          </button>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                        <Icon className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: W.red }} />
+                        <div>
+                          <p className="text-[12px] font-semibold" style={{ color: W.text }}>{label}</p>
+                          <p className="text-[10px]" style={{ color: W.muted }}>
+                            {label === "Improve Prompt" && refFile ? "Analyzes your photo + prompt" : desc}
+                          </p>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <span
                   className="text-[10px] font-mono"
                   style={{ color: prompt.length > 450 ? "#fbbf24" : W.dim }}

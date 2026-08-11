@@ -33,7 +33,8 @@ const S = {
 };
 
 const NAV_ITEMS = [
-  { href: "/generate", label: "Generate", icon: Aperture },
+  { href: "/generate", label: "Image Generator", icon: Aperture },
+  { href: "/tools/image-to-video", label: "Video Generator", icon: Clapperboard },
   { href: "/templates", label: "Templates", icon: Layers },
   { href: "/studio", label: "Content Studio", icon: PenSquare },
   { href: "/history", label: "History", icon: Clock },
@@ -46,7 +47,6 @@ const TOOL_ITEMS = [
   { href: "/tools/cleanup", label: "Cleanup", icon: Eraser, color: "#fbbf24" },
   { href: "/tools/upscale", label: "Upscale 4×", icon: Maximize2, color: "#f87171" },
   { href: "/tools/uncrop", label: "Uncrop", icon: Frame, color: "#f472b6" },
-  { href: "/tools/image-to-video", label: "Image to Video", icon: Clapperboard, color: "#dc2626" },
 ];
 
 type SidebarUser = {

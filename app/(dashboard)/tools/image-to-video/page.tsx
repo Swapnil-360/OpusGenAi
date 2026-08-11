@@ -127,6 +127,9 @@ export default function ImageToVideoPage() {
                   <p className="text-[11px] font-bold" style={{ color: W.text }}>{tier.label}</p>
                   <p className="text-[9px] mt-0.5" style={{ color: W.dim }}>{tier.blurb}</p>
                   <p className="text-[10px] font-semibold mt-1.5" style={{ color: W.red }}>{tier.resolution} · {tier.creditCost}cr</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: W.dim, opacity: 0.75 }}>
+                    {tier.modelLabel}{tier.includesAudio && " · AI audio"}
+                  </p>
                 </div>
               );
             })}

@@ -90,7 +90,16 @@ export interface VideoTier {
    *  same axis as "sharpest resolution" isn't the same axis as "best model
    *  quality", so price alone doesn't tell the story between these three. */
   blurb: string;
+  /** Raw fal.ai endpoint ID — what the server actually calls. */
   model: string;
+  /** Human-readable model name for display — `model` is a fal endpoint path
+   *  (e.g. "bytedance/seedance-2.0/mini/image-to-video"), not something to
+   *  show a user directly. */
+  modelLabel: string;
+  /** All three current models generate synchronized audio natively (the
+   *  route always sends generate_audio: true) — there is no separate "audio
+   *  model"; this just documents that the video model itself produces it. */
+  includesAudio: boolean;
   resolution: "480p" | "720p" | "1080p";
   durationSeconds: number;
   apiCost: number;
@@ -120,6 +129,8 @@ export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
     label: "Standard",
     blurb: "Fast & affordable",
     model: "bytedance/seedance-2.0/mini/image-to-video",
+    modelLabel: "Seedance 2.0 Mini",
+    includesAudio: true,
     resolution: "720p",
     durationSeconds: 5,
     apiCost: 0.77,
@@ -130,6 +141,8 @@ export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
     label: "HD 1080p",
     blurb: "Sharpest resolution",
     model: "fal-ai/wan-25-preview/image-to-video",
+    modelLabel: "Wan 2.5",
+    includesAudio: true,
     resolution: "1080p",
     durationSeconds: 5,
     apiCost: 0.75,
@@ -140,6 +153,8 @@ export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
     label: "Premium",
     blurb: "Best model quality",
     model: "bytedance/seedance-2.5/image-to-video",
+    modelLabel: "Seedance 2.5",
+    includesAudio: true,
     resolution: "720p",
     durationSeconds: 5,
     apiCost: 2.37,

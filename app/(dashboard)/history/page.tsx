@@ -9,6 +9,7 @@ import {
   List, Play, Search, SlidersHorizontal, Sparkles, Star, X,
 } from "lucide-react";
 import { useTemplates } from "@/lib/hooks/use-templates";
+import { VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
 import { formatTimeAgo, truncate } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -31,7 +32,8 @@ type FilterStatus = "all" | "completed" | "failed";
 
 type CombinedEntry = {
   id: string; prompt: string; status: "completed" | "processing" | "failed";
-  images: string[]; videoUrl: string | null; creditsUsed: number; aspectRatio: string;
+  images: string[]; videoUrl: string | null; videoQuality: VideoQuality | null;
+  creditsUsed: number; aspectRatio: string;
   createdAt: Date; templateId?: string;
 };
 
@@ -55,13 +57,14 @@ export default function HistoryPage() {
         const { generations: data } = await res.json();
         setAllGenerations(
           (data ?? []).map((g: { id: string; prompt: string | null; status: string; metadata: unknown; credit_cost: number | null; created_at: string }) => {
-            const meta = g.metadata as { images?: string[]; videoUrl?: string; aspectRatio?: string; templateId?: string };
+            const meta = g.metadata as { images?: string[]; videoUrl?: string; quality?: VideoQuality; aspectRatio?: string; templateId?: string };
             return {
               id: g.id,
               prompt: g.prompt ?? "",
               status: g.status as "completed" | "processing" | "failed",
               images: meta?.images ?? [],
               videoUrl: meta?.videoUrl ?? null,
+              videoQuality: meta?.quality ?? null,
               creditsUsed: g.credit_cost ?? 1,
               aspectRatio: meta?.aspectRatio ?? "1:1",
               createdAt: new Date(g.created_at),
@@ -500,7 +503,14 @@ export default function HistoryPage() {
                       <Download className="w-3.5 h-3.5" /> Download
                     </button>
                   </div>
-                ) : (
+                ) : null}
+                {selectedGen.videoUrl && selectedGen.videoQuality && (
+                  <p className="text-[10px] text-center -mt-2" style={{ color: W.dim }}>
+                    Generated with {VIDEO_TIERS[selectedGen.videoQuality].modelLabel}
+                    {VIDEO_TIERS[selectedGen.videoQuality].includesAudio && " · includes AI audio"}
+                  </p>
+                )}
+                {!selectedGen.videoUrl && (
                   /* Image grid */
                   <div className="grid grid-cols-2 gap-2">
                     {selectedGen.images.map((src, i) => (

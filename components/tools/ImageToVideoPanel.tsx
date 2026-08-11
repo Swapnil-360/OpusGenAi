@@ -197,6 +197,9 @@ export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelPro
                 >
                   <p className="text-[11px] font-bold" style={{ color: active ? W.red : W.text }}>{tier.label}</p>
                   <p className="text-[9px]" style={{ color: W.dim }}>{tier.blurb} · {tier.creditCost}cr</p>
+                  <p className="text-[9px] mt-0.5" style={{ color: active ? W.red : W.dim, opacity: 0.75 }}>
+                    {tier.modelLabel}{tier.includesAudio && " · AI audio"}
+                  </p>
                 </button>
               );
             })}
@@ -283,6 +286,7 @@ export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelPro
           <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin mb-3" />
           <p className="text-xs font-semibold" style={{ color: W.text }}>Creating your video…</p>
           <p className="text-[10px] mt-1" style={{ color: W.dim }}>Usually takes 1–2 minutes</p>
+          <p className="text-[9px] mt-2" style={{ color: W.dim }}>Generating with {VIDEO_TIERS[quality].modelLabel}</p>
         </div>
       )}
 
@@ -297,6 +301,9 @@ export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelPro
             className="w-full max-w-sm mx-auto rounded-xl block"
             style={{ border: `1px solid ${W.border}` }}
           />
+          <p className="text-[10px] text-center mt-2" style={{ color: W.dim }}>
+            Generated with {VIDEO_TIERS[quality].modelLabel}{VIDEO_TIERS[quality].includesAudio && " · includes AI audio"}
+          </p>
           <div className="flex gap-2 mt-3">
             <button
               onClick={() => downloadFile(videoUrl, "mp4")}

@@ -32,7 +32,12 @@ const CSP = [
   // same host pattern as img-src) — video played as a stuck 0:00 player with
   // no console CORS error, just a quietly dropped resource load.
   `media-src 'self' blob: https://fal.media https://*.fal.media`,
-  `connect-src 'self' https://unpkg.com https://va.vercel-scripts.com https://vitals.vercel-insights.com${supabaseHostname ? ` https://${supabaseHostname}` : ""}`,
+  // fal.media here (not just img-src) because every download button does
+  // fetch(src) to turn the remote file into a blob before saving it — img-src
+  // covers the <img>/<video> tag itself, connect-src covers that fetch() call.
+  // Missing this meant every download button for any fal-hosted image or
+  // video was silently broken app-wide, not just on History.
+  `connect-src 'self' https://unpkg.com https://va.vercel-scripts.com https://vitals.vercel-insights.com https://fal.media https://*.fal.media${supabaseHostname ? ` https://${supabaseHostname}` : ""}`,
   `upgrade-insecure-requests`,
 ].join("; ");
 

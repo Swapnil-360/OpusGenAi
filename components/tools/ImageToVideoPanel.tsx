@@ -18,7 +18,8 @@ const W = {
   redBorder: "rgba(220,38,38,0.30)",
 };
 
-const MOTION_EXAMPLES = ["Slow zoom in", "Gentle rotation", "Camera pan", "Subtle drift"];
+const STYLE_OPTIONS = ["Luxury / Premium", "Minimal / Clean", "Energetic / Dynamic", "Natural / Lifestyle", "Dramatic / Moody"];
+const MOVEMENT_OPTIONS = ["Slow Push-In", "Orbit / Rotate", "Pull-Back Reveal", "Static Drift"];
 const QUALITIES: VideoQuality[] = ["standard", "hd", "premium"];
 
 /** downloads any src (data: or remote) with the given extension, matching
@@ -45,6 +46,8 @@ interface ImageToVideoPanelProps {
 
 export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelProps) {
   const [quality, setQuality] = useState<VideoQuality>("standard");
+  const [style, setStyle] = useState(STYLE_OPTIONS[0]);
+  const [movement, setMovement] = useState(MOVEMENT_OPTIONS[0]);
   const [videoPrompt, setVideoPrompt] = useState("");
   const [videoStatus, setVideoStatus] = useState<"idle" | "processing" | "done" | "failed">("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -63,7 +66,7 @@ export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelPro
       const res = await fetch("/api/enhance-video-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl, hint: videoPrompt.trim() }),
+        body: JSON.stringify({ imageUrl, style, movement, hint: videoPrompt.trim() }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -199,8 +202,46 @@ export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelPro
             })}
           </div>
 
+          <p className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5" style={{ color: W.dim }}>Style</p>
+          <div className="flex flex-wrap gap-1.5">
+            {STYLE_OPTIONS.map((s) => {
+              const active = style === s;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setStyle(s)}
+                  className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
+                  style={active
+                    ? { border: `1px solid ${W.redBorder}`, background: W.redBg, color: W.red }
+                    : { border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+                >
+                  {s}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5" style={{ color: W.dim }}>Camera movement</p>
+          <div className="flex flex-wrap gap-1.5">
+            {MOVEMENT_OPTIONS.map((m) => {
+              const active = movement === m;
+              return (
+                <button
+                  key={m}
+                  onClick={() => setMovement(m)}
+                  className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
+                  style={active
+                    ? { border: `1px solid ${W.redBorder}`, background: W.redBg, color: W.red }
+                    : { border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+                >
+                  {m}
+                </button>
+              );
+            })}
+          </div>
+
           <div className="flex items-center justify-between mt-3 mb-1.5">
-            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: W.dim }}>Motion prompt</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: W.dim }}>Production prompt</p>
             <button
               onClick={enhancePrompt}
               disabled={enhancing}
@@ -212,31 +253,17 @@ export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelPro
               ) : (
                 <Wand2 className="w-2.5 h-2.5" />
               )}
-              {enhancing ? "Writing…" : "AI Suggest"}
+              {enhancing ? "Writing…" : "Write Production Prompt"}
             </button>
           </div>
           <textarea
             value={videoPrompt}
             onChange={(e) => setVideoPrompt(e.target.value)}
-            placeholder="Describe the motion — e.g. slow zoom in with soft camera drift… or tap AI Suggest for a professional ad-style prompt"
-            rows={3}
+            placeholder="Pick a style + camera movement above, then tap Write Production Prompt — or write your own detailed direction here."
+            rows={6}
             className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2.5 text-xs leading-relaxed placeholder:opacity-40"
             style={{ color: W.text, border: `1px solid ${W.border}`, background: W.glassDim }}
           />
-          <div className="flex flex-wrap items-center gap-1.5 mt-2">
-            {MOTION_EXAMPLES.map((label) => (
-              <button
-                key={label}
-                onClick={() => setVideoPrompt(label)}
-                className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.redBorder; e.currentTarget.style.color = W.red; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.border; e.currentTarget.style.color = W.muted; }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
           <motion.button
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.98 }}

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Clapperboard, Crown, Download, Lock, RefreshCw } from "lucide-react";
+import { Clapperboard, Crown, Download, Lock, RefreshCw, Wand2 } from "lucide-react";
 import { VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
 import { toast } from "sonner";
 
@@ -49,11 +49,35 @@ export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelPro
   const [videoStatus, setVideoStatus] = useState<"idle" | "processing" | "done" | "failed">("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [enhancing, setEnhancing] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
+
+  async function enhancePrompt() {
+    if (!imageUrl || enhancing) return;
+    setEnhancing(true);
+    try {
+      const res = await fetch("/api/enhance-video-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl, hint: videoPrompt.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "Couldn't generate a prompt. Try again.");
+        return;
+      }
+      setVideoPrompt(data.prompt);
+      toast.success("Professional prompt ready!");
+    } catch {
+      toast.error("Network error. Check your connection.");
+    } finally {
+      setEnhancing(false);
+    }
+  }
 
   function reset() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
@@ -175,12 +199,28 @@ export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelPro
             })}
           </div>
 
+          <div className="flex items-center justify-between mt-3 mb-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: W.dim }}>Motion prompt</p>
+            <button
+              onClick={enhancePrompt}
+              disabled={enhancing}
+              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-60"
+              style={{ color: W.red, background: W.redBg, border: `1px solid ${W.redBorder}` }}
+            >
+              {enhancing ? (
+                <div className="w-2.5 h-2.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+              ) : (
+                <Wand2 className="w-2.5 h-2.5" />
+              )}
+              {enhancing ? "Writing…" : "AI Suggest"}
+            </button>
+          </div>
           <textarea
             value={videoPrompt}
             onChange={(e) => setVideoPrompt(e.target.value)}
-            placeholder="Describe the motion — e.g. slow zoom in with soft camera drift…"
-            rows={2}
-            className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2.5 text-xs leading-relaxed placeholder:opacity-40 mt-3"
+            placeholder="Describe the motion — e.g. slow zoom in with soft camera drift… or tap AI Suggest for a professional ad-style prompt"
+            rows={3}
+            className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2.5 text-xs leading-relaxed placeholder:opacity-40"
             style={{ color: W.text, border: `1px solid ${W.border}`, background: W.glassDim }}
           />
           <div className="flex flex-wrap items-center gap-1.5 mt-2">

@@ -212,39 +212,39 @@ export default function TemplatesPage() {
               role="dialog"
               aria-modal="true"
               aria-labelledby="template-modal-title"
-              className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-3xl shadow-2xl z-10"
+              className="relative w-full max-w-4xl max-h-[90vh] md:h-[68vh] overflow-hidden rounded-3xl shadow-2xl z-10 flex flex-col md:flex-row"
               style={{ background: "#0d0303", border: `1px solid ${W.border}` }}
             >
-              {/* Cover — full image, not cropped. Forcing every cover into a
-                  16:9 object-cover box was cutting off anything shot at a
-                  different aspect ratio; object-contain shows the whole
-                  image, capped by max-height so a very tall one doesn't
-                  blow out the modal. Letterbox bars use the modal's own
-                  background so they read as intentional, not a bug. */}
-              <div className="relative flex items-center justify-center" style={{ background: "#0d0303" }}>
+              {/* Close sits on the modal (not the image) so it lands correctly
+                  in both the stacked and side-by-side layouts. */}
+              <button onClick={() => setPreview(null)} aria-label="Close"
+                className="absolute top-3 right-3 z-20 w-9 h-9 rounded-xl backdrop-blur-sm flex items-center justify-center transition-colors"
+                style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Image pane — object-contain against an accent-tinted backdrop,
+                  so a square/portrait cover is shown whole rather than cropped,
+                  and the leftover space reads as an intentional preview mat.
+                  Fixed pane width/height on desktop means the modal's own size
+                  no longer swings with each cover's aspect ratio. */}
+              <div
+                className="relative shrink-0 md:w-[55%] md:h-full flex items-center justify-center p-3 md:p-5"
+                style={{ background: `linear-gradient(155deg, ${preview.accentColor}1f 0%, #0a0202 80%)` }}
+              >
                 {preview.coverImageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={preview.coverImageUrl}
                     alt={preview.name}
-                    className="w-full max-h-[65vh] object-contain block"
+                    className="max-w-full max-h-[34vh] md:max-h-full object-contain rounded-xl"
                   />
                 ) : (
-                  <div
-                    className="w-full aspect-video flex items-center justify-center"
-                    style={{ background: `linear-gradient(160deg, ${preview.accentColor}30 0%, #0d0303 80%)` }}
-                  >
-                    <span className="text-[11px]" style={{ color: W.dim }}>Preview generating…</span>
-                  </div>
+                  <span className="text-[11px] py-16" style={{ color: W.dim }}>Preview generating…</span>
                 )}
-                <button onClick={() => setPreview(null)} aria-label="Close"
-                  className="absolute top-3 right-3 w-9 h-9 rounded-xl backdrop-blur-sm flex items-center justify-center transition-colors"
-                  style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "#fff")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
-                >
-                  <X className="w-4 h-4" />
-                </button>
                 {preview.isPro && (
                   <div className="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/70 backdrop-blur-md" style={{ border: "1px solid rgba(251,191,36,0.4)" }}>
                     <Crown className="w-3.5 h-3.5 text-amber-400" />
@@ -253,70 +253,70 @@ export default function TemplatesPage() {
                 )}
               </div>
 
-              {/* Body */}
-              <div className="px-6 pb-6 -mt-2">
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div>
-                    <h2 id="template-modal-title" className="text-xl font-black tracking-tight" style={{ color: W.text }}>{preview.name}</h2>
-                    <p className="text-sm mt-0.5" style={{ color: W.muted }}>{preview.description}</p>
-                  </div>
-                  <span className="mt-1 shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full"
-                    style={{ background: `${preview.accentColor}20`, color: preview.accentColor, border: `1px solid ${preview.accentColor}35` }}>
-                    {preview.category}
-                  </span>
-                </div>
-
-                {/* Prompt — capped height with internal scroll so a long prompt
-                    (up to 4000 chars now) can't push the buttons/tags below
-                    out of the initial view; the cover image above is what
-                    should be immediately visible, not a wall of text. */}
-                <div className="mb-5 p-3 rounded-xl" style={{ background: W.glass, border: `1px solid ${W.border}` }}>
-                  <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: W.dim }}>Prompt Applied</p>
-                  <p className="text-xs leading-relaxed font-mono max-h-24 overflow-y-auto pr-1" style={{ color: W.muted }}>…{preview.prompt}</p>
-                </div>
-
-                {/* Tags */}
-                <div className="flex flex-wrap gap-1.5 mb-5">
-                  {preview.tags.map((tag) => (
-                    <span key={tag} className="text-xs rounded-lg px-2.5 py-1 font-medium"
-                      style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.muted }}>
-                      {tag}
+              {/* Details pane — scrolls internally, so the action buttons stay
+                  pinned and visible no matter how long the prompt is. */}
+              <div className="flex flex-col min-h-0 flex-1">
+                <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar px-5 sm:px-6 pt-5 sm:pt-6">
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <div className="min-w-0">
+                      <h2 id="template-modal-title" className="text-xl font-black tracking-tight" style={{ color: W.text }}>{preview.name}</h2>
+                      <p className="text-sm mt-0.5" style={{ color: W.muted }}>{preview.description}</p>
+                    </div>
+                    <span className="mt-1 shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full"
+                      style={{ background: `${preview.accentColor}20`, color: preview.accentColor, border: `1px solid ${preview.accentColor}35` }}>
+                      {preview.category}
                     </span>
-                  ))}
+                  </div>
+
+                  <div className="mb-4 p-3 rounded-xl" style={{ background: W.glass, border: `1px solid ${W.border}` }}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: W.dim }}>Prompt Applied</p>
+                    <p className="text-xs leading-relaxed font-mono" style={{ color: W.muted }}>…{preview.prompt}</p>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 pb-5">
+                    {preview.tags.map((tag) => (
+                      <span key={tag} className="text-xs rounded-lg px-2.5 py-1 font-medium"
+                        style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.muted }}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex gap-2.5">
-                  <button
-                    onClick={() => setPreview(null)}
-                    className="flex-1 h-11 rounded-xl font-semibold text-sm transition-all"
-                    style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = W.glassDim; e.currentTarget.style.color = W.text; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = W.glass; e.currentTarget.style.color = W.muted; }}
-                  >
-                    Cancel
-                  </button>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => { setPreview(null); applyTemplate(preview); }}
-                    className="flex-1 h-11 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all"
-                    style={preview.isPro ? { background: "#f59e0b" } : { background: "#dc2626" }}
-                  >
-                    {preview.isPro ? (
-                      <><Crown className="w-4 h-4" />Use Template</>
-                    ) : (
-                      <><Sparkles className="w-4 h-4" />Use Template</>
-                    )}
-                  </motion.button>
-                </div>
+                <div className="shrink-0 px-5 sm:px-6 py-4" style={{ borderTop: `1px solid ${W.border}` }}>
+                  <div className="flex gap-2.5">
+                    <button
+                      onClick={() => setPreview(null)}
+                      className="flex-1 h-11 rounded-xl font-semibold text-sm transition-all"
+                      style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = W.glassDim; e.currentTarget.style.color = W.text; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = W.glass; e.currentTarget.style.color = W.muted; }}
+                    >
+                      Cancel
+                    </button>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => { setPreview(null); applyTemplate(preview); }}
+                      className="flex-1 h-11 rounded-xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all"
+                      style={preview.isPro ? { background: "#f59e0b" } : { background: "#dc2626" }}
+                    >
+                      {preview.isPro ? (
+                        <><Crown className="w-4 h-4" />Use Template</>
+                      ) : (
+                        <><Sparkles className="w-4 h-4" />Use Template</>
+                      )}
+                    </motion.button>
+                  </div>
 
-                {preview.isPro && (
-                  <p className="text-[11px] text-center mt-3 flex items-center justify-center gap-1" style={{ color: W.dim }}>
-                    <Lock className="w-3 h-3" />
-                    Requires Pro plan ·{" "}
-                    <span className="font-semibold" style={{ color: W.muted }}>Pro plans coming soon</span>
-                  </p>
-                )}
+                  {preview.isPro && (
+                    <p className="text-[11px] text-center mt-3 flex items-center justify-center gap-1" style={{ color: W.dim }}>
+                      <Lock className="w-3 h-3" />
+                      Requires Pro plan ·{" "}
+                      <span className="font-semibold" style={{ color: W.muted }}>Pro plans coming soon</span>
+                    </p>
+                  )}
+                </div>
               </div>
             </motion.div>
           </motion.div>

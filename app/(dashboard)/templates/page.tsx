@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Crown, Layers, Lock, Search, Sparkles, X } from "lucide-react";
@@ -216,19 +215,28 @@ export default function TemplatesPage() {
               className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto no-scrollbar rounded-3xl shadow-2xl z-10"
               style={{ background: "#0d0303", border: `1px solid ${W.border}` }}
             >
-              {/* Cover */}
-              <div className="relative aspect-video overflow-hidden" style={{ background: W.glass }}>
+              {/* Cover — full image, not cropped. Forcing every cover into a
+                  16:9 object-cover box was cutting off anything shot at a
+                  different aspect ratio; object-contain shows the whole
+                  image, capped by max-height so a very tall one doesn't
+                  blow out the modal. Letterbox bars use the modal's own
+                  background so they read as intentional, not a bug. */}
+              <div className="relative flex items-center justify-center" style={{ background: "#0d0303" }}>
                 {preview.coverImageUrl ? (
-                  <Image src={preview.coverImageUrl} alt={preview.name} fill sizes="(max-width: 768px) 100vw, 672px" className="object-cover" />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={preview.coverImageUrl}
+                    alt={preview.name}
+                    className="w-full max-h-[65vh] object-contain block"
+                  />
                 ) : (
                   <div
-                    className="absolute inset-0 flex items-center justify-center"
+                    className="w-full aspect-video flex items-center justify-center"
                     style={{ background: `linear-gradient(160deg, ${preview.accentColor}30 0%, #0d0303 80%)` }}
                   >
                     <span className="text-[11px]" style={{ color: W.dim }}>Preview generating…</span>
                   </div>
                 )}
-                <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 0%, #0d0303 100%)" }} />
                 <button onClick={() => setPreview(null)} aria-label="Close"
                   className="absolute top-3 right-3 w-9 h-9 rounded-xl backdrop-blur-sm flex items-center justify-center transition-colors"
                   style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.7)" }}

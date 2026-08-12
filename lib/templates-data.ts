@@ -3,7 +3,7 @@
 // for the fetch. This file only holds the shared type and static UI metadata
 // (category chip labels), not the template rows themselves.
 
-export type TemplateType = "production" | "universal";
+export type TemplateType = "production" | "universal" | "campaign";
 
 export interface Template {
   id: string;
@@ -52,6 +52,17 @@ export const UNIVERSAL_CATEGORIES: { id: string; label: string }[] = [
   { id: "editorial", label: "Editorial" },
   { id: "monochrome", label: "Monochrome" },
   { id: "outdoor", label: "Outdoor" },
+];
+
+// Campaign templates are full brand-advertising scenes rather than a single
+// clean product shot — retail environments, out-of-home billboards, multipack
+// packaging, lifestyle groups. Their own category vocabulary again.
+export const CAMPAIGN_CATEGORIES: { id: string; label: string }[] = [
+  { id: "all", label: "All Templates" },
+  { id: "lifestyle", label: "Lifestyle" },
+  { id: "packaging", label: "Packaging" },
+  { id: "outdoor", label: "Out-of-Home" },
+  { id: "identity", label: "Brand Identity" },
 ];
 
 export function getTemplateById(templates: Template[], id: string): Template | undefined {

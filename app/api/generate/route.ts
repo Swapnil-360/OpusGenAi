@@ -4,7 +4,7 @@ import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { getUserPlan } from "@/lib/entitlements";
 import { QUALITY_TIERS, canUseQuality, type Quality } from "@/lib/plans";
-import { buildScenePrompt, buildProductEditPrompt, buildPortraitEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
+import { buildScenePrompt, buildProductEditPrompt, buildPortraitEditPrompt, buildCampaignEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
 import { rejectIfBot } from "@/lib/bot-protect";
 
 const CREDIT_COST = 1;
@@ -67,8 +67,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Product photo is required for this mode." }, { status: 400 });
       }
       const imageUrl = await uploadDataUrlToFal(inputImage);
-      const editPrompt = templateType === "universal"
-        ? buildPortraitEditPrompt(prompt.trim())
+      const editPrompt =
+        templateType === "universal" ? buildPortraitEditPrompt(prompt.trim())
+        : templateType === "campaign" ? buildCampaignEditPrompt(prompt.trim())
         : buildProductEditPrompt(prompt.trim());
       const result = await fal.subscribe(tier.model, {
         input: {

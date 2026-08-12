@@ -28,3 +28,14 @@ export function buildProductEditPrompt(userPrompt: string): string {
 export function buildPortraitEditPrompt(userPrompt: string): string {
   return `${userPrompt}. Keep the person's exact face, likeness, facial features, expression, skin tone, and hair completely accurate and unchanged. Remove any other people or distracting background clutter — show only this one person as a clean, professional portrait photo.`;
 }
+
+// Campaign path: full brand-campaign scenes — billboards, retail environments,
+// multipack packaging, groups of people holding the product. These deliberately
+// omit buildProductEditPrompt's "remove any other objects… show only this single
+// product" clause, which would directly contradict the entire point of the shot
+// (a crowd at a checkout counter, a 4-pack carrier, an out-of-home billboard).
+// Brand fidelity is still enforced — that's the part that actually matters when
+// the model redraws packaging.
+export function buildCampaignEditPrompt(userPrompt: string): string {
+  return `${userPrompt}. Keep the product's packaging design, label, logo, brand colours, and all visible text completely accurate and unchanged — no distortion, warping, or invented branding.`;
+}

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Crown, Layers, Lock, Search, Sparkles, X } from "lucide-react";
 import {
-  PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, getTemplatesByCategory,
+  PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, CAMPAIGN_CATEGORIES, getTemplatesByCategory,
   type Template, type TemplateType,
 } from "@/lib/templates-data";
 import { useTemplates } from "@/lib/hooks/use-templates";
@@ -30,6 +30,7 @@ const W = {
 const TYPES: { id: TemplateType; label: string; hint: string }[] = [
   { id: "production", label: "Production", hint: "For your product photos" },
   { id: "universal", label: "Universal", hint: "For your own photos" },
+  { id: "campaign", label: "Campaign", hint: "Full brand ad scenes" },
 ];
 
 export default function TemplatesPage() {
@@ -40,7 +41,10 @@ export default function TemplatesPage() {
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<Template | null>(null);
 
-  const categories = activeType === "production" ? PRODUCTION_CATEGORIES : UNIVERSAL_CATEGORIES;
+  const categories =
+    activeType === "production" ? PRODUCTION_CATEGORIES
+    : activeType === "campaign" ? CAMPAIGN_CATEGORIES
+    : UNIVERSAL_CATEGORIES;
   const byType = templates.filter((t) => t.templateType === activeType);
 
   useEffect(() => {

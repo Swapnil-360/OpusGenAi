@@ -41,7 +41,7 @@ import {
   type BannerMode,
   type WelcomeConfig,
 } from "@/lib/admin-config";
-import { PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, type Template, type TemplateType } from "@/lib/templates-data";
+import { PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, CAMPAIGN_CATEGORIES, type Template, type TemplateType } from "@/lib/templates-data";
 import { type Plan } from "@/lib/plans";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { createClient } from "@/lib/supabase/client";
@@ -1047,7 +1047,7 @@ export default function AdminPage() {
                   <div>
                     <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Type</label>
                     <div className="flex gap-2">
-                      {(["production", "universal"] as const).map((t) => (
+                      {(["production", "universal", "campaign"] as const).map((t) => (
                         <button key={t} onClick={() => setTemplateForm((f) => f && { ...f, templateType: t })}
                           className="flex-1 h-9 rounded-xl text-xs font-semibold capitalize transition-all"
                           style={templateForm.templateType === t
@@ -1065,7 +1065,9 @@ export default function AdminPage() {
                       placeholder="e.g. luxury, professional"
                       className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
                     <datalist id="template-category-options">
-                      {(templateForm.templateType === "production" ? PRODUCTION_CATEGORIES : UNIVERSAL_CATEGORIES)
+                      {(templateForm.templateType === "production" ? PRODUCTION_CATEGORIES
+                        : templateForm.templateType === "campaign" ? CAMPAIGN_CATEGORIES
+                        : UNIVERSAL_CATEGORIES)
                         .filter((c) => c.id !== "all")
                         .map((c) => <option key={c.id} value={c.id} />)}
                     </datalist>
@@ -1151,7 +1153,12 @@ export default function AdminPage() {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <p className="text-sm font-semibold truncate" style={{ color: T.text }}>{tpl.name}</p>
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ background: `${tpl.accentColor}20`, color: tpl.accentColor }}>{tpl.category}</span>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ background: tpl.templateType === "universal" ? "rgba(56,189,248,0.12)" : "rgba(255,255,255,0.06)", color: tpl.templateType === "universal" ? T.blue : T.muted }}>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase"
+                        style={
+                          tpl.templateType === "universal" ? { background: "rgba(56,189,248,0.12)", color: T.blue }
+                          : tpl.templateType === "campaign" ? { background: "rgba(167,139,250,0.14)", color: "#a78bfa" }
+                          : { background: "rgba(255,255,255,0.06)", color: T.muted }
+                        }>
                         {tpl.templateType}
                       </span>
                       {tpl.isPro && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>PRO</span>}

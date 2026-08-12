@@ -60,6 +60,11 @@ export const UNIVERSAL_CATEGORIES: { id: string; label: string }[] = [
 export const CAMPAIGN_CATEGORIES: { id: string; label: string }[] = [
   { id: "all", label: "All Templates" },
   { id: "lifestyle", label: "Lifestyle" },
+  { id: "skincare", label: "Skincare" },
+  { id: "makeup", label: "Makeup" },
+  { id: "fragrance", label: "Fragrance" },
+  { id: "haircare", label: "Hair Care" },
+  { id: "bodycare", label: "Body Care" },
   { id: "packaging", label: "Packaging" },
   { id: "outdoor", label: "Out-of-Home" },
   { id: "identity", label: "Brand Identity" },

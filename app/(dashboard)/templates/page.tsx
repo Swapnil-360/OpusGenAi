@@ -258,10 +258,13 @@ export default function TemplatesPage() {
                   </span>
                 </div>
 
-                {/* Prompt */}
+                {/* Prompt — capped height with internal scroll so a long prompt
+                    (up to 4000 chars now) can't push the buttons/tags below
+                    out of the initial view; the cover image above is what
+                    should be immediately visible, not a wall of text. */}
                 <div className="mb-5 p-3 rounded-xl" style={{ background: W.glass, border: `1px solid ${W.border}` }}>
                   <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: W.dim }}>Prompt Applied</p>
-                  <p className="text-xs leading-relaxed font-mono" style={{ color: W.muted }}>…{preview.prompt}</p>
+                  <p className="text-xs leading-relaxed font-mono max-h-24 overflow-y-auto pr-1" style={{ color: W.muted }}>…{preview.prompt}</p>
                 </div>
 
                 {/* Tags */}

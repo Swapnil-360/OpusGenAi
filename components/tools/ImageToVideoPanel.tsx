@@ -42,17 +42,19 @@ interface ImageToVideoPanelProps {
    *  UI affordance only. The server independently re-checks entitlement on
    *  every request; this value is never trusted for cost. */
   isEntitled: boolean;
-  /** Pre-fills the motion prompt — used when arriving from a video template
-   *  (/tools/image-to-video?template=<id>). Only seeds the initial value; the
-   *  user edits freely from there. */
-  initialPrompt?: string;
+  /** Video template applied via /tools/image-to-video?template=<id>. Its
+   *  prompt is never sent to the browser — only the id (forwarded to the
+   *  server, which resolves the real prompt) and the [FIELD] labels it needs
+   *  the user to fill in. */
+  template?: { id: string; name: string; placeholders: string[] } | null;
 }
 
-export function ImageToVideoPanel({ imageUrl, isEntitled, initialPrompt }: ImageToVideoPanelProps) {
+export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVideoPanelProps) {
   const [quality, setQuality] = useState<VideoQuality>("standard");
   const [style, setStyle] = useState(STYLE_OPTIONS[0]);
   const [movement, setMovement] = useState(MOVEMENT_OPTIONS[0]);
-  const [videoPrompt, setVideoPrompt] = useState(initialPrompt ?? "");
+  const [videoPrompt, setVideoPrompt] = useState("");
+  const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
   const [videoStatus, setVideoStatus] = useState<"idle" | "processing" | "done" | "failed">("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
@@ -91,10 +93,10 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, initialPrompt }: Image
     setVideoStatus("idle");
     setVideoUrl(null);
     setVideoError(null);
-    // Back to the template's prompt when one was supplied, rather than blank —
-    // "Try another motion" after arriving from a template shouldn't silently
-    // throw that template away.
-    setVideoPrompt(initialPrompt ?? "");
+    // The template itself (and its filled-in fields) survives — only the
+    // user's extra direction is cleared, so "Try another motion" after
+    // arriving from a template doesn't silently throw that template away.
+    setVideoPrompt("");
   }
 
   function pollStatus(generationId: string) {
@@ -130,6 +132,11 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, initialPrompt }: Image
       });
       return;
     }
+    const missing = (template?.placeholders ?? []).filter((p) => !placeholderValues[p]?.trim());
+    if (missing.length > 0) {
+      toast.error(`Fill in ${missing.join(", ")} before generating.`);
+      return;
+    }
     setVideoStatus("processing");
     setVideoError(null);
     setVideoUrl(null);
@@ -138,7 +145,13 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, initialPrompt }: Image
       const res = await fetch("/api/generate-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl, prompt: videoPrompt.trim(), quality }),
+        body: JSON.stringify({
+          imageUrl,
+          prompt: videoPrompt.trim(),
+          templateId: template?.id,
+          placeholderValues,
+          quality,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -212,6 +225,55 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, initialPrompt }: Image
             })}
           </div>
 
+          {/* With a template applied its prompt IS the direction — the style /
+              movement pickers and the AI prompt writer would only fight it, so
+              they're replaced by the template card and whatever fields it needs. */}
+          {template ? (
+            <>
+              <div className="mt-3 rounded-xl p-3" style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}>
+                <div className="flex items-start gap-2.5">
+                  <Clapperboard className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: W.red }} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold" style={{ color: W.text }}>{template.name}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>
+                      Motion direction is applied automatically.
+                    </p>
+                  </div>
+                </div>
+
+                {template.placeholders.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: W.dim }}>
+                      This template needs
+                    </p>
+                    {template.placeholders.map((field) => (
+                      <input
+                        key={field}
+                        value={placeholderValues[field] ?? ""}
+                        onChange={(e) => setPlaceholderValues((v) => ({ ...v, [field]: e.target.value }))}
+                        placeholder={field.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                        className="w-full h-8 px-2.5 rounded-lg text-xs outline-none"
+                        style={{ background: W.glassDim, border: `1px solid ${W.border}`, color: W.text }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <p className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5" style={{ color: W.dim }}>
+                Anything to add? (optional)
+              </p>
+              <textarea
+                value={videoPrompt}
+                onChange={(e) => setVideoPrompt(e.target.value)}
+                placeholder="e.g. keep the background darker, slow the motion down…"
+                rows={3}
+                className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2.5 text-xs leading-relaxed placeholder:opacity-40"
+                style={{ color: W.text, border: `1px solid ${W.border}`, background: W.glassDim }}
+              />
+            </>
+          ) : (
+          <>
           <p className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5" style={{ color: W.dim }}>Style</p>
           <div className="flex flex-wrap gap-1.5">
             {STYLE_OPTIONS.map((s) => {
@@ -274,6 +336,8 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, initialPrompt }: Image
             className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2.5 text-xs leading-relaxed placeholder:opacity-40"
             style={{ color: W.text, border: `1px solid ${W.border}`, background: W.glassDim }}
           />
+          </>
+          )}
           <motion.button
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.98 }}

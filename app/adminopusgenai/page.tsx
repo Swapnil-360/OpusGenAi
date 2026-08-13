@@ -43,7 +43,6 @@ import {
 } from "@/lib/admin-config";
 import { PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, CAMPAIGN_CATEGORIES, VIDEO_CATEGORIES, type Template, type TemplateType } from "@/lib/templates-data";
 import { type Plan } from "@/lib/plans";
-import { useTemplates } from "@/lib/hooks/use-templates";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
@@ -134,7 +133,35 @@ const EMPTY_TEMPLATE_FORM: TemplateFormState = {
   sortOrder: 0,
 };
 
-function templateToForm(tpl: Template): TemplateFormState {
+// Template prompts are stripped from the user-facing API (the column is
+// revoked from anon and authenticated alike), but the admin panel exists to
+// edit them — so it reads /api/admin/templates, which serves the real prompt
+// behind an admin check.
+type AdminTemplate = Omit<Template, "placeholders"> & { prompt: string };
+
+function rowToAdminTemplate(row: {
+  id: string; name: string; template_type: TemplateType; category: string;
+  description: string; tags: string[] | null; prompt: string;
+  cover_image_url: string | null; preview_video_url: string | null;
+  accent_color: string; is_pro: boolean; sort_order: number;
+}): AdminTemplate {
+  return {
+    id: row.id,
+    name: row.name,
+    templateType: row.template_type,
+    category: row.category,
+    description: row.description,
+    tags: row.tags ?? [],
+    prompt: row.prompt,
+    coverImageUrl: row.cover_image_url,
+    previewVideoUrl: row.preview_video_url,
+    accentColor: row.accent_color,
+    isPro: row.is_pro,
+    sortOrder: row.sort_order,
+  };
+}
+
+function templateToForm(tpl: AdminTemplate): TemplateFormState {
   return {
     id: tpl.id,
     name: tpl.name,
@@ -208,7 +235,25 @@ export default function AdminPage() {
   const [dataError, setDataError] = useState(false);
 
   // ── templates tab state ──────────────────────────────────────────────────────
-  const { templates, loading: templatesLoading, refetch: refetchTemplates } = useTemplates({ withPrompts: true });
+  const [templates, setTemplates] = useState<AdminTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [templatesReloadKey, setTemplatesReloadKey] = useState(0);
+  const refetchTemplates = () => setTemplatesReloadKey((k) => k + 1);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTemplatesLoading(true);
+    fetch("/api/admin/templates", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { templates: [] }))
+      .then((data) => {
+        if (cancelled) return;
+        setTemplates((data.templates ?? []).map(rowToAdminTemplate));
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setTemplatesLoading(false); });
+    return () => { cancelled = true; };
+  }, [templatesReloadKey]);
+
   const [templateForm, setTemplateForm] = useState<TemplateFormState | null>(null); // null = form closed
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);

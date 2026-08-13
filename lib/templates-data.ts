@@ -12,7 +12,11 @@ export interface Template {
   category: string;
   description: string;
   tags: string[];
-  prompt: string;
+  /** The [FIELD] labels this template needs the user to fill in (e.g.
+   *  "YOUR BRAND"). The prompt itself is never sent to the browser — it's
+   *  resolved server-side from the template id at generation time — so this
+   *  is what lets the UI collect the required values without exposing it. */
+  placeholders: string[];
   coverImageUrl: string | null;
   /** Video templates only — a short looping preview clip. Null until one has
    *  been generated, in which case coverImageUrl acts as the poster frame. */

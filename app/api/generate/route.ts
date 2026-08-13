@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { resolveTemplatePrompt } from "@/lib/template-prompt";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { getUserPlan } from "@/lib/entitlements";
@@ -14,11 +16,16 @@ const CREDIT_COST = 1;
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, ratio = "1:1", templateId, templateType, mode, image: inputImage, quality: rawQuality } = await req.json();
-
-    if (!prompt?.trim()) {
-      return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
-    }
+    const {
+      prompt: userPrompt = "",
+      ratio = "1:1",
+      templateId,
+      templateType: rawTemplateType,
+      placeholderValues,
+      mode,
+      image: inputImage,
+      quality: rawQuality,
+    } = await req.json();
 
     // ── Auth + credit check ──
     const supabase = await createClient();
@@ -30,6 +37,37 @@ export async function POST(req: NextRequest) {
 
     const botResponse = await rejectIfBot();
     if (botResponse) return botResponse;
+
+    // The template's prompt is never sent to the browser (the column is
+    // revoked from anon and authenticated alike) — it's looked up here from
+    // the id, placeholders filled from the user's answers, and whatever extra
+    // direction they typed appended. Without a template, the user's own text
+    // is the whole prompt.
+    let prompt = String(userPrompt);
+    let templateType = rawTemplateType;
+    if (templateId) {
+      const admin = createAdminClient();
+      const { data: tpl } = await admin
+        .from("templates")
+        .select("prompt, template_type")
+        .eq("id", templateId)
+        .single();
+      if (!tpl) {
+        return NextResponse.json({ error: "That template no longer exists." }, { status: 400 });
+      }
+      // Trusted from the row, not the request — a client can't relabel a
+      // template to get a different prompt-fidelity suffix applied.
+      templateType = tpl.template_type;
+      prompt = resolveTemplatePrompt(
+        tpl.prompt,
+        typeof placeholderValues === "object" && placeholderValues ? placeholderValues : {},
+        String(userPrompt)
+      );
+    }
+
+    if (!prompt.trim()) {
+      return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
+    }
 
     const isPremium = mode === "premium";
     // Quality only applies to the premium (image-preserving edit) path —

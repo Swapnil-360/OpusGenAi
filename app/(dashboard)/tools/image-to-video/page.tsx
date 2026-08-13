@@ -40,7 +40,7 @@ export default function ImageToVideoPage() {
 
 function ImageToVideoPageInner() {
   const searchParams = useSearchParams();
-  const { templates } = useTemplates({ withPrompts: true });
+  const { templates } = useTemplates({ authenticated: true });
   const templateId = searchParams.get("template");
   const activeTemplate = templateId ? templates.find((t) => t.id === templateId) : undefined;
 
@@ -244,7 +244,9 @@ function ImageToVideoPageInner() {
               key={activeTemplate?.id ?? "none"}
               imageUrl={sourceImageUrl}
               isEntitled={isEntitled}
-              initialPrompt={activeTemplate?.prompt}
+              template={activeTemplate
+                ? { id: activeTemplate.id, name: activeTemplate.name, placeholders: activeTemplate.placeholders }
+                : null}
             />
           </div>
         )}

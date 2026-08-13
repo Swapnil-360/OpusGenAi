@@ -174,7 +174,7 @@ export default function GeneratePage() {
 
 function GeneratePageInner() {
   const searchParams = useSearchParams();
-  const { templates } = useTemplates({ withPrompts: true });
+  const { templates } = useTemplates({ authenticated: true });
   const [prompt, setPrompt] = useState("");
   const [promptFocused, setPromptFocused] = useState(false);
   const [selectedSize, setSelectedSize] = useState<SizePreset>(SIZE_PRESETS[0]);
@@ -182,6 +182,9 @@ function GeneratePageInner() {
   const [showAiMenu, setShowAiMenu] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  // Values for a template's [FIELD] placeholders — the only template text the
+  // user supplies, since the prompt itself stays server-side.
+  const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
   const [genStatus, setGenStatus] = useState<"idle" | "processing" | "done">("idle");
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
@@ -297,7 +300,7 @@ function GeneratePageInner() {
         prompt: prompt.trim(),
         ratio: selectedSize.ratio,
         templateId: selectedTemplate,
-        templateType: appliedTemplate?.templateType,
+        placeholderValues,
         mode: "premium",
         quality,
         image: imageDataUrl,
@@ -326,7 +329,7 @@ function GeneratePageInner() {
         prompt: prompt.trim(),
         ratio: selectedSize.ratio,
         templateId: selectedTemplate,
-        templateType: appliedTemplate?.templateType,
+        placeholderValues,
       }),
     });
 
@@ -344,7 +347,15 @@ function GeneratePageInner() {
 
   async function handleGenerate() {
     if (genStatus === "processing") return;
-    if (!prompt.trim()) { toast.error("Type a prompt first."); return; }
+    // With a template applied the prompt lives server-side, so the textarea is
+    // optional — but any [FIELD] the template needs must be answered, or the
+    // model would render the placeholder label as literal text.
+    if (!selectedTemplate && !prompt.trim()) { toast.error("Type a prompt first."); return; }
+    const missing = (appliedTemplate?.placeholders ?? []).filter((p) => !placeholderValues[p]?.trim());
+    if (missing.length > 0) {
+      toast.error(`Fill in ${missing.join(", ")} before generating.`);
+      return;
+    }
     closeAll();
     setGenStatus("processing");
     setGeneratedImage(null);
@@ -369,11 +380,14 @@ function GeneratePageInner() {
     }
   }
 
+  // The template's prompt is never sent to the browser — applying one just
+  // records the id (sent to /api/generate, which resolves the real prompt
+  // server-side). The textarea stays the user's own optional additions.
   function handleSelectTemplate(id: string) {
     const tpl = templates.find((t) => t.id === id);
     if (!tpl) return;
     setSelectedTemplate(id);
-    setPrompt(tpl.prompt);
+    setPlaceholderValues({});
     setShowTemplatePicker(false);
     toast.success(`Template applied: ${tpl.name}`);
   }
@@ -511,13 +525,56 @@ function GeneratePageInner() {
                 </div>
               )}
 
+              {/* Applied template — the prompt behind it stays server-side, so
+                  this shows what's active and collects only the fields the
+                  template genuinely needs from the user. */}
+              {appliedTemplate && (
+                <div className="mx-4 mt-3 rounded-xl p-3" style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}>
+                  <div className="flex items-start gap-2.5">
+                    <Layers className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: W.red }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold" style={{ color: W.text }}>{appliedTemplate.name}</p>
+                      <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>{appliedTemplate.description}</p>
+                    </div>
+                    <button
+                      onClick={() => { setSelectedTemplate(null); setPlaceholderValues({}); }}
+                      className="shrink-0 p-1 rounded-md transition-opacity opacity-60 hover:opacity-100"
+                      style={{ color: W.muted }}
+                      aria-label="Remove template"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {appliedTemplate.placeholders.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: W.dim }}>
+                        This template needs
+                      </p>
+                      {appliedTemplate.placeholders.map((field) => (
+                        <input
+                          key={field}
+                          value={placeholderValues[field] ?? ""}
+                          onChange={(e) => setPlaceholderValues((v) => ({ ...v, [field]: e.target.value }))}
+                          placeholder={field.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                          className="w-full h-8 px-2.5 rounded-lg text-xs outline-none"
+                          style={{ background: W.glassDim, border: `1px solid ${W.border}`, color: W.text }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onFocus={() => setPromptFocused(true)}
                 onBlur={() => setPromptFocused(false)}
-                rows={6}
-                placeholder={refFile
+                rows={appliedTemplate ? 3 : 6}
+                placeholder={appliedTemplate
+                  ? "Anything to add? (optional) — e.g. use a darker background, add soft rim lighting…"
+                  : refFile
                   ? "Describe the full scene you want — e.g. on white marble surface with soft morning light, e-commerce product photography…"
                   : "Describe your product scene — e.g. luxury perfume bottle on black marble with cinematic side lighting, editorial style…"}
                 className="w-full bg-transparent resize-none outline-none px-4 pt-4 pb-2 text-sm leading-relaxed placeholder:opacity-35"

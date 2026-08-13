@@ -36,7 +36,7 @@ const TYPES: { id: TemplateType; label: string; hint: string }[] = [
 
 export default function TemplatesPage() {
   const router = useRouter();
-  const { templates, loading, error, refetch } = useTemplates({ withPrompts: true });
+  const { templates, loading, error, refetch } = useTemplates({ authenticated: true });
   const [activeType, setActiveType] = useState<TemplateType>("production");
   const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");

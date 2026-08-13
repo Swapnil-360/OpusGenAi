@@ -5,6 +5,7 @@ import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, refundCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { getUserPlan } from "@/lib/entitlements";
 import { VIDEO_TIERS, canUseVideoQuality, type VideoQuality } from "@/lib/plans";
+import { resolveTemplatePrompt } from "@/lib/template-prompt";
 import { rejectIfBot } from "@/lib/bot-protect";
 
 const DEFAULT_MOTION_PROMPT = "smooth cinematic camera motion, subtle zoom, natural movement";
@@ -13,7 +14,7 @@ const FAL_URL_RE = /^https:\/\/[^/]*fal\.(media|ai|run)\//;
 
 export async function POST(req: NextRequest) {
   try {
-    const { imageUrl, prompt, quality: rawQuality } = await req.json();
+    const { imageUrl, prompt: userPrompt, templateId, placeholderValues, quality: rawQuality } = await req.json();
 
     // Either an image this app already generated (https://*.fal.media/...,
     // unchanged) or a fresh local upload (data:image/...;base64,) — the
@@ -58,6 +59,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Failed to process the uploaded image." }, { status: 400 });
     }
 
+    // Template prompts never reach the browser, so resolve here from the id.
+    // Done before charging, same reasoning as the upload above — an invalid
+    // template shouldn't cost the user credits.
+    const admin = createAdminClient();
+    let motionPrompt = typeof userPrompt === "string" ? userPrompt.trim() : "";
+    if (templateId) {
+      const { data: tpl } = await admin
+        .from("templates")
+        .select("prompt")
+        .eq("id", templateId)
+        .single();
+      if (!tpl) {
+        return NextResponse.json({ error: "That template no longer exists." }, { status: 400 });
+      }
+      motionPrompt = resolveTemplatePrompt(
+        tpl.prompt,
+        typeof placeholderValues === "object" && placeholderValues ? placeholderValues : {},
+        motionPrompt
+      );
+    }
+    if (!motionPrompt) motionPrompt = DEFAULT_MOTION_PROMPT;
+
     const cost = tier.creditCost;
     const credits = await getUserCredits(user.id);
     if (!isUnlimited && credits < cost) {
@@ -74,9 +97,6 @@ export async function POST(req: NextRequest) {
     const newCredits = isUnlimited
       ? UNLIMITED_CREDITS_DISPLAY
       : await chargeCredits(user.id, cost, credits, `Image-to-video (${quality})`);
-
-    const admin = createAdminClient();
-    const motionPrompt = typeof prompt === "string" && prompt.trim() ? prompt.trim() : DEFAULT_MOTION_PROMPT;
 
     const { data: row, error: insertError } = await admin
       .from("generations")

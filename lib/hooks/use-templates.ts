@@ -11,9 +11,9 @@ interface TemplateRow {
   category: string;
   description: string;
   tags: string[];
-  /** Absent on the public (anon) path — the column is revoked from the anon
-   *  role so prompts can't be scraped without an account. */
-  prompt?: string | null;
+  /** Only present on the authenticated /api/templates path — the public path
+   *  can't see it, and neither carries the prompt itself. */
+  placeholders?: string[];
   cover_image_url: string | null;
   preview_video_url: string | null;
   accent_color: string;
@@ -29,7 +29,7 @@ function mapRow(row: TemplateRow): Template {
     category: row.category,
     description: row.description,
     tags: row.tags ?? [],
-    prompt: row.prompt ?? "",
+    placeholders: row.placeholders ?? [],
     coverImageUrl: row.cover_image_url,
     previewVideoUrl: row.preview_video_url,
     accentColor: row.accent_color,
@@ -38,20 +38,21 @@ function mapRow(row: TemplateRow): Template {
   };
 }
 
-// Everything except `prompt` — the only columns the anon role is granted.
+// The prompt column is revoked from both anon and authenticated, so neither
+// path selects it — these are simply all the columns that remain readable.
 const PUBLIC_COLUMNS =
   "id,name,template_type,category,description,tags,cover_image_url,preview_video_url,accent_color,is_pro,sort_order";
 
 interface UseTemplatesOptions {
-  /** Signed-in surfaces (dashboard) fetch through /api/templates so prompts
-   *  are included. Public surfaces (the landing page) leave this false and
-   *  get everything except the prompt. */
-  withPrompts?: boolean;
+  /** Signed-in surfaces fetch through /api/templates, which additionally
+   *  returns each template's `placeholders`. Public surfaces (the landing
+   *  page) read directly and get everything except that. */
+  authenticated?: boolean;
 }
 
 // Small, rarely-changing table (~40 rows) — fetched fresh on every mount so
 // admin edits show up immediately rather than behind a stale cache.
-export function useTemplates({ withPrompts = false }: UseTemplatesOptions = {}) {
+export function useTemplates({ authenticated = false }: UseTemplatesOptions = {}) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -65,7 +66,7 @@ export function useTemplates({ withPrompts = false }: UseTemplatesOptions = {}) 
       setError(false);
       try {
         let rows: TemplateRow[];
-        if (withPrompts) {
+        if (authenticated) {
           const res = await fetch("/api/templates", { cache: "no-store" });
           if (!res.ok) throw new Error(`templates fetch failed (${res.status})`);
           rows = (await res.json()).templates ?? [];
@@ -90,7 +91,7 @@ export function useTemplates({ withPrompts = false }: UseTemplatesOptions = {}) 
 
     load();
     return () => { cancelled = true; };
-  }, [reloadKey, withPrompts]);
+  }, [reloadKey, authenticated]);
 
   const refetch = () => setReloadKey((k) => k + 1);
 

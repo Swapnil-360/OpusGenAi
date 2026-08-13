@@ -10,7 +10,7 @@ function makeTemplate(overrides: Partial<Template>): Template {
     category: "minimal",
     description: "",
     tags: [],
-    prompt: "",
+    placeholders: [],
     coverImageUrl: null,
     previewVideoUrl: null,
     accentColor: "#000",

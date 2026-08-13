@@ -41,7 +41,7 @@ import {
   type BannerMode,
   type WelcomeConfig,
 } from "@/lib/admin-config";
-import { PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, CAMPAIGN_CATEGORIES, type Template, type TemplateType } from "@/lib/templates-data";
+import { PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, CAMPAIGN_CATEGORIES, VIDEO_CATEGORIES, type Template, type TemplateType } from "@/lib/templates-data";
 import { type Plan } from "@/lib/plans";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { createClient } from "@/lib/supabase/client";
@@ -1047,9 +1047,9 @@ export default function AdminPage() {
                   <div>
                     <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>Type</label>
                     <div className="flex gap-2">
-                      {(["production", "universal", "campaign"] as const).map((t) => (
+                      {(["production", "universal", "campaign", "video"] as const).map((t) => (
                         <button key={t} onClick={() => setTemplateForm((f) => f && { ...f, templateType: t })}
-                          className="flex-1 h-9 rounded-xl text-xs font-semibold capitalize transition-all"
+                          className="flex-1 h-9 rounded-xl text-[11px] font-semibold capitalize transition-all"
                           style={templateForm.templateType === t
                             ? { background: T.redBg, border: `1px solid ${T.redBorder}`, color: T.red }
                             : { background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, color: T.muted }}>
@@ -1067,6 +1067,7 @@ export default function AdminPage() {
                     <datalist id="template-category-options">
                       {(templateForm.templateType === "production" ? PRODUCTION_CATEGORIES
                         : templateForm.templateType === "campaign" ? CAMPAIGN_CATEGORIES
+                        : templateForm.templateType === "video" ? VIDEO_CATEGORIES
                         : UNIVERSAL_CATEGORIES)
                         .filter((c) => c.id !== "all")
                         .map((c) => <option key={c.id} value={c.id} />)}
@@ -1157,6 +1158,7 @@ export default function AdminPage() {
                         style={
                           tpl.templateType === "universal" ? { background: "rgba(56,189,248,0.12)", color: T.blue }
                           : tpl.templateType === "campaign" ? { background: "rgba(167,139,250,0.14)", color: "#a78bfa" }
+                          : tpl.templateType === "video" ? { background: "rgba(220,38,38,0.14)", color: "#f87171" }
                           : { background: "rgba(255,255,255,0.06)", color: T.muted }
                         }>
                         {tpl.templateType}

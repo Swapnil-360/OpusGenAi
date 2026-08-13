@@ -13,6 +13,7 @@ interface TemplateRow {
   tags: string[];
   prompt: string;
   cover_image_url: string | null;
+  preview_video_url: string | null;
   accent_color: string;
   is_pro: boolean;
   sort_order: number;
@@ -28,6 +29,7 @@ function mapRow(row: TemplateRow): Template {
     tags: row.tags ?? [],
     prompt: row.prompt,
     coverImageUrl: row.cover_image_url,
+    previewVideoUrl: row.preview_video_url,
     accentColor: row.accent_color,
     isPro: row.is_pro,
     sortOrder: row.sort_order,
@@ -51,7 +53,7 @@ export function useTemplates() {
       try {
         const rows = await selectPublic<TemplateRow>(
           "templates",
-          "select=id,name,template_type,category,description,tags,prompt,cover_image_url,accent_color,is_pro,sort_order&order=sort_order.asc"
+          "select=id,name,template_type,category,description,tags,prompt,cover_image_url,preview_video_url,accent_color,is_pro,sort_order&order=sort_order.asc"
         );
         if (cancelled) return;
         setTemplates(rows.map(mapRow));

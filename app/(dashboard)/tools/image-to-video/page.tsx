@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Clapperboard, ImageUp, Sparkles, X } from "lucide-react";
 import { UploadZone } from "@/components/tools/ToolPageShell";
 import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
 import { fileToDataUrl } from "@/lib/mask-canvas";
+import { useTemplates } from "@/lib/hooks/use-templates";
 import { VIDEO_TIERS, isPlanAtLeast, type Plan, type VideoQuality } from "@/lib/plans";
 import { toast } from "sonner";
 
@@ -26,7 +28,22 @@ const W = {
 const QUALITIES: VideoQuality[] = ["standard", "hd", "premium"];
 type SourceTab = "upload" | "generate";
 
+// useSearchParams needs a Suspense boundary under the App Router — same
+// pattern the generate page uses for its own ?template= deep link.
 export default function ImageToVideoPage() {
+  return (
+    <Suspense fallback={<div className="h-full" style={{ background: W.bg }} />}>
+      <ImageToVideoPageInner />
+    </Suspense>
+  );
+}
+
+function ImageToVideoPageInner() {
+  const searchParams = useSearchParams();
+  const { templates } = useTemplates();
+  const templateId = searchParams.get("template");
+  const activeTemplate = templateId ? templates.find((t) => t.id === templateId) : undefined;
+
   const [tab, setTab] = useState<SourceTab>("upload");
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [sourceImageUrl, setSourceImageUrl] = useState<string | null>(null);
@@ -113,6 +130,23 @@ export default function ImageToVideoPage() {
             <p className="text-[11px] mt-0.5" style={{ color: W.muted }}>Bring your product photos to life with AI motion</p>
           </div>
         </div>
+
+        {/* Arrived from a video template — say so, since the motion prompt
+            further down is pre-filled and would otherwise look unexplained. */}
+        {activeTemplate && (
+          <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
+            style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}>
+            <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: W.red }} />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold" style={{ color: W.text }}>
+                Using template: {activeTemplate.name}
+              </p>
+              <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>
+                {sourceImageUrl ? "Motion prompt pre-filled below — edit it freely." : "Add your product photo below to get started."}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* ── Quality preview strip — shown up front, before any image, so the
             choice is legible before committing to a source image. Hidden once
@@ -206,7 +240,12 @@ export default function ImageToVideoPage() {
               </button>
             </div>
 
-            <ImageToVideoPanel imageUrl={sourceImageUrl} isEntitled={isEntitled} />
+            <ImageToVideoPanel
+              key={activeTemplate?.id ?? "none"}
+              imageUrl={sourceImageUrl}
+              isEntitled={isEntitled}
+              initialPrompt={activeTemplate?.prompt}
+            />
           </div>
         )}
       </div>

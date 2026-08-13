@@ -12,9 +12,7 @@ import {
   useAnimationFrame,
   type MotionValue,
 } from "framer-motion";
-import { ArrowRight, Check } from "lucide-react";
-import { TOOLS } from "@/lib/tools-config";
-import { GradientCard, type GradientCardProps } from "@/components/ui/gradient-card";
+import { ArrowRight, Check, Play } from "lucide-react";
 import { PLANS, MOCK_CURRENT_USER, type Plan } from "@/lib/mock-data";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { useHeroImages } from "@/lib/hooks/use-hero-images";
@@ -25,8 +23,6 @@ import { SiteBanner } from "@/components/shared/SiteBanner";
 import { cn } from "@/lib/utils";
 
 // ─── Static data ─────────────────────────────────────────────────────────────
-
-const GRADIENT_CYCLE: NonNullable<GradientCardProps["gradient"]>[] = ["orange", "purple", "green", "gray"];
 
 const CAPABILITIES = [
   "Product Photography",
@@ -449,6 +445,11 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
 export default function LandingPage() {
   const router = useRouter();
   const { templates: ALL_TEMPLATES, loading: templatesLoading, error: templatesError, refetch: refetchTemplates } = useTemplates();
+  // Video templates get their own section (they're motion prompts, and their
+  // preview is a clip rather than a still); the image-template carousel below
+  // covers everything else.
+  const VIDEO_TEMPLATES = ALL_TEMPLATES.filter((t) => t.templateType === "video");
+  const IMAGE_TEMPLATES = ALL_TEMPLATES.filter((t) => t.templateType !== "video");
   const { images: heroImages } = useHeroImages(8);
   const orbitAngle = useMotionValue(0);
   useAnimationFrame((t) => {
@@ -712,18 +713,18 @@ export default function LandingPage() {
           </motion.div>
         </div>
 
-        {/* ══ TOOLS ════════════════════════════════════════════════════════════ */}
-        <section id="tools" className="py-10 md:py-16 lg:py-20 px-4 sm:px-6">
+        {/* ══ VIDEO TEMPLATES ══════════════════════════════════════════════════ */}
+        <section id="video-templates" className="py-10 md:py-16 lg:py-20 px-4 sm:px-6">
           <div className="max-w-7xl mx-auto">
             <FadeIn>
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6 md:mb-10">
                 <div>
-                  <SectionLabel>The Toolbox</SectionLabel>
+                  <SectionLabel>Video Templates</SectionLabel>
                   <h2
                     className="font-black tracking-tight leading-[0.9]"
                     style={{ fontSize: "clamp(2.4rem,4.5vw,5rem)" }}
                   >
-                    Six precision
+                    Turn a photo
                     <br />
                     <span
                       style={{
@@ -731,12 +732,12 @@ export default function LandingPage() {
                         fontWeight: 300,
                       }}
                     >
-                      tools, one platform
+                      into a video ad
                     </span>
                   </h2>
                 </div>
                 <Link
-                  href="/signup"
+                  href="/tools/image-to-video"
                   className="flex items-center gap-1.5 text-sm font-medium shrink-0 pb-1 group transition-colors"
                   style={{ color: "rgba(255,255,255,0.52)" }}
                   onMouseEnter={(e) =>
@@ -746,29 +747,63 @@ export default function LandingPage() {
                     (e.currentTarget.style.color = "rgba(255,255,255,0.35)")
                   }
                 >
-                  All tools free to start
+                  Open the video generator
                   <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                 </Link>
               </div>
             </FadeIn>
 
-            {/* GradientCard per tool — compact card, image banner + content,
-                height driven by content; the grid row stretches every card
-                in a row to match, so sizing stays even. 2-up from mobile up,
-                3-up on desktop. */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3 items-stretch">
-              {TOOLS.map((tool, i) => (
-                <FadeIn key={tool.id} delay={i * 0.07}>
-                  <GradientCard
-                    gradient={GRADIENT_CYCLE[i % GRADIENT_CYCLE.length]}
-                    badgeText={tool.badge ?? `${tool.creditCost} credit${tool.creditCost > 1 ? "s" : ""}`}
-                    badgeColor={tool.accentColor}
-                    title={tool.label}
-                    description={tool.description}
-                    ctaText="Try it free"
-                    ctaHref={tool.href}
-                    imageUrl={tool.cardImage}
-                  />
+            {/* Each card links straight into the video generator with the
+                template pre-selected, so the motion prompt is already filled
+                and the user only has to add their own product photo.
+                previewVideoUrl plays when one exists; until then coverImageUrl
+                is the poster, falling back to an accent gradient. */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 items-stretch">
+              {VIDEO_TEMPLATES.map((tpl, i) => (
+                <FadeIn key={tpl.id} delay={i * 0.06}>
+                  <Link
+                    href={`/tools/image-to-video?template=${tpl.id}`}
+                    className="group block rounded-2xl overflow-hidden h-full transition-all"
+                    style={{ border: "1px solid rgba(255,255,255,0.08)", background: "#140505" }}
+                  >
+                    <div className="relative aspect-video overflow-hidden" style={{ background: `linear-gradient(150deg, ${tpl.accentColor}26 0%, #0d0303 85%)` }}>
+                      {tpl.previewVideoUrl ? (
+                        <video
+                          src={tpl.previewVideoUrl}
+                          poster={tpl.coverImageUrl ?? undefined}
+                          muted loop playsInline preload="metadata"
+                          onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                          onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : tpl.coverImageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={tpl.coverImageUrl} alt={tpl.name} className="w-full h-full object-cover" />
+                      ) : null}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform group-hover:scale-110"
+                          style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)" }}
+                        >
+                          <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                        </div>
+                      </div>
+                      {tpl.isPro && (
+                        <span
+                          className="absolute top-2 right-2 text-[9px] font-black px-1.5 py-0.5 rounded-full"
+                          style={{ background: "rgba(0,0,0,0.7)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.4)" }}
+                        >
+                          PRO
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm font-bold mb-0.5">{tpl.name}</p>
+                      <p className="text-[11px] leading-snug" style={{ color: "rgba(255,255,255,0.45)" }}>
+                        {tpl.description}
+                      </p>
+                    </div>
+                  </Link>
                 </FadeIn>
               ))}
             </div>
@@ -806,17 +841,17 @@ export default function LandingPage() {
                     style={{ border: "2px solid rgba(255,255,255,0.15)", borderTopColor: "#f87171" }}
                   />
                 </div>
-              ) : ALL_TEMPLATES.length > 0 ? (
+              ) : IMAGE_TEMPLATES.length > 0 ? (
                 <>
                   <FeaturedCarousel
-                    items={ALL_TEMPLATES}
+                    items={IMAGE_TEMPLATES}
                     onSelect={() => router.push("/templates")}
                   />
                   <p
                     className="text-center text-[11px] sm:text-xs mt-2"
                     style={{ color: "rgba(255,255,255,0.35)" }}
                   >
-                    Drag to browse · {ALL_TEMPLATES.length} templates
+                    Drag to browse · {IMAGE_TEMPLATES.length} templates
                   </p>
                 </>
               ) : templatesError ? (

@@ -3,7 +3,7 @@
 // for the fetch. This file only holds the shared type and static UI metadata
 // (category chip labels), not the template rows themselves.
 
-export type TemplateType = "production" | "universal" | "campaign";
+export type TemplateType = "production" | "universal" | "campaign" | "video";
 
 export interface Template {
   id: string;
@@ -14,6 +14,9 @@ export interface Template {
   tags: string[];
   prompt: string;
   coverImageUrl: string | null;
+  /** Video templates only — a short looping preview clip. Null until one has
+   *  been generated, in which case coverImageUrl acts as the poster frame. */
+  previewVideoUrl: string | null;
   accentColor: string;
   isPro: boolean;
   sortOrder: number;
@@ -68,6 +71,18 @@ export const CAMPAIGN_CATEGORIES: { id: string; label: string }[] = [
   { id: "packaging", label: "Packaging" },
   { id: "outdoor", label: "Out-of-Home" },
   { id: "identity", label: "Brand Identity" },
+];
+
+// Video templates are motion prompts for the image-to-video generator — the
+// vocabulary is camera movement and mood rather than scene/surface, so again
+// its own list.
+export const VIDEO_CATEGORIES: { id: string; label: string }[] = [
+  { id: "all", label: "All Templates" },
+  { id: "luxury", label: "Luxury" },
+  { id: "dynamic", label: "Dynamic" },
+  { id: "natural", label: "Natural" },
+  { id: "moody", label: "Moody" },
+  { id: "minimal", label: "Minimal" },
 ];
 
 export function getTemplateById(templates: Template[], id: string): Template | undefined {

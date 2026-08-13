@@ -12,6 +12,7 @@ function makeTemplate(overrides: Partial<Template>): Template {
     tags: [],
     prompt: "",
     coverImageUrl: null,
+    previewVideoUrl: null,
     accentColor: "#000",
     isPro: false,
     sortOrder: 0,

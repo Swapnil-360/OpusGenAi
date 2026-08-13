@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Crown, Layers, Lock, Search, Sparkles, X } from "lucide-react";
 import {
-  PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, CAMPAIGN_CATEGORIES, getTemplatesByCategory,
-  type Template, type TemplateType,
+  PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, CAMPAIGN_CATEGORIES, VIDEO_CATEGORIES,
+  getTemplatesByCategory, type Template, type TemplateType,
 } from "@/lib/templates-data";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { toast } from "sonner";
@@ -31,6 +31,7 @@ const TYPES: { id: TemplateType; label: string; hint: string }[] = [
   { id: "production", label: "Production", hint: "For your product photos" },
   { id: "universal", label: "Universal", hint: "For your own photos" },
   { id: "campaign", label: "Campaign", hint: "Full brand ad scenes" },
+  { id: "video", label: "Video", hint: "Motion for the video generator" },
 ];
 
 export default function TemplatesPage() {
@@ -44,6 +45,7 @@ export default function TemplatesPage() {
   const categories =
     activeType === "production" ? PRODUCTION_CATEGORIES
     : activeType === "campaign" ? CAMPAIGN_CATEGORIES
+    : activeType === "video" ? VIDEO_CATEGORIES
     : UNIVERSAL_CATEGORIES;
   const byType = templates.filter((t) => t.templateType === activeType);
 
@@ -70,7 +72,10 @@ export default function TemplatesPage() {
 
   function applyTemplate(tpl: Template) {
     toast.success(`Template applied: ${tpl.name}`);
-    router.push(`/generate?template=${tpl.id}`);
+    // Video templates are motion prompts for the video generator — sending
+    // them to /generate would drop the prompt into the image pipeline.
+    const destination = tpl.templateType === "video" ? "/tools/image-to-video" : "/generate";
+    router.push(`${destination}?template=${tpl.id}`);
   }
 
   return (

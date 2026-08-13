@@ -42,13 +42,17 @@ interface ImageToVideoPanelProps {
    *  UI affordance only. The server independently re-checks entitlement on
    *  every request; this value is never trusted for cost. */
   isEntitled: boolean;
+  /** Pre-fills the motion prompt — used when arriving from a video template
+   *  (/tools/image-to-video?template=<id>). Only seeds the initial value; the
+   *  user edits freely from there. */
+  initialPrompt?: string;
 }
 
-export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelProps) {
+export function ImageToVideoPanel({ imageUrl, isEntitled, initialPrompt }: ImageToVideoPanelProps) {
   const [quality, setQuality] = useState<VideoQuality>("standard");
   const [style, setStyle] = useState(STYLE_OPTIONS[0]);
   const [movement, setMovement] = useState(MOVEMENT_OPTIONS[0]);
-  const [videoPrompt, setVideoPrompt] = useState("");
+  const [videoPrompt, setVideoPrompt] = useState(initialPrompt ?? "");
   const [videoStatus, setVideoStatus] = useState<"idle" | "processing" | "done" | "failed">("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
@@ -87,7 +91,10 @@ export function ImageToVideoPanel({ imageUrl, isEntitled }: ImageToVideoPanelPro
     setVideoStatus("idle");
     setVideoUrl(null);
     setVideoError(null);
-    setVideoPrompt("");
+    // Back to the template's prompt when one was supplied, rather than blank —
+    // "Try another motion" after arriving from a template shouldn't silently
+    // throw that template away.
+    setVideoPrompt(initialPrompt ?? "");
   }
 
   function pollStatus(generationId: string) {

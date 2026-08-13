@@ -174,7 +174,7 @@ export default function GeneratePage() {
 
 function GeneratePageInner() {
   const searchParams = useSearchParams();
-  const { templates } = useTemplates();
+  const { templates } = useTemplates({ withPrompts: true });
   const [prompt, setPrompt] = useState("");
   const [promptFocused, setPromptFocused] = useState(false);
   const [selectedSize, setSelectedSize] = useState<SizePreset>(SIZE_PRESETS[0]);

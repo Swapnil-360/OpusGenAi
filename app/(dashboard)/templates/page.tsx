@@ -36,7 +36,7 @@ const TYPES: { id: TemplateType; label: string; hint: string }[] = [
 
 export default function TemplatesPage() {
   const router = useRouter();
-  const { templates, loading, error, refetch } = useTemplates();
+  const { templates, loading, error, refetch } = useTemplates({ withPrompts: true });
   const [activeType, setActiveType] = useState<TemplateType>("production");
   const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");
@@ -277,9 +277,20 @@ export default function TemplatesPage() {
                     </span>
                   </div>
 
-                  <div className="mb-4 p-3 rounded-xl" style={{ background: W.glass, border: `1px solid ${W.border}` }}>
-                    <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: W.dim }}>Prompt Applied</p>
-                    <p className="text-xs leading-relaxed font-mono" style={{ color: W.muted }}>…{preview.prompt}</p>
+                  {/* The prompt itself is deliberately not shown while browsing —
+                      it's the product's IP, and a browse surface is where it
+                      would be easiest to copy out wholesale. It's applied on
+                      "Use Template" and stays fully editable in the generator. */}
+                  <div className="mb-4 p-3 rounded-xl flex items-start gap-2.5" style={{ background: W.glass, border: `1px solid ${W.border}` }}>
+                    <Lock className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: W.dim }} />
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color: W.dim }}>Prompt included</p>
+                      <p className="text-xs leading-relaxed" style={{ color: W.muted }}>
+                        {preview.templateType === "video"
+                          ? "A production-grade motion prompt is applied automatically — edit it in the video generator once your photo is added."
+                          : "A production-grade prompt is applied automatically — edit it in the generator after you apply this template."}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 pb-5">

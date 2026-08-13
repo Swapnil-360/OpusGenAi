@@ -11,7 +11,9 @@ interface TemplateRow {
   category: string;
   description: string;
   tags: string[];
-  prompt: string;
+  /** Absent on the public (anon) path — the column is revoked from the anon
+   *  role so prompts can't be scraped without an account. */
+  prompt?: string | null;
   cover_image_url: string | null;
   preview_video_url: string | null;
   accent_color: string;
@@ -27,7 +29,7 @@ function mapRow(row: TemplateRow): Template {
     category: row.category,
     description: row.description,
     tags: row.tags ?? [],
-    prompt: row.prompt,
+    prompt: row.prompt ?? "",
     coverImageUrl: row.cover_image_url,
     previewVideoUrl: row.preview_video_url,
     accentColor: row.accent_color,
@@ -36,9 +38,20 @@ function mapRow(row: TemplateRow): Template {
   };
 }
 
-// Small, rarely-changing table (~20 rows) — fetched fresh on every mount so
+// Everything except `prompt` — the only columns the anon role is granted.
+const PUBLIC_COLUMNS =
+  "id,name,template_type,category,description,tags,cover_image_url,preview_video_url,accent_color,is_pro,sort_order";
+
+interface UseTemplatesOptions {
+  /** Signed-in surfaces (dashboard) fetch through /api/templates so prompts
+   *  are included. Public surfaces (the landing page) leave this false and
+   *  get everything except the prompt. */
+  withPrompts?: boolean;
+}
+
+// Small, rarely-changing table (~40 rows) — fetched fresh on every mount so
 // admin edits show up immediately rather than behind a stale cache.
-export function useTemplates() {
+export function useTemplates({ withPrompts = false }: UseTemplatesOptions = {}) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -51,10 +64,17 @@ export function useTemplates() {
       setLoading(true);
       setError(false);
       try {
-        const rows = await selectPublic<TemplateRow>(
-          "templates",
-          "select=id,name,template_type,category,description,tags,prompt,cover_image_url,preview_video_url,accent_color,is_pro,sort_order&order=sort_order.asc"
-        );
+        let rows: TemplateRow[];
+        if (withPrompts) {
+          const res = await fetch("/api/templates", { cache: "no-store" });
+          if (!res.ok) throw new Error(`templates fetch failed (${res.status})`);
+          rows = (await res.json()).templates ?? [];
+        } else {
+          rows = await selectPublic<TemplateRow>(
+            "templates",
+            `select=${PUBLIC_COLUMNS}&order=sort_order.asc`
+          );
+        }
         if (cancelled) return;
         setTemplates(rows.map(mapRow));
         setLoading(false);
@@ -70,7 +90,7 @@ export function useTemplates() {
 
     load();
     return () => { cancelled = true; };
-  }, [reloadKey]);
+  }, [reloadKey, withPrompts]);
 
   const refetch = () => setReloadKey((k) => k + 1);
 

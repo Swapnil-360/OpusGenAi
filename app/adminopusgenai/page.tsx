@@ -208,7 +208,7 @@ export default function AdminPage() {
   const [dataError, setDataError] = useState(false);
 
   // ── templates tab state ──────────────────────────────────────────────────────
-  const { templates, loading: templatesLoading, refetch: refetchTemplates } = useTemplates();
+  const { templates, loading: templatesLoading, refetch: refetchTemplates } = useTemplates({ withPrompts: true });
   const [templateForm, setTemplateForm] = useState<TemplateFormState | null>(null); // null = form closed
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);

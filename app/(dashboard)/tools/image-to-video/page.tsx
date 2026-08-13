@@ -40,7 +40,7 @@ export default function ImageToVideoPage() {
 
 function ImageToVideoPageInner() {
   const searchParams = useSearchParams();
-  const { templates } = useTemplates();
+  const { templates } = useTemplates({ withPrompts: true });
   const templateId = searchParams.get("template");
   const activeTemplate = templateId ? templates.find((t) => t.id === templateId) : undefined;
 

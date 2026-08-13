@@ -818,17 +818,17 @@ export default function LandingPage() {
         >
           <div className="max-w-7xl mx-auto">
             <FadeIn className="mb-6 md:mb-10">
-              <SectionLabel>Template Marketplace</SectionLabel>
+              <SectionLabel>Image Templates</SectionLabel>
               <h2
                 className="font-black tracking-tight leading-[0.9]"
                 style={{ fontSize: "clamp(2.4rem,4.5vw,5rem)" }}
               >
-                Premium templates
+                Premium image
                 <br />
                 <span
                   style={{ color: "rgba(255,255,255,0.2)", fontWeight: 300 }}
                 >
-                  built to convert
+                  templates built to convert
                 </span>
               </h2>
             </FadeIn>

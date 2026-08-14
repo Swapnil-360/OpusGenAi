@@ -4,6 +4,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { fileToUploadDataUrl } from "@/lib/mask-canvas";
+import { readApiError } from "@/lib/api-error";
 import {
   ArrowLeft,
   BarChart3,
@@ -496,12 +498,10 @@ export default function AdminPage() {
 
   async function uploadCoverImage(id: string, file: File) {
     setRegeneratingId(id);
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    // Downscaled first — a straight-from-camera cover was posting many MB of
+    // base64 and getting rejected before the route ever ran, which is what the
+    // bare "Upload failed." was. 2048px is far more than a card cover needs.
+    const dataUrl = await fileToUploadDataUrl(file);
     const res = await fetch(`/api/admin/templates/${id}/cover-image`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -509,8 +509,7 @@ export default function AdminPage() {
     });
     setRegeneratingId(null);
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast.error(err.error || "Upload failed.");
+      toast.error(await readApiError(res, "Upload failed."));
       return;
     }
     toast.success("Photo uploaded.");
@@ -551,12 +550,7 @@ export default function AdminPage() {
       return;
     }
     setUploadingHero(true);
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    const dataUrl = await fileToUploadDataUrl(file);
     const res = await fetch("/api/admin/hero-images/upload", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -564,7 +558,7 @@ export default function AdminPage() {
     });
     setUploadingHero(false);
     if (!res.ok) {
-      toast.error("Upload failed.");
+      toast.error(await readApiError(res, "Upload failed."));
       return;
     }
     const { url } = await res.json();

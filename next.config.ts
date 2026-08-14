@@ -31,7 +31,10 @@ const CSP = [
   // blocking every fal-hosted clip (verified real URL: v3b.fal.media/files/...,
   // same host pattern as img-src) — video played as a stuck 0:00 player with
   // no console CORS error, just a quietly dropped resource load.
-  `media-src 'self' blob: https://fal.media https://*.fal.media`,
+  // Supabase's host is here too: template preview clips are copied into our
+  // own public bucket rather than linked straight to fal, so the landing
+  // page's <video> loads from Supabase, not fal.
+  `media-src 'self' blob: https://fal.media https://*.fal.media${supabaseHostname ? ` https://${supabaseHostname}` : ""}`,
   // fal.media here (not just img-src) because every download button does
   // fetch(src) to turn the remote file into a blob before saving it — img-src
   // covers the <img>/<video> tag itself, connect-src covers that fetch() call.

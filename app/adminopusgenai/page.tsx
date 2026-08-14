@@ -35,6 +35,9 @@ import {
   ImagePlus,
   Images,
   Shuffle,
+  Clapperboard,
+  Film,
+  Upload,
 } from "lucide-react";
 import {
   DEFAULT_BANNER,
@@ -100,6 +103,16 @@ type AdminStats = {
   totalCreditsSpent: number;
   falBalance: number | null;
   falCurrency: string;
+};
+
+// One of the admin's own completed video generations, offered as a ready-made
+// preview clip for a video template.
+type AdminVideo = {
+  id: string;
+  prompt: string;
+  videoUrl: string;
+  quality: string | null;
+  createdAt: string;
 };
 
 type HeroSettings = {
@@ -260,6 +273,28 @@ export default function AdminPage() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
+
+  // ── video-template preview clip state ────────────────────────────────────────
+  // videoTarget = the video template whose preview clip is being managed
+  // (null = the panel is closed).
+  const [videoTarget, setVideoTarget] = useState<AdminTemplate | null>(null);
+  const [myVideos, setMyVideos] = useState<AdminVideo[]>([]);
+  const [myVideosLoading, setMyVideosLoading] = useState(false);
+  const [savingPreviewVideo, setSavingPreviewVideo] = useState(false);
+
+  // Loaded when the panel opens rather than with the tab: most template edits
+  // never touch a preview clip, and this reads every generation row.
+  useEffect(() => {
+    if (!videoTarget) return;
+    let cancelled = false;
+    setMyVideosLoading(true);
+    fetch("/api/admin/videos", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { videos: [] }))
+      .then((data) => { if (!cancelled) setMyVideos(data.videos ?? []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setMyVideosLoading(false); });
+    return () => { cancelled = true; };
+  }, [videoTarget?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── hero images tab state ────────────────────────────────────────────────────
   const [heroSettings, setHeroSettings] = useState<HeroSettings>({ mode: "random", templateIds: [], customImageUrls: [] });
@@ -514,6 +549,62 @@ export default function AdminPage() {
     }
     toast.success("Photo uploaded.");
     refetchTemplates();
+  }
+
+  // ── video-template preview clip actions ──────────────────────────────────────
+  // Each of these refetches and re-points videoTarget at the updated row, so
+  // the open panel shows the new clip without being closed and reopened.
+  function syncVideoTarget(id: string, previewVideoUrl: string | null) {
+    setTemplates((cur) => cur.map((t) => (t.id === id ? { ...t, previewVideoUrl } : t)));
+    setVideoTarget((cur) => (cur && cur.id === id ? { ...cur, previewVideoUrl } : cur));
+  }
+
+  // Posted as raw bytes, not a base64 data URL: base64 would inflate a
+  // multi-MB clip by another third for nothing.
+  async function uploadPreviewVideo(id: string, file: File) {
+    setSavingPreviewVideo(true);
+    const res = await fetch(`/api/admin/templates/${id}/preview-video`, {
+      method: "POST",
+      headers: { "Content-Type": file.type || "video/mp4" },
+      body: file,
+    });
+    setSavingPreviewVideo(false);
+    if (!res.ok) {
+      toast.error(await readApiError(res, "Upload failed."));
+      return;
+    }
+    const { url } = await res.json();
+    syncVideoTarget(id, url);
+    toast.success("Preview clip set.");
+  }
+
+  async function applyGeneratedVideoAsPreview(id: string, sourceUrl: string) {
+    setSavingPreviewVideo(true);
+    const res = await fetch(`/api/admin/templates/${id}/preview-video`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourceUrl }),
+    });
+    setSavingPreviewVideo(false);
+    if (!res.ok) {
+      toast.error(await readApiError(res, "Couldn't use that video."));
+      return;
+    }
+    const { url } = await res.json();
+    syncVideoTarget(id, url);
+    toast.success("Preview clip set.");
+  }
+
+  async function removePreviewVideo(id: string) {
+    setSavingPreviewVideo(true);
+    const res = await fetch(`/api/admin/templates/${id}/preview-video`, { method: "DELETE" });
+    setSavingPreviewVideo(false);
+    if (!res.ok) {
+      toast.error(await readApiError(res, "Couldn't remove the clip."));
+      return;
+    }
+    syncVideoTarget(id, null);
+    toast.success("Preview clip removed.");
   }
 
   async function generateAllPreviews() {
@@ -1045,8 +1136,17 @@ export default function AdminPage() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
               <p className="text-xs" style={{ color: T.muted }}>
-                {templatesLoading ? "Loading…" : `${templates.length} templates · ${templates.filter((t) => !t.coverImageUrl).length} missing a preview`}
+                {templatesLoading
+                  ? "Loading…"
+                  : `${templates.length} templates · ${templates.filter((t) => !t.coverImageUrl).length} missing a preview`}
               </p>
+              {!templatesLoading && templates.some((t) => t.templateType === "video" && !t.previewVideoUrl) && (
+                <p className="text-xs flex items-center gap-1.5 basis-full sm:basis-auto" style={{ color: T.dim }}>
+                  <Clapperboard className="w-3.5 h-3.5" style={{ color: T.red }} />
+                  {templates.filter((t) => t.templateType === "video" && !t.previewVideoUrl).length} video
+                  {templates.filter((t) => t.templateType === "video" && !t.previewVideoUrl).length === 1 ? " template has" : " templates have"} no clip
+                </p>
+              )}
               <div className="flex items-center gap-2">
                 <button
                   onClick={generateAllPreviews}
@@ -1179,7 +1279,13 @@ export default function AdminPage() {
               )}
               {templates.map((tpl) => (
                 <div key={tpl.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: T.card, border: `1px solid ${T.border}` }}>
-                  {tpl.coverImageUrl ? (
+                  {tpl.previewVideoUrl ? (
+                    <video src={tpl.previewVideoUrl} poster={tpl.coverImageUrl ?? undefined}
+                      muted loop playsInline preload="metadata"
+                      onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                      onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                      className="w-12 h-12 rounded-lg object-cover shrink-0" />
+                  ) : tpl.coverImageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={tpl.coverImageUrl} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" />
                   ) : (
@@ -1208,6 +1314,17 @@ export default function AdminPage() {
                   </div>
 
                   <div className="flex items-center gap-1.5 shrink-0">
+                    {tpl.templateType === "video" && (
+                      <button onClick={() => setVideoTarget(tpl)}
+                        title="Preview clip — the video that plays on the landing page"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70"
+                        style={{
+                          background: tpl.previewVideoUrl ? "rgba(220,38,38,0.12)" : "rgba(255,255,255,0.03)",
+                          border: `1px solid ${tpl.previewVideoUrl ? T.redBorder : T.border}`,
+                        }}>
+                        <Clapperboard className="w-3.5 h-3.5" style={{ color: tpl.previewVideoUrl ? T.red : T.muted }} />
+                      </button>
+                    )}
                     <label title="Upload a real photo (e.g. an actual tool output) instead of an AI-generated preview"
                       className="w-8 h-8 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70 cursor-pointer"
                       style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, opacity: regeneratingId === tpl.id ? 0.5 : 1 }}>
@@ -1237,6 +1354,126 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+
+            {/* ── Preview clip panel (video templates only) ────────────────────
+                The landing page plays previewVideoUrl on hover and falls back
+                to the cover image, so a template without a clip still renders
+                — this is what fills that in. */}
+            {videoTarget && (
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
+                style={{ background: "rgba(0,0,0,0.72)" }}
+                onClick={() => !savingPreviewVideo && setVideoTarget(null)}>
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl"
+                  style={{ background: T.card, border: `1px solid ${T.border}` }}>
+
+                  <div className="flex items-start gap-3 p-5 sticky top-0 z-10"
+                    style={{ background: T.card, borderBottom: `1px solid ${T.border}` }}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ background: "rgba(220,38,38,0.12)", border: `1px solid ${T.redBorder}` }}>
+                      <Clapperboard className="w-4 h-4" style={{ color: T.red }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-black" style={{ color: T.text }}>Preview clip</h3>
+                      <p className="text-xs mt-0.5 truncate" style={{ color: T.muted }}>
+                        Plays on the landing page card for <span style={{ color: T.text }}>{videoTarget.name}</span>
+                      </p>
+                    </div>
+                    <button onClick={() => setVideoTarget(null)} disabled={savingPreviewVideo}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 disabled:opacity-40"
+                      style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
+                      <X className="w-4 h-4" style={{ color: T.muted }} />
+                    </button>
+                  </div>
+
+                  <div className="p-5 space-y-5">
+                    {/* Current clip */}
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: T.muted }}>Current</p>
+                      {videoTarget.previewVideoUrl ? (
+                        <div className="flex flex-col sm:flex-row gap-3">
+                          <video src={videoTarget.previewVideoUrl} poster={videoTarget.coverImageUrl ?? undefined}
+                            controls loop playsInline preload="metadata"
+                            className="w-full sm:w-64 rounded-xl aspect-video object-cover shrink-0"
+                            style={{ border: `1px solid ${T.border}`, background: "#0d0303" }} />
+                          <div className="flex flex-col justify-center gap-2">
+                            <p className="text-xs" style={{ color: T.dim }}>
+                              This clip is stored in our own bucket, so it keeps working regardless of what fal does with the original.
+                            </p>
+                            <button onClick={() => removePreviewVideo(videoTarget.id)} disabled={savingPreviewVideo}
+                              className="h-9 px-4 rounded-xl text-xs font-bold self-start disabled:opacity-50"
+                              style={{ background: "rgba(220,38,38,0.08)", border: `1px solid ${T.redBorder}`, color: T.red }}>
+                              Remove clip
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl px-4 py-6 text-center"
+                          style={{ background: "rgba(255,255,255,0.02)", border: `1px dashed ${T.border}` }}>
+                          <Film className="w-5 h-5 mx-auto mb-1.5" style={{ color: T.dim }} />
+                          <p className="text-xs" style={{ color: T.dim }}>
+                            No clip yet — the card shows its cover image with a play badge.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Upload */}
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: T.muted }}>Upload a video</p>
+                      <label className="flex items-center gap-2.5 h-11 px-4 rounded-xl cursor-pointer transition-opacity hover:opacity-80"
+                        style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, opacity: savingPreviewVideo ? 0.5 : 1 }}>
+                        <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" disabled={savingPreviewVideo}
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadPreviewVideo(videoTarget.id, f); e.target.value = ""; }} />
+                        <Upload className="w-4 h-4" style={{ color: T.muted }} />
+                        <span className="text-sm font-semibold" style={{ color: T.text }}>
+                          {savingPreviewVideo ? "Working…" : "Choose an MP4, WebM, or MOV"}
+                        </span>
+                        <span className="text-[11px] ml-auto" style={{ color: T.dim }}>up to 50MB</span>
+                      </label>
+                    </div>
+
+                    {/* Pick from own generations */}
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wider mb-1" style={{ color: T.muted }}>Use one of my generated videos</p>
+                      <p className="text-xs mb-2.5" style={{ color: T.dim }}>
+                        Videos you generated in the app. Picking one copies it into our bucket.
+                      </p>
+
+                      {myVideosLoading && <p className="text-xs py-6 text-center" style={{ color: T.dim }}>Loading…</p>}
+                      {!myVideosLoading && myVideos.length === 0 && (
+                        <p className="text-xs py-6 text-center" style={{ color: T.dim }}>
+                          You haven&apos;t generated any videos yet — make one in the Video Generator and it&apos;ll show up here.
+                        </p>
+                      )}
+                      {!myVideosLoading && myVideos.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                          {myVideos.map((v) => (
+                            <button key={v.id} disabled={savingPreviewVideo}
+                              onClick={() => applyGeneratedVideoAsPreview(videoTarget.id, v.videoUrl)}
+                              className="group text-left rounded-xl overflow-hidden transition-all disabled:opacity-50"
+                              style={{ background: "rgba(255,255,255,0.02)", border: `1px solid ${T.border}` }}>
+                              <video src={v.videoUrl} muted loop playsInline preload="metadata"
+                                onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                                onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                                className="w-full aspect-video object-cover" style={{ background: "#0d0303" }} />
+                              <div className="p-2">
+                                <p className="text-[11px] line-clamp-2 leading-snug" style={{ color: T.muted }}>{v.prompt}</p>
+                                {v.quality && (
+                                  <p className="text-[9px] font-bold uppercase mt-1" style={{ color: T.dim }}>{v.quality}</p>
+                                )}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
           </motion.div>
         )}
 

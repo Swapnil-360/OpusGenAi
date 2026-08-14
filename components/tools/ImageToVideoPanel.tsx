@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Clapperboard, Crown, Download, Lock, RefreshCw, Wand2 } from "lucide-react";
 import { VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
 import { toast } from "sonner";
+import { readApiError } from "@/lib/api-error";
 
 const W = {
   text:      "rgba(255,255,255,0.90)",
@@ -153,13 +154,14 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
           quality,
         }),
       });
-      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
+        const message = await readApiError(res, "Failed to start video generation.");
         setVideoStatus("failed");
-        setVideoError(data.error || "Failed to start video generation.");
-        toast.error(data.error || "Failed to start video generation.");
+        setVideoError(message);
+        toast.error(message);
         return;
       }
+      const data = await res.json();
       if (typeof data.credits === "number") {
         window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: data.credits }));
       }

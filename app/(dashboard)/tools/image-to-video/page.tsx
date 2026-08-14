@@ -6,7 +6,8 @@ import { motion } from "framer-motion";
 import { Clapperboard, ImageUp, Sparkles, X } from "lucide-react";
 import { UploadZone } from "@/components/tools/ToolPageShell";
 import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
-import { fileToDataUrl } from "@/lib/mask-canvas";
+import { fileToUploadDataUrl } from "@/lib/mask-canvas";
+import { readApiError } from "@/lib/api-error";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { VIDEO_TIERS, isPlanAtLeast, type Plan, type VideoQuality } from "@/lib/plans";
 import { toast } from "sonner";
@@ -68,7 +69,7 @@ function ImageToVideoPageInner() {
     setUploadPreview(preview);
     // Sent to /api/generate-video as-is — that route uploads a data: URI to
     // fal storage itself and resolves a real URL before submitting the job.
-    const dataUrl = await fileToDataUrl(file);
+    const dataUrl = await fileToUploadDataUrl(file);
     setSourceImageUrl(dataUrl);
   }
 
@@ -89,8 +90,7 @@ function ImageToVideoPageInner() {
         body: JSON.stringify({ prompt: genPrompt.trim(), ratio: "1:1" }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Generation failed. Try again.");
+        toast.error(await readApiError(res, "Generation failed. Try again."));
         setGenStatus("idle");
         return;
       }

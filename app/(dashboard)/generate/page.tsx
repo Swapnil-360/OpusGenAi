@@ -13,7 +13,8 @@ import {
   Droplets, Gem, Watch, Pill, Footprints, Briefcase, Smartphone, Flame,
 } from "lucide-react";
 import { useTemplates } from "@/lib/hooks/use-templates";
-import { fileToDataUrl } from "@/lib/mask-canvas";
+import { fileToUploadDataUrl } from "@/lib/mask-canvas";
+import { readApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_NOTIFICATION_PREFS, LOW_CREDIT_THRESHOLD, type NotificationPrefs } from "@/lib/notification-prefs";
 import { QUALITY_TIERS, canUseQuality, isPlanAtLeast, type Plan, type Quality } from "@/lib/plans";
@@ -236,7 +237,7 @@ function GeneratePageInner() {
     toast.loading("Analyzing…", { id: "enhance-progress", duration: 60000 });
 
     try {
-      const image = refFile ? await fileToDataUrl(refFile) : undefined;
+      const image = refFile ? await fileToUploadDataUrl(refFile) : undefined;
       const res = await fetch("/api/enhance-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -291,7 +292,7 @@ function GeneratePageInner() {
   async function generateWithProduct(productFile: File) {
     toast.loading("Generating with premium AI…", { id: "gen-progress", duration: 60000 });
 
-    const imageDataUrl = await fileToDataUrl(productFile);
+    const imageDataUrl = await fileToUploadDataUrl(productFile);
 
     const res = await fetch("/api/generate", {
       method: "POST",
@@ -309,10 +310,7 @@ function GeneratePageInner() {
 
     toast.dismiss("gen-progress");
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || "Generation failed. Try again.");
-    }
+    if (!res.ok) throw new Error(await readApiError(res, "Generation failed. Try again."));
 
     const { image, credits } = await res.json();
     if (typeof credits === "number") {
@@ -333,10 +331,7 @@ function GeneratePageInner() {
       }),
     });
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || "Generation failed. Try again.");
-    }
+    if (!res.ok) throw new Error(await readApiError(res, "Generation failed. Try again."));
 
     const { image, credits } = await res.json();
     if (typeof credits === "number") {

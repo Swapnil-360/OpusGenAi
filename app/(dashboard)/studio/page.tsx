@@ -7,7 +7,7 @@ import {
   RefreshCw, Sparkles, X,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { fileToDataUrl } from "@/lib/mask-canvas";
+import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { toast } from "sonner";
 
 /* ─── Tokens ───────────────────────────────────────────────────────── */
@@ -127,7 +127,7 @@ export default function StudioPage() {
       // Freshly uploaded files need converting to a data URL the server can
       // read; history images are already a real hosted URL — send as-is.
       const image = uploadedFile
-        ? await fileToDataUrl(uploadedFile)
+        ? await fileToUploadDataUrl(uploadedFile)
         : (selectedHistoryIdx !== null ? historyImages[selectedHistoryIdx]?.src : undefined);
 
       const res = await fetch("/api/caption", {

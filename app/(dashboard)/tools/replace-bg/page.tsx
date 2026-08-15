@@ -104,10 +104,18 @@ export default function ReplaceBgPage() {
 
   async function handleDownload() {
     if (!result) return;
+    // result is a remote fal.media URL — a plain <a download> is silently
+    // ignored by the browser for cross-origin links (it just navigates to
+    // the image instead of saving it), so the file has to come back as a
+    // same-origin blob first.
+    const res = await fetch(result);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = result;
+    a.href = url;
     a.download = `opusgen-replace-bg-${Date.now()}.png`;
     a.click();
+    URL.revokeObjectURL(url);
     toast.success("Downloading…");
   }
 

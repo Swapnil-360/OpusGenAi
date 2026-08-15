@@ -185,12 +185,22 @@ export default function UpscalePage() {
               </span>
             )}
           </div>
-          <ResultPanel status={status} result={result} accentColor={TOOL_COLOR} onDownload={() => {
+          <ResultPanel status={status} result={result} accentColor={TOOL_COLOR} onDownload={async () => {
             if (!result) return;
+            // result is a remote fal.media URL now (this used to be a base64
+            // data: URL before the upscale provider migration) — a plain
+            // <a download> is silently ignored by the browser for
+            // cross-origin links, so it just opened the image full-view
+            // instead of saving it. Needs to come back as a same-origin
+            // blob first.
+            const res = await fetch(result);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
-            a.href = result;
+            a.href = url;
             a.download = `opusgen-upscaled-${Date.now()}.png`;
             a.click();
+            URL.revokeObjectURL(url);
             toast.success("Downloading…");
           }} />
 

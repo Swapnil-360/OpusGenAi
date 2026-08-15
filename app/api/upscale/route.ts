@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { fal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { rejectIfBot } from "@/lib/bot-protect";
 
-const HF_KEY = process.env.HUGGINGFACE_API_KEY!;
-const HF_BASE = "https://router.huggingface.co/hf-inference/models";
-const MODEL = "caidas/swin2SR-realworld-sr-x4-large";
+// Was Hugging Face's caidas/swin2SR-realworld-sr-x4-large via router.huggingface.co
+// — HF stopped serving that model through the hf-inference provider ("Model
+// not supported by provider hf-inference", confirmed in production logs),
+// breaking this tool outright with no code change on our side. Migrated to
+// fal.ai (fal-ai/esrgan), matching every other image tool in this app.
+const MODEL = "fal-ai/esrgan";
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const CREDIT_COST = 2;
 
@@ -41,28 +45,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Image too large (max 10MB)." }, { status: 413 });
     }
 
-    const imageBytes = await file.arrayBuffer();
+    // Scale and face-enhancement map onto real UI controls (previously never
+    // even sent to this route, so neither did anything). "AI sharpening" /
+    // "Noise reduction" / "Micro-detail boost" stay UI-only — ESRGAN doesn't
+    // expose separate knobs for those; upscaling itself already sharpens and
+    // denoises, so there's no distinct model parameter to wire them to.
+    const scale = formData.get("scale") === "4" ? 4 : 2;
+    const face = formData.get("face") === "true";
 
-    const res = await fetch(`${HF_BASE}/${MODEL}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${HF_KEY}`,
-        "Content-Type": file.type || "image/jpeg",
-        "x-wait-for-model": "true",
-      },
-      body: imageBytes,
-    });
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("HF upscale error:", errText);
-      return NextResponse.json({ error: "Upscale failed. Try again." }, { status: 502 });
+    let imageUrl: string;
+    try {
+      imageUrl = await fal.storage.upload(file);
+    } catch (uploadError) {
+      console.error("fal.storage.upload failed (upscale):", uploadError);
+      return NextResponse.json({ error: "Failed to process the uploaded image." }, { status: 400 });
     }
 
-    const resultBuffer = await res.arrayBuffer();
-    const base64 = Buffer.from(resultBuffer).toString("base64");
-    const contentType = res.headers.get("content-type") || "image/png";
-    const image = `data:${contentType};base64,${base64}`;
+    let upscaledUrl: string | undefined;
+    try {
+      const result = await fal.subscribe(MODEL, { input: { image_url: imageUrl, scale, face } });
+      upscaledUrl = (result.data as { image?: { url: string } })?.image?.url;
+    } catch (err) {
+      console.error("fal esrgan error:", err);
+    }
+
+    if (!upscaledUrl) {
+      return NextResponse.json({ error: "Upscale failed. Try again." }, { status: 502 });
+    }
 
     const { error: insertError } = await supabase.from("generations").insert({
       user_id: user.id,
@@ -71,7 +80,7 @@ export async function POST(req: NextRequest) {
       prompt: null,
       credit_cost: CREDIT_COST,
       completed_at: new Date().toISOString(),
-      metadata: { images: [image] },
+      metadata: { images: [upscaledUrl] },
     });
     if (insertError) console.error("generations insert failed:", insertError.message);
 
@@ -79,7 +88,7 @@ export async function POST(req: NextRequest) {
       ? UNLIMITED_CREDITS_DISPLAY
       : await chargeCredits(user.id, CREDIT_COST, credits, "Upscale 4×");
 
-    return NextResponse.json({ image, credits: newCredits });
+    return NextResponse.json({ image: upscaledUrl, credits: newCredits });
   } catch (err) {
     console.error("upscale route error:", err);
     return NextResponse.json({ error: "Server error." }, { status: 500 });

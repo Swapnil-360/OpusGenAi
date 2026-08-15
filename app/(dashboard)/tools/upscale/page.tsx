@@ -56,6 +56,11 @@ export default function UpscalePage() {
     try {
       const fd = new FormData();
       fd.append("image", inputFile);
+      // Previously never sent — the server always ran a single hardcoded
+      // fixed-scale model, so picking 2x vs 4x (and every enhancement
+      // checkbox) did nothing at all regardless of what was selected here.
+      fd.append("scale", scale === "4x" ? "4" : "2");
+      fd.append("face", String(enhancements.has("face")));
       const res = await fetch("/api/upscale", { method: "POST", body: fd });
       if (!res.ok) {
         const err = await res.json();

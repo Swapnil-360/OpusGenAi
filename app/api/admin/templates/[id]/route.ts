@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ADMIN_EMAILS } from "@/lib/admin-config";
+import { invalidateTemplatesCache } from "@/lib/cache";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -45,6 +46,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: "Failed to update template" }, { status: 500 });
   }
 
+  invalidateTemplatesCache();
+
   return NextResponse.json({ ok: true });
 }
 
@@ -61,6 +64,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     console.error("Admin template delete error:", error.message);
     return NextResponse.json({ error: "Failed to delete template" }, { status: 500 });
   }
+
+  invalidateTemplatesCache();
 
   return NextResponse.json({ ok: true });
 }

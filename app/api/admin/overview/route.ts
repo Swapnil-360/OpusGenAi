@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ADMIN_EMAILS } from "@/lib/admin-config";
+import { cachedQuery, CACHE_TAGS, CACHE_TTL } from "@/lib/cache";
+
+// The route handler itself must run per-request (it reads the caller's
+// session cookie to check admin access) — matches every other cookie-reading
+// route in this app. The Data Cache below is a separate, inner layer around
+// just the expensive query, not a substitute for this.
+export const dynamic = "force-dynamic";
 
 async function fetchFalBalance(): Promise<{ balance: number; currency: string } | null> {
   const key = process.env.FAL_ADMIN_API_KEY;
@@ -19,17 +26,18 @@ async function fetchFalBalance(): Promise<{ balance: number; currency: string } 
   }
 }
 
-export async function GET() {
-  // Defense in depth — middleware already gates this path, but never trust
-  // that alone for a route reading every user's data.
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const email = user?.email?.toLowerCase();
-  if (!email || !(ADMIN_EMAILS as readonly string[]).includes(email)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  try {
+/**
+ * Cached because it's genuinely expensive — a full unfiltered scan of every
+ * generation ever created, every auth user (up to 1000), plus a network call
+ * to fal's own billing API — for a dashboard that only 2 admin accounts ever
+ * view. TTL-only invalidation (no mutation hooks): this aggregates activity
+ * across every user's every action, so there's no single mutation to hang
+ * "the stats changed" off of the way there is for a template edit. A 60s-old
+ * admin dashboard is expected, not a correctness bug — nothing in the app
+ * reads these numbers back to make a decision.
+ */
+const getCachedOverview = cachedQuery(
+  async () => {
     const admin = createAdminClient();
 
     const [{ data: profiles, error: profilesError }, { data: authList, error: authError }, { data: generations, error: genError }, falBilling] =
@@ -74,7 +82,7 @@ export async function GET() {
 
     const totalCreditsRemaining = users.reduce((a, u) => a + u.credits, 0);
 
-    return NextResponse.json({
+    return {
       stats: {
         totalUsers: users.length,
         totalGenerations: (generations ?? []).length,
@@ -85,7 +93,25 @@ export async function GET() {
         falCurrency: falBilling?.currency ?? "USD",
       },
       users,
-    });
+    };
+  },
+  ["admin", "overview"],
+  { tags: [CACHE_TAGS.adminOverview], revalidateSeconds: CACHE_TTL.adminOverview }
+);
+
+export async function GET() {
+  // Defense in depth — middleware already gates this path, but never trust
+  // that alone for a route reading every user's data.
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const email = user?.email?.toLowerCase();
+  if (!email || !(ADMIN_EMAILS as readonly string[]).includes(email)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const overview = await getCachedOverview();
+    return NextResponse.json(overview);
   } catch (e) {
     console.error("Admin overview route error:", e);
     return NextResponse.json({ error: "Failed to load admin data" }, { status: 500 });

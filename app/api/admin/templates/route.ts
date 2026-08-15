@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ADMIN_EMAILS } from "@/lib/admin-config";
+import { invalidateTemplatesCache } from "@/lib/cache";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -79,6 +80,11 @@ export async function POST(req: NextRequest) {
     console.error("Admin template create error:", error.message);
     return NextResponse.json({ error: "Failed to create template" }, { status: 500 });
   }
+
+  // Only after the insert is confirmed — an invalidation before a write
+  // that then fails would just cache the stale list right back on the next
+  // read, which is why this is the last thing this handler does.
+  invalidateTemplatesCache();
 
   return NextResponse.json({ id: data.id });
 }

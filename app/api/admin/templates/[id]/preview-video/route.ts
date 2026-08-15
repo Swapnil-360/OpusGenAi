@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminUser } from "@/lib/require-admin";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { invalidateTemplatesCache } from "@/lib/cache";
 
 const BUCKET = "template-videos";
 const MAX_BYTES = 50 * 1024 * 1024; // matches the bucket's own file_size_limit
@@ -86,6 +87,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Failed to save" }, { status: 500 });
   }
 
+  invalidateTemplatesCache();
+
   return NextResponse.json({ url: bustedUrl });
 }
 
@@ -109,6 +112,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     console.error("Template preview video clear error:", error.message);
     return NextResponse.json({ error: "Failed to remove" }, { status: 500 });
   }
+
+  invalidateTemplatesCache();
 
   return NextResponse.json({ ok: true });
 }

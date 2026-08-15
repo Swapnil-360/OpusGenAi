@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ADMIN_EMAILS } from "@/lib/admin-config";
 import { fal } from "@/lib/fal";
+import { invalidateTemplatesCache } from "@/lib/cache";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -80,6 +81,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       console.error("Template cover_image_url update error:", updateError.message);
       return NextResponse.json({ error: "Failed to save preview image" }, { status: 500 });
     }
+
+    invalidateTemplatesCache();
 
     return NextResponse.json({ url: bustedUrl });
   } catch (e) {

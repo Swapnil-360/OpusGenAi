@@ -22,6 +22,7 @@ import {
   Zap,
   Archive,
   Eye,
+  Search,
   Megaphone,
   Sparkles,
   Wrench,
@@ -313,6 +314,23 @@ export default function AdminPage() {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [templateSearch, setTemplateSearch] = useState("");
+  const [templateTypeFilter, setTemplateTypeFilter] = useState<TemplateType | "all">("all");
+  const [previewTemplate, setPreviewTemplate] = useState<AdminTemplate | null>(null);
+
+  // Search matches name/description/category/tags — cheap client-side filter
+  // over an already-small (~30 row) list, no need for a server round trip.
+  const filteredTemplates = templates.filter((t) => {
+    if (templateTypeFilter !== "all" && t.templateType !== templateTypeFilter) return false;
+    const q = templateSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      t.name.toLowerCase().includes(q) ||
+      t.description.toLowerCase().includes(q) ||
+      t.category.toLowerCase().includes(q) ||
+      t.tags.some((tag) => tag.toLowerCase().includes(q))
+    );
+  });
 
   // ── video-template preview clip state ────────────────────────────────────────
   // videoTarget = the video template whose preview clip is being managed
@@ -1280,9 +1298,45 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Inline add/edit form */}
+            {/* Search + type filter — 30+ templates across 4 types was getting hard
+                to scan; this filters the list below without touching the counts
+                shown above (those stay based on the full set). */}
+            <div className="flex flex-wrap items-center gap-2 mb-5">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: T.dim }} />
+                <input value={templateSearch} onChange={(e) => setTemplateSearch(e.target.value)}
+                  placeholder="Search name, description, category, tags…"
+                  className="w-full h-9 pl-9 pr-3 rounded-xl text-sm outline-none"
+                  style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {(["all", "production", "universal", "campaign", "video"] as const).map((t) => {
+                  const active = templateTypeFilter === t;
+                  return (
+                    <button key={t} onClick={() => setTemplateTypeFilter(t)}
+                      className="h-9 px-3 rounded-xl text-xs font-bold capitalize transition-colors"
+                      style={active
+                        ? { background: T.redPrimary, color: "white" }
+                        : { background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}`, color: T.muted }}>
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Add/edit form — a modal, not an inline panel: with 30+ templates the
+                list can be much taller than the viewport, and an inline panel at
+                the top of the page opened completely out of view for anything
+                clicked further down (worst for video templates, which sort last) —
+                looked exactly like the Edit button silently doing nothing. */}
             {templateForm && (
-              <div className="p-5 rounded-2xl mb-6" style={{ background: T.card, border: `1px solid ${T.redBorder}` }}>
+              <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-6 overflow-y-auto"
+                style={{ background: "rgba(0,0,0,0.72)" }}
+                onClick={() => setTemplateForm(null)}>
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full sm:max-w-2xl my-0 sm:my-auto p-5 rounded-none sm:rounded-2xl" style={{ background: T.card, border: `1px solid ${T.redBorder}` }}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-black" style={{ color: T.text }}>{templateForm.id ? "Edit template" : "New template"}</h3>
                   <button onClick={() => setTemplateForm(null)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: T.dim }}>
@@ -1399,6 +1453,7 @@ export default function AdminPage() {
                     Cancel
                   </button>
                 </div>
+              </motion.div>
               </div>
             )}
 
@@ -1408,8 +1463,15 @@ export default function AdminPage() {
               {!templatesLoading && templates.length === 0 && (
                 <p className="text-xs text-center py-8" style={{ color: T.dim }}>No templates yet — add one to get started.</p>
               )}
-              {templates.map((tpl) => (
-                <div key={tpl.id} className="flex items-center gap-3 p-3 rounded-xl" style={{ background: T.card, border: `1px solid ${T.border}` }}>
+              {!templatesLoading && templates.length > 0 && filteredTemplates.length === 0 && (
+                <p className="text-xs text-center py-8" style={{ color: T.dim }}>
+                  No templates match {templateSearch ? `"${templateSearch}"` : "that filter"}.
+                </p>
+              )}
+              {filteredTemplates.map((tpl) => (
+                <div key={tpl.id} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors hover:bg-white/[0.02]"
+                  onClick={() => setPreviewTemplate(tpl)}
+                  style={{ background: T.card, border: `1px solid ${T.border}` }}>
                   {tpl.previewVideoUrl ? (
                     <video src={tpl.previewVideoUrl} poster={tpl.coverImageUrl ?? undefined}
                       muted loop playsInline preload="metadata"
@@ -1449,7 +1511,7 @@ export default function AdminPage() {
                     <p className="text-xs truncate mt-0.5" style={{ color: T.dim }}>{tpl.description}</p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                     {tpl.templateType === "video" && (
                       <button onClick={() => setVideoTarget(tpl)}
                         title="Preview clip — the video that plays on the landing page"
@@ -1605,6 +1667,87 @@ export default function AdminPage() {
                           ))}
                         </div>
                       )}
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* Preview modal — every template gets one, opened by clicking its row.
+                Read-only view of exactly what a user would see (media + name +
+                category + description + tags) plus the prompt underneath, since
+                the admin is the one audience that's supposed to see it. */}
+            {previewTemplate && (
+              <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-0 sm:p-6 overflow-y-auto"
+                style={{ background: "rgba(0,0,0,0.72)" }}
+                onClick={() => setPreviewTemplate(null)}>
+                <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="w-full sm:max-w-lg my-0 sm:my-auto rounded-none sm:rounded-2xl overflow-hidden"
+                  style={{ background: T.card, border: `1px solid ${T.border}` }}>
+
+                  <div className="relative aspect-video" style={{ background: `linear-gradient(160deg, ${previewTemplate.accentColor}30 0%, ${T.bg} 85%)` }}>
+                    {previewTemplate.previewVideoUrl ? (
+                      <video src={previewTemplate.previewVideoUrl} poster={previewTemplate.coverImageUrl ?? undefined}
+                        controls loop playsInline className="w-full h-full object-contain" style={{ background: "#000" }} />
+                    ) : previewTemplate.coverImageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={previewTemplate.coverImageUrl} alt={previewTemplate.name} className="w-full h-full object-contain" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <ImagePlus className="w-8 h-8" style={{ color: T.dim }} />
+                      </div>
+                    )}
+                    <button onClick={() => setPreviewTemplate(null)}
+                      className="absolute top-3 right-3 w-8 h-8 rounded-lg flex items-center justify-center"
+                      style={{ background: "rgba(0,0,0,0.6)", border: "1px solid rgba(255,255,255,0.15)" }}>
+                      <X className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+
+                  <div className="p-5">
+                    <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                      <h3 className="text-sm font-black" style={{ color: T.text }}>{previewTemplate.name}</h3>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ background: `${previewTemplate.accentColor}20`, color: previewTemplate.accentColor }}>
+                        {previewTemplate.category}
+                      </span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ background: "rgba(255,255,255,0.06)", color: T.muted }}>
+                        {previewTemplate.templateType}
+                      </span>
+                      {previewTemplate.isPro && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>PRO</span>
+                      )}
+                    </div>
+                    <p className="text-xs mb-3" style={{ color: T.muted }}>{previewTemplate.description}</p>
+
+                    {previewTemplate.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {previewTemplate.tags.map((tag) => (
+                          <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.04)", color: T.dim }}>{tag}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    {previewTemplate.imageSlots.length > 0 && (
+                      <p className="text-[11px] mb-3" style={{ color: T.dim }}>
+                        Needs {previewTemplate.imageSlots.length} extra photo{previewTemplate.imageSlots.length === 1 ? "" : "s"}: {previewTemplate.imageSlots.join(", ")}
+                      </p>
+                    )}
+
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: T.dim }}>Prompt</p>
+                    <div className="max-h-32 overflow-y-auto rounded-xl p-3 mb-4" style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
+                      <p className="text-[11px] leading-relaxed whitespace-pre-wrap" style={{ color: T.muted }}>{previewTemplate.prompt}</p>
+                    </div>
+
+                    <div className="flex items-center gap-2.5">
+                      <button onClick={() => { setTemplateForm(templateToForm(previewTemplate)); setPreviewTemplate(null); }}
+                        className="flex items-center gap-1.5 h-9 px-4 rounded-xl text-sm font-bold text-white"
+                        style={{ background: T.redPrimary }}>
+                        <Pencil className="w-3.5 h-3.5" /> Edit
+                      </button>
+                      <button onClick={() => setPreviewTemplate(null)} className="h-9 px-4 rounded-xl text-sm font-semibold" style={{ color: T.muted }}>
+                        Close
+                      </button>
                     </div>
                   </div>
                 </motion.div>

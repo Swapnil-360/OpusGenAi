@@ -2,17 +2,25 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, X, Menu } from "lucide-react";
-import { TOOLS } from "@/lib/tools-config";
+import { X, Menu } from "lucide-react";
 import { LogoBrand } from "@/components/shared/LogoBrand";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { createClient } from "@/lib/supabase/client";
 
+// "Tools" used to point at a landing-page section (id="tools") that was
+// removed when the Toolbox section was replaced by Video Templates — that
+// nav entry was left behind pointing at nothing. Templates is now two links,
+// not one, since there are two distinct template types a visitor should
+// know about; Image before Video matches the order the sections themselves
+// appear in on the page. Gallery is a real route (not a `#section`), same as
+// Home — the pathname check below handles highlighting it correctly.
 const NAV_LINKS = [
   { href: "/", label: "Home", section: null },
-  { href: "#tools", label: "Tools", section: "tools" },
-  { href: "#templates", label: "Templates", section: "templates" },
+  { href: "#templates", label: "Image Templates", section: "templates" },
+  { href: "#video-templates", label: "Video Templates", section: "video-templates" },
+  { href: "/gallery", label: "Gallery", section: null },
   { href: "#pricing", label: "Pricing", section: "pricing" },
 ];
 
@@ -23,6 +31,7 @@ function getInitials(name: string): string {
 }
 
 export function LandingNav() {
+  const pathname = usePathname();
   const [active, setActive] = useState("Home");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [authUser, setAuthUser] = useState<AuthUser>(null);
@@ -69,25 +78,35 @@ export function LandingNav() {
     return () => subscription.unsubscribe();
   }, []);
 
-  /* Track active section on scroll */
+  /* Track active section on scroll — only meaningful on the landing page
+   * itself, since these section ids only exist there. On a real route like
+   * /gallery, active is driven by pathname instead (below). */
   useEffect(() => {
+    if (pathname !== "/") return;
+    const sectionLinks = NAV_LINKS.filter((l) => l.section);
     const handler = () => {
-      const ids = ["tools", "templates", "pricing"];
       let found = "Home";
-      for (const id of ids) {
-        const el = document.getElementById(id);
+      for (const { section, label } of sectionLinks) {
+        const el = document.getElementById(section!);
         if (el) {
           const { top } = el.getBoundingClientRect();
-          if (top <= 120) {
-            found = id.charAt(0).toUpperCase() + id.slice(1);
-          }
+          if (top <= 120) found = label;
         }
       }
       setActive(found);
     };
+    handler();
     window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
-  }, []);
+  }, [pathname]);
+
+  /* Non-landing routes with their own nav entry (currently just Gallery)
+   * highlight by pathname instead of scroll position. */
+  useEffect(() => {
+    if (pathname === "/") return;
+    const match = NAV_LINKS.find((l) => l.href === pathname);
+    setActive(match?.label ?? "Home");
+  }, [pathname]);
 
   return (
     <>
@@ -243,33 +262,6 @@ export function LandingNav() {
                     }}
                   >
                     {label}
-                  </Link>
-                ))}
-                <div className="h-px my-1" style={{ background: "rgba(255,255,255,0.05)" }} />
-                {/* Tools */}
-                {TOOLS.map((tool) => (
-                  <Link
-                    key={tool.id}
-                    href={tool.href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl transition-colors"
-                    style={{ color: "rgba(255,255,255,0.45)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-                      e.currentTarget.style.color = "rgba(255,255,255,0.8)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = "rgba(255,255,255,0.45)";
-                    }}
-                  >
-                    <div
-                      className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
-                      style={{ background: `${tool.accentColor}20` }}
-                    >
-                      <Sparkles className="w-2.5 h-2.5" style={{ color: tool.accentColor }} />
-                    </div>
-                    <span className="text-[13px] font-medium">{tool.label}</span>
                   </Link>
                 ))}
                 <div className="h-px my-1" style={{ background: "rgba(255,255,255,0.05)" }} />

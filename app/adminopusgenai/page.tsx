@@ -38,6 +38,9 @@ import {
   Clapperboard,
   Film,
   Upload,
+  GalleryThumbnails,
+  ThumbsDown,
+  ThumbsUp,
 } from "lucide-react";
 import {
   DEFAULT_BANNER,
@@ -114,6 +117,33 @@ type AdminVideo = {
   quality: string | null;
   createdAt: string;
 };
+
+// One gallery submission or admin-added showcase item, as returned by
+// /api/admin/gallery — every status (pending/approved/rejected), unlike the
+// public read which only ever sees approved rows.
+type AdminGalleryItem = {
+  id: string;
+  generation_id: string | null;
+  media_type: "image" | "video";
+  media_url: string;
+  cover_image_url: string | null;
+  caption: string | null;
+  submitted_by: string | null;
+  source: "user_submitted" | "admin_added";
+  status: "pending" | "approved" | "rejected";
+  sort_order: number;
+  created_at: string;
+  approved_at: string | null;
+  // Supabase's JS client returns a to-one embedded relation as an object,
+  // but this has been observed to come back as a single-element array
+  // depending on client/query-shape — typed for both so rendering can't crash.
+  submitter: { full_name: string | null } | { full_name: string | null }[] | null;
+};
+
+function submitterName(item: AdminGalleryItem): string | null {
+  const s = Array.isArray(item.submitter) ? item.submitter[0] : item.submitter;
+  return s?.full_name ?? null;
+}
 
 type HeroSettings = {
   mode: "random" | "selected" | "custom";
@@ -246,7 +276,7 @@ const BANNER_MODES: { mode: BannerMode; label: string; icon: React.ElementType; 
 export default function AdminPage() {
   const router = useRouter();
   const [adminEmail, setAdminEmail] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "messages" | "feedback" | "users" | "templates" | "hero">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "messages" | "feedback" | "users" | "templates" | "hero" | "gallery">("overview");
   const [banner, setBanner] = useState<BannerConfig>(DEFAULT_BANNER);
   const [welcome, setWelcome] = useState<WelcomeConfig>(DEFAULT_WELCOME);
   const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
@@ -311,6 +341,71 @@ export default function AdminPage() {
   const [heroLoading, setHeroLoading] = useState(true);
   const [savingHero, setSavingHero] = useState(false);
   const [uploadingHero, setUploadingHero] = useState(false);
+
+  // ── gallery tab state ────────────────────────────────────────────────────────
+  const [galleryItems, setGalleryItems] = useState<AdminGalleryItem[]>([]);
+  const [galleryLoading, setGalleryLoading] = useState(true);
+  const [galleryReloadKey, setGalleryReloadKey] = useState(0);
+  const refetchGallery = () => setGalleryReloadKey((k) => k + 1);
+  const [galleryActionId, setGalleryActionId] = useState<string | null>(null);
+  const [uploadingGalleryFile, setUploadingGalleryFile] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setGalleryLoading(true);
+    fetch("/api/admin/gallery", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { items: [] }))
+      .then((data) => { if (!cancelled) setGalleryItems(data.items ?? []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setGalleryLoading(false); });
+    return () => { cancelled = true; };
+  }, [galleryReloadKey]);
+
+  async function reviewGalleryItem(id: string, status: "approved" | "rejected") {
+    setGalleryActionId(id);
+    const res = await fetch(`/api/admin/gallery/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setGalleryActionId(null);
+    if (!res.ok) {
+      toast.error(await readApiError(res, "Failed to update."));
+      return;
+    }
+    toast.success(status === "approved" ? "Approved — now live in the gallery." : "Rejected.");
+    refetchGallery();
+  }
+
+  async function deleteGalleryItem(id: string) {
+    if (!confirm("Remove this from the gallery? This can't be undone.")) return;
+    setGalleryActionId(id);
+    const res = await fetch(`/api/admin/gallery/${id}`, { method: "DELETE" });
+    setGalleryActionId(null);
+    if (!res.ok) {
+      toast.error(await readApiError(res, "Failed to remove."));
+      return;
+    }
+    toast.success("Removed.");
+    refetchGallery();
+  }
+
+  // Raw bytes, same as the template preview-video upload — no base64 inflation.
+  async function uploadGalleryFile(file: File) {
+    setUploadingGalleryFile(true);
+    const res = await fetch("/api/admin/gallery", {
+      method: "POST",
+      headers: { "Content-Type": file.type || "application/octet-stream" },
+      body: file,
+    });
+    setUploadingGalleryFile(false);
+    if (!res.ok) {
+      toast.error(await readApiError(res, "Upload failed."));
+      return;
+    }
+    toast.success("Added to the gallery.");
+    refetchGallery();
+  }
 
   useEffect(() => {
     const supabase = createClient();
@@ -708,6 +803,7 @@ export default function AdminPage() {
     { id: "users", label: "Users", icon: Users },
     { id: "templates", label: "Templates", icon: Layers },
     { id: "hero", label: "Hero", icon: Images },
+    { id: "gallery", label: "Gallery", icon: GalleryThumbnails },
   ] as const;
 
   return (
@@ -768,6 +864,12 @@ export default function AdminPage() {
                   <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center"
                     style={{ background: active ? "rgba(255,255,255,0.25)" : T.redBg, color: active ? "white" : T.red }}>
                     {newFeedbackCount}
+                  </span>
+                )}
+                {id === "gallery" && galleryItems.filter((g) => g.status === "pending").length > 0 && (
+                  <span className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center"
+                    style={{ background: active ? "rgba(255,255,255,0.25)" : T.redBg, color: active ? "white" : T.red }}>
+                    {galleryItems.filter((g) => g.status === "pending").length}
                   </span>
                 )}
               </button>
@@ -1614,6 +1716,113 @@ export default function AdminPage() {
                 </>
               )}
             </div>
+          </motion.div>
+        )}
+
+        {/* ── GALLERY TAB ────────────────────────────────────────────────── */}
+        {activeTab === "gallery" && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+              <p className="text-xs" style={{ color: T.muted }}>
+                {galleryLoading
+                  ? "Loading…"
+                  : `${galleryItems.length} items · ${galleryItems.filter((g) => g.status === "pending").length} pending review`}
+              </p>
+              <label className="flex items-center gap-1.5 text-xs px-3 h-8 rounded-lg font-semibold cursor-pointer transition-opacity hover:opacity-80"
+                style={{ background: T.card, border: `1px solid ${T.border}`, color: T.muted, opacity: uploadingGalleryFile ? 0.5 : 1 }}>
+                <input type="file" accept="image/*,video/*" className="hidden" disabled={uploadingGalleryFile}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadGalleryFile(f); e.target.value = ""; }} />
+                <Upload className="w-3.5 h-3.5" />
+                {uploadingGalleryFile ? "Uploading…" : "Add manually"}
+              </label>
+            </div>
+
+            {galleryLoading && <p className="text-xs text-center py-8" style={{ color: T.dim }}>Loading…</p>}
+            {!galleryLoading && galleryItems.length === 0 && (
+              <p className="text-xs text-center py-8" style={{ color: T.dim }}>
+                No submissions yet — items users submit from History will show up here for review.
+              </p>
+            )}
+
+            {!galleryLoading && (
+              <div className="space-y-8">
+                {(["pending", "approved", "rejected"] as const).map((status) => {
+                  const rows = galleryItems.filter((g) => g.status === status);
+                  if (rows.length === 0) return null;
+                  const sectionLabel = status === "pending" ? "Pending review" : status === "approved" ? "Approved — live in the gallery" : "Rejected";
+                  return (
+                    <div key={status}>
+                      <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: T.muted }}>
+                        {sectionLabel} <span style={{ color: T.dim }}>({rows.length})</span>
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {rows.map((item) => (
+                          <div key={item.id} className="rounded-xl overflow-hidden" style={{ background: T.card, border: `1px solid ${T.border}` }}>
+                            <div className="relative aspect-video" style={{ background: "#0d0303" }}>
+                              {item.media_type === "video" ? (
+                                <video src={item.media_url} poster={item.cover_image_url ?? undefined}
+                                  muted loop playsInline preload="metadata"
+                                  onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
+                                  onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                                  className="w-full h-full object-cover" />
+                              ) : (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={item.media_url} alt="" className="w-full h-full object-cover" />
+                              )}
+                              <span className="absolute top-1.5 left-1.5 text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase"
+                                style={{ background: "rgba(0,0,0,0.65)", color: item.source === "admin_added" ? "#fbbf24" : T.blue }}>
+                                {item.source === "admin_added" ? "Admin" : "User"}
+                              </span>
+                            </div>
+                            <div className="p-2.5">
+                              {item.caption ? (
+                                <p className="text-[11px] line-clamp-2 mb-1.5" style={{ color: T.muted }}>{item.caption}</p>
+                              ) : (
+                                <p className="text-[11px] mb-1.5" style={{ color: T.dim }}>No caption</p>
+                              )}
+                              {submitterName(item) && (
+                                <p className="text-[10px] mb-2" style={{ color: T.dim }}>by {submitterName(item)}</p>
+                              )}
+                              <div className="flex items-center gap-1.5">
+                                {status === "pending" && (
+                                  <>
+                                    <button onClick={() => reviewGalleryItem(item.id, "approved")} disabled={galleryActionId === item.id}
+                                      title="Approve"
+                                      className="flex-1 h-7 rounded-lg flex items-center justify-center gap-1 text-[10px] font-bold disabled:opacity-50"
+                                      style={{ background: T.greenBg, color: T.green, border: `1px solid rgba(74,222,128,0.25)` }}>
+                                      <ThumbsUp className="w-3 h-3" /> Approve
+                                    </button>
+                                    <button onClick={() => reviewGalleryItem(item.id, "rejected")} disabled={galleryActionId === item.id}
+                                      title="Reject"
+                                      className="flex-1 h-7 rounded-lg flex items-center justify-center gap-1 text-[10px] font-bold disabled:opacity-50"
+                                      style={{ background: T.redBg, color: T.red, border: `1px solid ${T.redBorder}` }}>
+                                      <ThumbsDown className="w-3 h-3" /> Reject
+                                    </button>
+                                  </>
+                                )}
+                                {status === "rejected" && (
+                                  <button onClick={() => reviewGalleryItem(item.id, "approved")} disabled={galleryActionId === item.id}
+                                    className="flex-1 h-7 rounded-lg flex items-center justify-center gap-1 text-[10px] font-bold disabled:opacity-50"
+                                    style={{ background: T.greenBg, color: T.green, border: `1px solid rgba(74,222,128,0.25)` }}>
+                                    <ThumbsUp className="w-3 h-3" /> Approve instead
+                                  </button>
+                                )}
+                                <button onClick={() => deleteGalleryItem(item.id)} disabled={galleryActionId === item.id}
+                                  title="Delete"
+                                  className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center disabled:opacity-50"
+                                  style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
+                                  <Trash2 className="w-3 h-3" style={{ color: T.muted }} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </motion.div>
         )}
 

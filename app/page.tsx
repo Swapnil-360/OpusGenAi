@@ -774,26 +774,33 @@ export default function LandingPage() {
                   >
                     <div className="relative aspect-video overflow-hidden" style={{ background: `linear-gradient(150deg, ${tpl.accentColor}26 0%, #0d0303 85%)` }}>
                       {tpl.previewVideoUrl ? (
+                        // Always playing, not hover-to-play — a visitor should see the
+                        // actual motion output without having to discover a hover
+                        // interaction first. autoPlay requires muted to satisfy browser
+                        // autoplay policy, which this already was for the hover version.
                         <video
                           src={tpl.previewVideoUrl}
                           poster={tpl.coverImageUrl ?? undefined}
-                          muted loop playsInline preload="metadata"
-                          onMouseEnter={(e) => e.currentTarget.play().catch(() => {})}
-                          onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                          autoPlay muted loop playsInline preload="auto"
                           className="w-full h-full object-cover"
                         />
                       ) : tpl.coverImageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={tpl.coverImageUrl} alt={tpl.name} className="w-full h-full object-cover" />
                       ) : null}
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform group-hover:scale-110"
-                          style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)" }}
-                        >
-                          <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                      {/* Only shown over the static fallback (no clip yet) — a "click to
+                          play" affordance on top of a video that's already autoplaying
+                          would be misleading. */}
+                      {!tpl.previewVideoUrl && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center backdrop-blur-sm transition-transform group-hover:scale-110"
+                            style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.2)" }}
+                          >
+                            <Play className="w-4 h-4 text-white fill-white ml-0.5" />
+                          </div>
                         </div>
-                      </div>
+                      )}
                       <span
                         className="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
                         style={{ background: "rgba(0,0,0,0.65)", color: "white", border: `1px solid ${tpl.accentColor}66` }}

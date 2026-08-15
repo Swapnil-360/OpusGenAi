@@ -11,6 +11,7 @@ import {
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { VIDEO_TIERS, MULTI_IMAGE_VIDEO_TIER, type VideoQuality } from "@/lib/plans";
 import { formatTimeAgo, truncate } from "@/lib/utils";
+import { readApiError } from "@/lib/api-error";
 import { toast } from "sonner";
 
 const W = {
@@ -46,6 +47,8 @@ export default function HistoryPage() {
   const [fullViewSrc, setFullViewSrc] = useState<string | null>(null);
   const [starred, setStarred] = useState<Set<string>>(new Set());
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [submittedIds, setSubmittedIds] = useState<Set<string>>(new Set());
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [allGenerations, setAllGenerations] = useState<CombinedEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -118,6 +121,34 @@ export default function HistoryPage() {
     setCopiedId(id);
     toast.success("Prompt copied!");
     setTimeout(() => setCopiedId(null), 1800);
+  }
+
+  async function submitToGallery(id: string) {
+    setSubmittingId(id);
+    try {
+      const res = await fetch("/api/gallery/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ generationId: id }),
+      });
+      if (!res.ok) {
+        if (res.status === 409) {
+          // Already submitted (e.g. in an earlier session) — treat as success
+          // for the button's own state rather than showing an error.
+          setSubmittedIds((prev) => new Set(prev).add(id));
+          toast.info("Already submitted for review.");
+          return;
+        }
+        toast.error(await readApiError(res, "Couldn't submit. Try again."));
+        return;
+      }
+      setSubmittedIds((prev) => new Set(prev).add(id));
+      toast.success("Submitted! We'll review it for the public gallery.");
+    } catch {
+      toast.error("Network error. Check your connection.");
+    } finally {
+      setSubmittingId(null);
+    }
   }
 
   async function downloadFile(src: string, extension: string = "png") {
@@ -570,7 +601,23 @@ export default function HistoryPage() {
                 })()}
               </div>
 
-              <div className="px-5 pb-5 pt-3 flex gap-2 shrink-0" style={{ borderTop: `1px solid ${W.border}` }}>
+              <div className="px-5 pb-5 pt-3 flex flex-wrap gap-2 shrink-0" style={{ borderTop: `1px solid ${W.border}` }}>
+                {selectedGen.status === "completed" && (
+                  <button
+                    onClick={() => submitToGallery(selectedGen.id)}
+                    disabled={submittingId === selectedGen.id || submittedIds.has(selectedGen.id)}
+                    className="flex-1 h-9 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-60"
+                    style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+                    onMouseEnter={(e) => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = W.glassDim; e.currentTarget.style.color = W.text; } }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = W.glass; e.currentTarget.style.color = W.muted; }}
+                  >
+                    {submittedIds.has(selectedGen.id)
+                      ? <><Check className="w-3.5 h-3.5 text-emerald-400" />Submitted</>
+                      : submittingId === selectedGen.id
+                        ? "Submitting…"
+                        : <><Star className="w-3.5 h-3.5" />Submit to Gallery</>}
+                  </button>
+                )}
                 <button
                   onClick={() => copyPrompt(selectedGen.prompt, selectedGen.id)}
                   className="flex-1 h-9 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"

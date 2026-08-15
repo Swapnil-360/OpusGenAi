@@ -20,6 +20,7 @@ const MAINTENANCE_ALLOWED_PREFIXES = [
   "/terms",
   "/cookie-policy",
   "/refund",
+  "/gallery", // showcase page — informational, not "processing" anything
 ];
 
 // The landing page ("/") is the one bare-root exception — checked separately

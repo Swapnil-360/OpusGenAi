@@ -83,16 +83,28 @@ export const CAMPAIGN_CATEGORIES: { id: string; label: string }[] = [
   { id: "identity", label: "Brand Identity" },
 ];
 
-// Video templates are motion prompts for the image-to-video generator — the
-// vocabulary is camera movement and mood rather than scene/surface, so again
-// its own list.
+// Video templates are one motion concept per product category (not a style
+// axis like the original camera-movement set) — each row's `category` is the
+// product type it was written for, so this doubles as both the filter list
+// and the label shown directly on each template card.
 export const VIDEO_CATEGORIES: { id: string; label: string }[] = [
   { id: "all", label: "All Templates" },
-  { id: "luxury", label: "Luxury" },
-  { id: "dynamic", label: "Dynamic" },
-  { id: "natural", label: "Natural" },
-  { id: "moody", label: "Moody" },
-  { id: "minimal", label: "Minimal" },
+  { id: "cosmetics", label: "Cosmetics" },
+  { id: "lipstick", label: "Lipstick / Lip Tint" },
+  { id: "skincare", label: "Skincare / Serum" },
+  { id: "perfume", label: "Perfume" },
+  { id: "drinks", label: "Drinks" },
+  { id: "soda", label: "Soda" },
+  { id: "energy-drink", label: "Energy Drink" },
+  { id: "ice-cream", label: "Ice Cream" },
+  { id: "chocolate", label: "Chocolate / Candy" },
+  { id: "shoes", label: "Shoes" },
+  { id: "sneakers", label: "Sneakers" },
+  { id: "clothing", label: "Clothing" },
+  { id: "watch-jewelry", label: "Watch / Jewelry" },
+  { id: "food-packaging", label: "Food Packaging" },
+  { id: "electronics", label: "Electronics" },
+  { id: "generic", label: "Generic Product" },
 ];
 
 export function getTemplateById(templates: Template[], id: string): Template | undefined {

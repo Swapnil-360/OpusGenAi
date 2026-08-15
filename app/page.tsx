@@ -15,6 +15,7 @@ import {
 import { ArrowRight, Check, Play } from "lucide-react";
 import { PLANS, MOCK_CURRENT_USER, type Plan } from "@/lib/mock-data";
 import { useTemplates } from "@/lib/hooks/use-templates";
+import { VIDEO_CATEGORIES } from "@/lib/templates-data";
 import { useHeroImages } from "@/lib/hooks/use-hero-images";
 import { FeaturedCarousel } from "@/components/templates/featured-carousel";
 import { LandingNav } from "@/components/landing/LandingNav";
@@ -450,6 +451,11 @@ export default function LandingPage() {
   // covers everything else.
   const VIDEO_TEMPLATES = ALL_TEMPLATES.filter((t) => t.templateType === "video");
   const IMAGE_TEMPLATES = ALL_TEMPLATES.filter((t) => t.templateType !== "video");
+  // Video templates are now one per product category (cosmetics, skincare,
+  // sneakers, ...) rather than a style axis, so the category itself is worth
+  // surfacing on the card — this is what turns the raw "sneakers" id into
+  // the "Sneakers" label shown below.
+  const videoCategoryLabel = (id: string) => VIDEO_CATEGORIES.find((c) => c.id === id)?.label ?? id;
   const { images: heroImages } = useHeroImages(8);
   const orbitAngle = useMotionValue(0);
   useAnimationFrame((t) => {
@@ -788,6 +794,12 @@ export default function LandingPage() {
                           <Play className="w-4 h-4 text-white fill-white ml-0.5" />
                         </div>
                       </div>
+                      <span
+                        className="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
+                        style={{ background: "rgba(0,0,0,0.65)", color: "white", border: `1px solid ${tpl.accentColor}66` }}
+                      >
+                        {videoCategoryLabel(tpl.category)}
+                      </span>
                       {tpl.isPro && (
                         <span
                           className="absolute top-2 right-2 text-[9px] font-black px-1.5 py-0.5 rounded-full"

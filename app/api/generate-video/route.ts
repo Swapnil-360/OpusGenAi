@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, refundCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { getUserPlan } from "@/lib/entitlements";
-import { VIDEO_TIERS, canUseVideoQuality, canUseMultiImageVideo, MULTI_IMAGE_VIDEO_TIER, type VideoQuality } from "@/lib/plans";
+import { VIDEO_TIERS, canUseVideoQuality, canUseMultiImageVideo, hasReachedBasicVideoLimit, BASIC_STANDARD_VIDEO_LIMIT, MULTI_IMAGE_VIDEO_TIER, type VideoQuality } from "@/lib/plans";
 import { resolveTemplatePrompt } from "@/lib/template-prompt";
 import { rejectIfBot } from "@/lib/bot-protect";
 
@@ -60,11 +60,32 @@ export async function POST(req: NextRequest) {
     const tier = isMultiImage ? MULTI_IMAGE_VIDEO_TIER : VIDEO_TIERS[quality];
 
     const isUnlimited = hasUnlimitedCredits(user.email);
+    const admin = createAdminClient();
+
     if (!isUnlimited) {
       const plan = await getUserPlan(user.id);
       const entitled = isMultiImage ? canUseMultiImageVideo(plan) : canUseVideoQuality(plan, quality);
       if (!entitled) {
         return NextResponse.json({ error: "Upgrade to Pro to unlock Image-to-Video." }, { status: 403 });
+      }
+
+      // Basic's video access is Standard-quality only, capped — HD, Premium,
+      // and multi-image all stay Pro-only via the minPlan check above, so
+      // this only ever applies to the one tier Basic can actually reach.
+      if (!isMultiImage && quality === "standard" && plan === "basic") {
+        const { count } = await admin
+          .from("generations")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("tool_id", "image-to-video")
+          .in("status", ["completed", "pending"])
+          .eq("metadata->>quality", "standard");
+        if (hasReachedBasicVideoLimit(plan, count ?? 0)) {
+          return NextResponse.json(
+            { error: `You've used all ${BASIC_STANDARD_VIDEO_LIMIT} videos included with Basic. Upgrade to Pro for unlimited video.` },
+            { status: 403 }
+          );
+        }
       }
     }
 
@@ -85,7 +106,6 @@ export async function POST(req: NextRequest) {
     // Template prompts never reach the browser, so resolve here from the id.
     // Done before charging, same reasoning as the upload above — an invalid
     // template shouldn't cost the user credits.
-    const admin = createAdminClient();
     let motionPrompt = typeof userPrompt === "string" ? userPrompt.trim() : "";
     if (templateId) {
       const { data: tpl } = await admin

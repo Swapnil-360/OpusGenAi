@@ -17,7 +17,7 @@ import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { readApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_NOTIFICATION_PREFS, LOW_CREDIT_THRESHOLD, type NotificationPrefs } from "@/lib/notification-prefs";
-import { QUALITY_TIERS, canUseQuality, isPlanAtLeast, type Plan, type Quality } from "@/lib/plans";
+import { QUALITY_TIERS, canUseQuality, type Plan, type Quality } from "@/lib/plans";
 import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -205,6 +205,7 @@ function GeneratePageInner() {
   // hasn't been manually set to "pro" would see every gated option locked
   // even though the server would let the request through.
   const [isAdmin, setIsAdmin] = useState(false);
+  const [standardVideosUsed, setStandardVideosUsed] = useState(0);
 
   useEffect(() => {
     if (!isVideoProcessing) return;
@@ -231,6 +232,7 @@ function GeneratePageInner() {
       .then((me) => {
         if (me?.plan) setUserPlan(me.plan);
         if (typeof me?.isAdmin === "boolean") setIsAdmin(me.isAdmin);
+        if (typeof me?.standardVideosUsed === "number") setStandardVideosUsed(me.standardVideosUsed);
       })
       .catch(() => {});
   }, []);
@@ -1056,7 +1058,9 @@ function GeneratePageInner() {
                 <ImageToVideoPanel
                   key={generatedImage}
                   imageUrl={generatedImage}
-                  isEntitled={isAdmin || isPlanAtLeast(userPlan, "pro")}
+                  plan={userPlan}
+                  isAdmin={isAdmin}
+                  standardVideosUsed={standardVideosUsed}
                   onProcessingChange={setIsVideoProcessing}
                 />
               )}

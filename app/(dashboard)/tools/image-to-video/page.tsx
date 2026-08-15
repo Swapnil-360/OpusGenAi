@@ -9,7 +9,7 @@ import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
 import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { readApiError } from "@/lib/api-error";
 import { useTemplates } from "@/lib/hooks/use-templates";
-import { VIDEO_TIERS, isPlanAtLeast, type Plan, type VideoQuality } from "@/lib/plans";
+import { VIDEO_TIERS, type Plan, type VideoQuality } from "@/lib/plans";
 import { toast } from "sonner";
 
 const W = {
@@ -54,6 +54,7 @@ function ImageToVideoPageInner() {
 
   const [userPlan, setUserPlan] = useState<Plan>("free");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [standardVideosUsed, setStandardVideosUsed] = useState(0);
   // The panel tracks its own generation, but "Change image" here would
   // unmount it — orphaning a paid, still-running job with no way to cancel
   // it from this page. Disabled while true; the panel's own Cancel button is
@@ -73,6 +74,7 @@ function ImageToVideoPageInner() {
       .then((me) => {
         if (me?.plan) setUserPlan(me.plan);
         if (typeof me?.isAdmin === "boolean") setIsAdmin(me.isAdmin);
+        if (typeof me?.standardVideosUsed === "number") setStandardVideosUsed(me.standardVideosUsed);
       })
       .catch(() => {});
   }, []);
@@ -128,8 +130,6 @@ function ImageToVideoPageInner() {
     setUploadPreview(null);
     setGenPrompt("");
   }
-
-  const isEntitled = isAdmin || isPlanAtLeast(userPlan, "pro");
 
   return (
     <div className="h-full overflow-y-auto" style={{ background: W.bg }}>
@@ -261,7 +261,9 @@ function ImageToVideoPageInner() {
             <ImageToVideoPanel
               key={activeTemplate?.id ?? "none"}
               imageUrl={sourceImageUrl}
-              isEntitled={isEntitled}
+              plan={userPlan}
+              isAdmin={isAdmin}
+              standardVideosUsed={standardVideosUsed}
               onProcessingChange={setIsVideoProcessing}
               template={activeTemplate
                 ? { id: activeTemplate.id, name: activeTemplate.name, placeholders: activeTemplate.placeholders, imageSlots: activeTemplate.imageSlots }

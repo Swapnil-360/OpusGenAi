@@ -1,5 +1,17 @@
 export type Plan = "free" | "basic" | "pro";
 
+// A Basic subscriber can generate at most this many Standard-quality videos,
+// total — not per month, since credits themselves don't refill on a billing
+// cycle in this app yet (no cron/Stripe renewal exists), so a monthly count
+// would either never reset or need infrastructure this feature doesn't
+// warrant on its own. Declared up top since PLAN_LIMITS' marketing copy
+// references it too, not just the video-tier logic further down. Enforced
+// server-side by counting the user's own completed/pending image-to-video
+// generations at quality="standard" — see /api/generate-video. A cancelled/
+// refunded attempt doesn't count against this (nothing was actually
+// delivered), same reasoning as why it isn't charged credits either.
+export const BASIC_STANDARD_VIDEO_LIMIT = 3;
+
 export type Quality = "standard" | "hd" | "ultra";
 
 export interface QualityTier {
@@ -73,7 +85,12 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     name: "Basic",
     price: 9.99,
     credits: 50,
-    features: ["50 credits/month", "All 6 tools", "HD + 4K quality", "PNG + JPG download", "All templates", "Social captions"],
+    // "N video generations" placed early (not appended at the end) — the
+    // landing pricing card and the account page's plan summary both truncate
+    // this list to a fixed number of items (slice(0, 3) / slice(0, 4)), and
+    // this is meant to be a visible differentiator, not one that only shows
+    // up if a visitor expands the full list.
+    features: ["50 credits/month", `${BASIC_STANDARD_VIDEO_LIMIT} video generations`, "All 6 tools", "HD + 4K quality", "PNG + JPG download", "All templates", "Social captions"],
     cta: "Get Basic",
     highlight: false,
   },
@@ -82,7 +99,7 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
     price: 29,
     originalPrice: 39,
     credits: 150,
-    features: ["150 credits/month", "All 6 tools", "HD + 4K quality", "Image-to-video", "All templates", "Caption studio"],
+    features: ["150 credits/month", "All 6 tools", "HD + 4K quality", "Unlimited image-to-video (HD & multi-photo)", "All templates", "Caption studio"],
     cta: "Get Pro",
     highlight: true,
   },
@@ -141,7 +158,11 @@ export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
     durationSeconds: 5,
     apiCost: 0.77,
     creditCost: 10,
-    minPlan: "pro",
+    // Basic gets a taste of video (Standard/Seedance 2.0 Mini only, capped —
+    // see BASIC_STANDARD_VIDEO_LIMIT below) rather than video staying a pure
+    // Pro-only feature. HD and Premium remain Pro-only: they're the reason to
+    // actually upgrade once someone's used up the free taste.
+    minPlan: "basic",
   },
   hd: {
     label: "HD 1080p",
@@ -215,4 +236,13 @@ export function canUseVideoQuality(plan: Plan, quality: VideoQuality): boolean {
 
 export function canUseMultiImageVideo(plan: Plan): boolean {
   return isPlanAtLeast(plan, MULTI_IMAGE_VIDEO_TIER.minPlan);
+}
+
+/** Whether a Basic-plan user has used up their BASIC_STANDARD_VIDEO_LIMIT
+ *  free Standard videos — always false for Pro (no cap) or Free (can't use
+ *  video at all, a separate check via canUseVideoQuality). `standardVideoCount`
+ *  is the caller's own count of the user's completed/pending Standard-tier
+ *  image-to-video generations — this function only holds the threshold. */
+export function hasReachedBasicVideoLimit(plan: Plan, standardVideoCount: number): boolean {
+  return plan === "basic" && standardVideoCount >= BASIC_STANDARD_VIDEO_LIMIT;
 }

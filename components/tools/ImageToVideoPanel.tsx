@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Clapperboard, Crown, Download, ImagePlus, Lock, Plus, RefreshCw, Wand2, X } from "lucide-react";
-import { MULTI_IMAGE_VIDEO_TIER, VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
+import {
+  BASIC_STANDARD_VIDEO_LIMIT, MULTI_IMAGE_VIDEO_TIER, VIDEO_TIERS,
+  canUseVideoQuality, canUseMultiImageVideo, hasReachedBasicVideoLimit,
+  type Plan, type VideoQuality,
+} from "@/lib/plans";
 import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { toast } from "sonner";
 import { readApiError } from "@/lib/api-error";
@@ -57,10 +61,21 @@ async function downloadFile(src: string, extension: string) {
 interface ImageToVideoPanelProps {
   /** The source image to animate — null hides the panel entirely. */
   imageUrl: string | null;
-  /** Whether the current user's plan (or admin bypass) unlocks video at all —
-   *  UI affordance only. The server independently re-checks entitlement on
-   *  every request; this value is never trusted for cost. */
-  isEntitled: boolean;
+  /** The signed-in user's plan. Per-tier entitlement (which quality options
+   *  are unlocked, whether multi-image is available, the Basic video cap)
+   *  is all derived from this via lib/plans helpers — not a single flattened
+   *  boolean, since Basic and Pro now have different video access. UI
+   *  affordance only; the server independently re-checks everything on
+   *  every request and never trusts this for cost. */
+  plan: Plan;
+  /** Admin bypass — unlocks every tier and the Basic cap, matching the
+   *  server's hasUnlimitedCredits check. */
+  isAdmin: boolean;
+  /** How many Standard-quality videos this user has already generated —
+   *  only meaningful for Basic (see BASIC_STANDARD_VIDEO_LIMIT). Undefined
+   *  while the parent's /api/me call hasn't resolved yet; treated as 0 so
+   *  the panel doesn't flash a false "limit reached" on first render. */
+  standardVideosUsed?: number;
   /** Video template applied via /tools/image-to-video?template=<id>. Its
    *  prompt is never sent to the browser — only the id (forwarded to the
    *  server, which resolves the real prompt), the [FIELD] labels it needs
@@ -78,7 +93,15 @@ interface ImageToVideoPanelProps {
 // total, since the main image always fills the first slot.
 const MAX_EXTRA_IMAGES = MULTI_IMAGE_VIDEO_TIER.maxImages - 1;
 
-export function ImageToVideoPanel({ imageUrl, isEntitled, template, onProcessingChange }: ImageToVideoPanelProps) {
+export function ImageToVideoPanel({ imageUrl, plan, isAdmin, standardVideosUsed, template, onProcessingChange }: ImageToVideoPanelProps) {
+  // Basic and Pro both unlock at least Standard quality now; HD/Premium and
+  // multi-image stay Pro-only via their own minPlan. Admin bypasses all of
+  // it, same as the server's hasUnlimitedCredits check.
+  const canUseTier = (q: VideoQuality) => isAdmin || canUseVideoQuality(plan, q);
+  const canUseMulti = isAdmin || canUseMultiImageVideo(plan);
+  const isEntitled = canUseTier("standard"); // panel-level gate: can this user use video at all
+  const basicLimitReached = !isAdmin && hasReachedBasicVideoLimit(plan, standardVideosUsed ?? 0);
+
   const [quality, setQuality] = useState<VideoQuality>("standard");
   const [style, setStyle] = useState(STYLE_OPTIONS[0]);
   const [movement, setMovement] = useState(MOVEMENT_OPTIONS[0]);
@@ -212,8 +235,26 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template, onProcessing
   async function startGeneration() {
     if (!imageUrl) return;
     if (!isEntitled) {
-      toast.info("Image-to-Video needs the Pro plan.", {
+      toast.info("Image-to-Video needs at least the Basic plan.", {
         action: { label: "Upgrade", onClick: () => { window.location.href = "/account"; } },
+      });
+      return;
+    }
+    if (isMultiImage && !canUseMulti) {
+      toast.info("Combining multiple photos needs the Pro plan.", {
+        action: { label: "Upgrade", onClick: () => { window.location.href = "/account"; } },
+      });
+      return;
+    }
+    if (!isMultiImage && !canUseTier(quality)) {
+      toast.info(`${VIDEO_TIERS[quality].label} needs the Pro plan.`, {
+        action: { label: "Upgrade", onClick: () => { window.location.href = "/account"; } },
+      });
+      return;
+    }
+    if (!isMultiImage && quality === "standard" && basicLimitReached) {
+      toast.info(`You've used all ${BASIC_STANDARD_VIDEO_LIMIT} videos included with Basic.`, {
+        action: { label: "Upgrade to Pro", onClick: () => { window.location.href = "/account"; } },
       });
       return;
     }
@@ -322,7 +363,7 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template, onProcessing
           <div className="flex items-center gap-1.5">
             <p className="text-xs font-bold" style={{ color: W.text }}>Animate this image</p>
             <span className="flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full text-white" style={{ background: "#dc2626" }}>
-              <Crown className="w-2.5 h-2.5" /> PRO
+              <Crown className="w-2.5 h-2.5" /> BASIC+
             </span>
           </div>
           <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>
@@ -333,7 +374,59 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template, onProcessing
         </div>
       </div>
 
-      {videoStatus === "idle" && (
+      {/* Basic's video access is Standard-only and capped — shown up front so
+          it's not a surprise only once someone hits the wall mid-flow. */}
+      {!isAdmin && plan === "basic" && (
+        <p className="text-[10px] mt-1 mb-0.5" style={{ color: basicLimitReached ? W.red : W.dim }}>
+          {basicLimitReached
+            ? `You've used all ${BASIC_STANDARD_VIDEO_LIMIT} Standard videos included with Basic.`
+            : `${(standardVideosUsed ?? 0)} of ${BASIC_STANDARD_VIDEO_LIMIT} Standard videos used on Basic`}
+          {" · "}
+          <button onClick={() => { window.location.href = "/account"; }} className="underline underline-offset-2" style={{ color: W.red }}>
+            Upgrade to Pro for unlimited
+          </button>
+        </p>
+      )}
+
+      {videoStatus === "idle" && basicLimitReached && !(templateSlots.length > 0 && !canUseMulti) && (
+        // Basic can only ever reach Standard quality (HD/Premium are Pro
+        // regardless) — once its cap is used up there's genuinely nothing
+        // left to generate here, so this replaces the whole flow rather than
+        // showing pickers that all funnel into the same blocked toast.
+        <div className="mt-3 rounded-xl p-4 text-center" style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}>
+          <Lock className="w-4 h-4 mx-auto mb-1.5" style={{ color: W.red }} />
+          <p className="text-xs font-semibold" style={{ color: W.text }}>
+            You&apos;ve used all {BASIC_STANDARD_VIDEO_LIMIT} videos included with Basic
+          </p>
+          <p className="text-[10px] mt-1" style={{ color: W.dim }}>
+            Upgrade to Pro for unlimited video, plus HD and Premium quality.
+          </p>
+          <button onClick={() => { window.location.href = "/account"; }}
+            className="mt-3 h-8 px-4 rounded-lg text-xs font-bold text-white" style={{ background: "#dc2626" }}>
+            Upgrade to Pro
+          </button>
+        </div>
+      )}
+
+      {videoStatus === "idle" && !basicLimitReached && templateSlots.length > 0 && !canUseMulti && (
+        // This template needs multiple photos, which is a Pro-only capability
+        // — nothing else in the panel is usable for this template on Basic,
+        // so this replaces the whole flow rather than letting someone fill in
+        // reference photos only to be blocked at the very last step.
+        <div className="mt-3 rounded-xl p-4 text-center" style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}>
+          <Lock className="w-4 h-4 mx-auto mb-1.5" style={{ color: W.red }} />
+          <p className="text-xs font-semibold" style={{ color: W.text }}>{template?.name} needs Pro</p>
+          <p className="text-[10px] mt-1" style={{ color: W.dim }}>
+            This template combines multiple photos, which is a Pro feature.
+          </p>
+          <button onClick={() => { window.location.href = "/account"; }}
+            className="mt-3 h-8 px-4 rounded-lg text-xs font-bold text-white" style={{ background: "#dc2626" }}>
+            Upgrade to Pro
+          </button>
+        </div>
+      )}
+
+      {videoStatus === "idle" && !basicLimitReached && !(templateSlots.length > 0 && !canUseMulti) && (
         <>
           {/* Reference photos beyond the main image. A template with imageSlots
               gets one fixed, labeled, required box per slot; freeform gets a
@@ -380,12 +473,26 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template, onProcessing
                   </div>
                 ))}
                 {!template && extraImages.length < MAX_EXTRA_IMAGES && (
-                  <button onClick={addExtraImageSlot}
-                    className="w-16 h-16 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0 transition-opacity hover:opacity-80"
-                    style={{ border: `1px dashed ${W.border}`, background: W.glassDim }}>
-                    <Plus className="w-3.5 h-3.5" style={{ color: W.dim }} />
-                    <span className="text-[8px] font-semibold" style={{ color: W.dim }}>Add</span>
-                  </button>
+                  canUseMulti ? (
+                    <button onClick={addExtraImageSlot}
+                      className="w-16 h-16 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0 transition-opacity hover:opacity-80"
+                      style={{ border: `1px dashed ${W.border}`, background: W.glassDim }}>
+                      <Plus className="w-3.5 h-3.5" style={{ color: W.dim }} />
+                      <span className="text-[8px] font-semibold" style={{ color: W.dim }}>Add</span>
+                    </button>
+                  ) : extraImages.length === 0 ? (
+                    // Only shown once, as a locked teaser — not a lock icon
+                    // repeated in every empty slot, which would look broken
+                    // since a freeform list here has no fixed slot count.
+                    <button onClick={() => toast.info("Combining multiple photos needs the Pro plan.", {
+                        action: { label: "Upgrade", onClick: () => { window.location.href = "/account"; } },
+                      })}
+                      className="w-16 h-16 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0"
+                      style={{ border: `1px dashed ${W.border}`, background: W.glassDim, opacity: 0.6 }}>
+                      <Lock className="w-3.5 h-3.5" style={{ color: W.dim }} />
+                      <span className="text-[7px] font-semibold" style={{ color: W.dim }}>Pro</span>
+                    </button>
+                  ) : null
                 )}
               </div>
               {isMultiImage && (
@@ -401,16 +508,27 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template, onProcessing
             {QUALITIES.map((q) => {
               const tier = VIDEO_TIERS[q];
               const active = quality === q;
+              const locked = !canUseTier(q);
               return (
                 <button
                   key={q}
-                  onClick={() => setQuality(q)}
-                  className="px-3 py-1.5 rounded-xl text-left transition-all"
+                  onClick={() => {
+                    if (locked) {
+                      toast.info(`${tier.label} needs the Pro plan.`, {
+                        action: { label: "Upgrade", onClick: () => { window.location.href = "/account"; } },
+                      });
+                      return;
+                    }
+                    setQuality(q);
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-left transition-all relative"
                   style={{
                     border: `1px solid ${active ? W.redBorder : W.border}`,
                     background: active ? W.redBg : W.glass,
+                    opacity: locked ? 0.55 : 1,
                   }}
                 >
+                  {locked && <Lock className="w-3 h-3 absolute top-1.5 right-1.5" style={{ color: W.dim }} />}
                   <p className="text-[11px] font-bold" style={{ color: active ? W.red : W.text }}>{tier.label}</p>
                   <p className="text-[9px]" style={{ color: W.dim }}>{tier.blurb} · {tier.creditCost}cr</p>
                   <p className="text-[9px] mt-0.5" style={{ color: active ? W.red : W.dim, opacity: 0.75 }}>
@@ -590,6 +708,21 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template, onProcessing
             <p className="text-[9px] mt-2" style={{ color: W.dim }}>
               Generating with {isMultiImage ? MULTI_IMAGE_VIDEO_TIER.modelLabel : VIDEO_TIERS[quality].modelLabel}
             </p>
+
+            {/* Once it's run past the typical estimate for its tier, the honest
+                thing isn't a faster-looking spinner — it's telling the user they
+                don't have to sit here. Otherwise "still nothing after minutes"
+                reads as broken and just pushes people to cancel out of
+                boredom, not because anything's actually wrong. */}
+            {fakeProgress >= PROGRESS_CAP && (
+              <div className="w-full max-w-xs mt-3 rounded-xl p-3 text-center" style={{ background: W.glassDim, border: `1px solid ${W.border}` }}>
+                <p className="text-[10px] leading-relaxed" style={{ color: W.muted }}>
+                  Taking longer than usual — that&apos;s okay, it&apos;s still working. You don&apos;t need to
+                  wait here: your video will show up in <span style={{ color: W.text, fontWeight: 600 }}>History</span> the
+                  moment it&apos;s done, whether this page is open or not.
+                </p>
+              </div>
+            )}
 
             <button
               onClick={cancelGeneration}

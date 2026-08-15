@@ -23,7 +23,7 @@ export async function GET() {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  const [{ data: profile }, { count }, prefsResult] = await Promise.all([
+  const [{ data: profile }, { count }, prefsResult, { count: standardVideoCount }] = await Promise.all([
     supabase.from("profiles").select("full_name, credits, avatar_url, plan").eq("id", user.id).single(),
     supabase
       .from("generations")
@@ -33,6 +33,17 @@ export async function GET() {
     // Kept as its own query: an older schema without this column shouldn't
     // take the rest of the profile down with it.
     supabase.from("profiles").select("notification_prefs").eq("id", user.id).single(),
+    // Same condition /api/generate-video enforces the Basic cap against —
+    // only meaningful when plan is "basic", but cheap enough (one indexed
+    // count) to just always fetch rather than branch on plan first and lose
+    // the parallelism above.
+    supabase
+      .from("generations")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("tool_id", "image-to-video")
+      .in("status", ["completed", "pending"])
+      .eq("metadata->>quality", "standard"),
   ]);
 
   const meta = (user.user_metadata ?? {}) as Record<string, string | undefined>;
@@ -50,6 +61,7 @@ export async function GET() {
     credits: typeof profile?.credits === "number" ? profile.credits : 0,
     plan: profile?.plan ?? "free",
     totalGenerations: count ?? 0,
+    standardVideosUsed: standardVideoCount ?? 0,
     isAdmin: !!user.email && (ADMIN_EMAILS as readonly string[]).includes(user.email.toLowerCase()),
     notificationPrefs: prefsResult.data?.notification_prefs ?? null,
   });

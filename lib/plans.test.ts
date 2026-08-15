@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-  canUseQuality, canUseVideoQuality, canUseMultiImageVideo, isPlanAtLeast,
-  MULTI_IMAGE_VIDEO_TIER, PLAN_LIMITS, QUALITY_TIERS, VIDEO_TIERS, type VideoQuality,
+  canUseQuality, canUseVideoQuality, canUseMultiImageVideo, hasReachedBasicVideoLimit, isPlanAtLeast,
+  BASIC_STANDARD_VIDEO_LIMIT, MULTI_IMAGE_VIDEO_TIER, PLAN_LIMITS, QUALITY_TIERS, VIDEO_TIERS, type VideoQuality,
 } from "@/lib/plans";
 
 describe("isPlanAtLeast", () => {
@@ -43,8 +43,15 @@ describe("QUALITY_TIERS", () => {
 describe("VIDEO_TIERS", () => {
   const qualities: VideoQuality[] = ["standard", "hd", "premium"];
 
-  it("all three qualities are Pro-only", () => {
-    for (const q of qualities) {
+  it("standard is available to Basic and Pro — the one video tier Basic can reach", () => {
+    expect(VIDEO_TIERS.standard.minPlan).toBe("basic");
+    expect(canUseVideoQuality("free", "standard")).toBe(false);
+    expect(canUseVideoQuality("basic", "standard")).toBe(true);
+    expect(canUseVideoQuality("pro", "standard")).toBe(true);
+  });
+
+  it("hd and premium stay Pro-only — Basic's video access is Standard only", () => {
+    for (const q of ["hd", "premium"] as VideoQuality[]) {
       expect(VIDEO_TIERS[q].minPlan).toBe("pro");
       expect(canUseVideoQuality("basic", q)).toBe(false);
       expect(canUseVideoQuality("pro", q)).toBe(true);
@@ -102,5 +109,35 @@ describe("MULTI_IMAGE_VIDEO_TIER", () => {
 
   it("allows a main photo plus at least one extra reference photo", () => {
     expect(MULTI_IMAGE_VIDEO_TIER.maxImages).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("Basic-plan video access", () => {
+  it("Standard's margin holds up at Basic's own (slightly higher) revenue-per-credit rate, not just Pro's", () => {
+    // VIDEO_TIERS' margin tests above all compute against Pro's
+    // revenue-per-credit — opening Standard to Basic means that math needs
+    // to hold at Basic's rate too, not be quietly assumed from Pro's.
+    const revenuePerCredit = PLAN_LIMITS.basic.price / PLAN_LIMITS.basic.credits;
+    const tier = VIDEO_TIERS.standard;
+    const revenue = tier.creditCost * revenuePerCredit;
+    const margin = (revenue - tier.apiCost) / revenue;
+    expect(margin).toBeGreaterThan(0.4);
+    expect(margin).toBeLessThan(0.7);
+  });
+
+  it("hasReachedBasicVideoLimit only ever applies to the basic plan", () => {
+    expect(hasReachedBasicVideoLimit("basic", BASIC_STANDARD_VIDEO_LIMIT)).toBe(true);
+    expect(hasReachedBasicVideoLimit("basic", BASIC_STANDARD_VIDEO_LIMIT - 1)).toBe(false);
+    // Pro has no cap regardless of count — the limit constant is a Basic-only
+    // concept, not a global video ceiling.
+    expect(hasReachedBasicVideoLimit("pro", 999)).toBe(false);
+    expect(hasReachedBasicVideoLimit("free", 999)).toBe(false);
+  });
+
+  it("the limit is reached at exactly the Nth video, not before or after", () => {
+    for (let n = 0; n < BASIC_STANDARD_VIDEO_LIMIT; n++) {
+      expect(hasReachedBasicVideoLimit("basic", n)).toBe(false);
+    }
+    expect(hasReachedBasicVideoLimit("basic", BASIC_STANDARD_VIDEO_LIMIT)).toBe(true);
   });
 });

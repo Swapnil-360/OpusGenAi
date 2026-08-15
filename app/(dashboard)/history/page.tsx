@@ -29,10 +29,10 @@ const W = {
 };
 
 type ViewMode = "grid" | "list";
-type FilterStatus = "all" | "completed" | "failed";
+type FilterStatus = "all" | "completed" | "pending" | "failed";
 
 type CombinedEntry = {
-  id: string; prompt: string; status: "completed" | "processing" | "failed";
+  id: string; prompt: string; status: "completed" | "pending" | "failed";
   images: string[]; videoUrl: string | null; videoQuality: VideoQuality | "multi" | null;
   creditsUsed: number; aspectRatio: string;
   createdAt: Date; templateId?: string;
@@ -49,6 +49,7 @@ export default function HistoryPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [submittedIds, setSubmittedIds] = useState<Set<string>>(new Set());
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [allGenerations, setAllGenerations] = useState<CombinedEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +65,7 @@ export default function HistoryPage() {
             return {
               id: g.id,
               prompt: g.prompt ?? "",
-              status: g.status as "completed" | "processing" | "failed",
+              status: g.status as "completed" | "pending" | "failed",
               images: meta?.images ?? [],
               videoUrl: meta?.videoUrl ?? null,
               videoQuality: meta?.quality ?? null,
@@ -148,6 +149,37 @@ export default function HistoryPage() {
       toast.error("Network error. Check your connection.");
     } finally {
       setSubmittingId(null);
+    }
+  }
+
+  async function cancelPendingVideo(id: string) {
+    setCancellingId(id);
+    try {
+      const res = await fetch(`/api/generate-video/${id}/cancel`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(await readApiError(res, "Couldn't cancel. Try again."));
+        return;
+      }
+      if (typeof data.credits === "number") {
+        window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: data.credits }));
+      }
+      // Reflect the outcome locally rather than refetching the whole list —
+      // this is the same shape /api/history would settle it to anyway.
+      setAllGenerations((prev) => prev.map((g) => (g.id === id
+        ? {
+            ...g,
+            status: data.status === "completed" ? "completed" : "failed",
+            videoUrl: data.status === "completed" ? data.videoUrl : g.videoUrl,
+          }
+        : g)));
+      toast.success(data.status === "completed"
+        ? "That one finished just as you cancelled it!"
+        : data.cancelled ? "Cancelled — credits refunded." : "Stopped.");
+    } catch {
+      toast.error("Network error. Check your connection.");
+    } finally {
+      setCancellingId(null);
     }
   }
 
@@ -246,7 +278,7 @@ export default function HistoryPage() {
 
         {/* Status filter pills */}
         <div className="flex gap-1.5 flex-wrap">
-          {(["all", "completed", "failed"] as FilterStatus[]).map((s) => {
+          {(["all", "completed", "pending", "failed"] as FilterStatus[]).map((s) => {
             const count = s === "all" ? allGenerations.length : allGenerations.filter((g) => g.status === s).length;
             const isActive = filterStatus === s;
             return (
@@ -261,6 +293,7 @@ export default function HistoryPage() {
                 onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.background = W.glassDim; e.currentTarget.style.color = W.muted; } }}
               >
                 {s === "completed" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                {s === "pending" && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
                 {s === "failed" && <span className="w-1.5 h-1.5 rounded-full bg-red-500/70" />}
                 {s.charAt(0).toUpperCase() + s.slice(1)}
                 <span className="text-[10px] rounded-full px-1.5"
@@ -316,7 +349,16 @@ export default function HistoryPage() {
                 >
                   {/* Image grid (or a single video tile) */}
                   <div className="grid grid-cols-2 gap-0.5 h-36 relative">
-                    {gen.videoUrl ? (
+                    {gen.status === "pending" ? (
+                      // A video job fal hasn't finished yet — this used to render
+                      // as a blank tile indistinguishable from a real empty state,
+                      // which is exactly what made a genuinely stuck generation
+                      // look like data loss instead of "still working."
+                      <div className="col-span-2 flex flex-col items-center justify-center gap-1.5" style={{ background: W.glass }}>
+                        <div className="w-5 h-5 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                        <span className="text-[10px] font-semibold" style={{ color: W.dim }}>Generating…</span>
+                      </div>
+                    ) : gen.videoUrl ? (
                       <div className="col-span-2 relative overflow-hidden" style={{ background: W.glass }}>
                         <video src={gen.videoUrl} muted preload="metadata" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -367,7 +409,9 @@ export default function HistoryPage() {
                         {formatTimeAgo(gen.createdAt)}
                       </div>
                       <span className="text-[10px]" style={{ color: W.dim }}>·</span>
-                      <span className="text-[10px]" style={{ color: W.dim }}>{gen.videoUrl ? "1 video" : `${gen.images.length} images`}</span>
+                      <span className="text-[10px]" style={{ color: W.dim }}>
+                        {gen.status === "pending" ? "Generating…" : gen.videoUrl ? "1 video" : `${gen.images.length} images`}
+                      </span>
                       <div className="ml-auto flex items-center gap-1">
                         <button
                           onClick={(e) => { e.stopPropagation(); copyPrompt(gen.prompt, gen.id); }}
@@ -414,7 +458,11 @@ export default function HistoryPage() {
                 >
                   {/* Thumbnail strip (or a single video thumbnail) */}
                   <div className="flex gap-1 shrink-0">
-                    {gen.videoUrl ? (
+                    {gen.status === "pending" ? (
+                      <div className="w-11 h-11 rounded-lg flex items-center justify-center" style={{ background: W.glass }}>
+                        <div className="w-3.5 h-3.5 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                      </div>
+                    ) : gen.videoUrl ? (
                       <div className="relative w-11 h-11 rounded-lg overflow-hidden" style={{ background: W.glass }}>
                         <video src={gen.videoUrl} muted preload="metadata" className="w-full h-full object-cover" />
                         <div className="absolute inset-0 flex items-center justify-center">
@@ -520,6 +568,15 @@ export default function HistoryPage() {
               </div>
 
               <div className="overflow-y-auto flex-1 p-5 space-y-4">
+                {selectedGen.status === "pending" && (
+                  <div className="rounded-xl p-5 flex flex-col items-center text-center gap-2" style={{ background: W.glass, border: `1px solid ${W.border}` }}>
+                    <div className="w-6 h-6 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                    <p className="text-xs font-semibold" style={{ color: W.text }}>Still generating…</p>
+                    <p className="text-[10px]" style={{ color: W.dim }}>
+                      This keeps working even with this page closed — reopen History any time to check on it, or cancel below for an instant refund.
+                    </p>
+                  </div>
+                )}
                 {selectedGen.videoUrl ? (
                   /* Video — always-visible download button, native controls
                    * already occupy the bottom edge so hover-reveal (used for
@@ -543,7 +600,7 @@ export default function HistoryPage() {
                     })()}
                   </p>
                 )}
-                {!selectedGen.videoUrl && (
+                {!selectedGen.videoUrl && selectedGen.status !== "pending" && (
                   /* Image grid */
                   <div className="grid grid-cols-2 gap-2">
                     {selectedGen.images.map((src, i) => (
@@ -602,6 +659,17 @@ export default function HistoryPage() {
               </div>
 
               <div className="px-5 pb-5 pt-3 flex flex-wrap gap-2 shrink-0" style={{ borderTop: `1px solid ${W.border}` }}>
+                {selectedGen.status === "pending" && (
+                  <button
+                    onClick={() => cancelPendingVideo(selectedGen.id)}
+                    disabled={cancellingId === selectedGen.id}
+                    className="flex-1 h-9 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-60"
+                    style={{ border: `1px solid ${W.redBorder}`, background: W.redBg, color: W.red }}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    {cancellingId === selectedGen.id ? "Cancelling…" : "Cancel — refund my credits"}
+                  </button>
+                )}
                 {selectedGen.status === "completed" && (
                   <button
                     onClick={() => submitToGallery(selectedGen.id)}

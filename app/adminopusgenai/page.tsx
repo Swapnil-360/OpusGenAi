@@ -1354,7 +1354,7 @@ export default function AdminPage() {
                 onClick={() => setTemplateForm(null)}>
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full sm:max-w-2xl my-0 sm:my-auto p-5 rounded-none sm:rounded-2xl" style={{ background: T.card, border: `1px solid ${T.redBorder}` }}>
+                className="w-full sm:max-w-2xl my-0 sm:my-auto p-5 rounded-none sm:rounded-2xl" style={{ background: "#120404", border: `1px solid ${T.redBorder}` }}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-black" style={{ color: T.text }}>{templateForm.id ? "Edit template" : "New template"}</h3>
                   <button onClick={() => setTemplateForm(null)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ color: T.dim }}>
@@ -1583,10 +1583,10 @@ export default function AdminPage() {
                   initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
                   onClick={(e) => e.stopPropagation()}
                   className="w-full sm:max-w-3xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl"
-                  style={{ background: T.card, border: `1px solid ${T.border}` }}>
+                  style={{ background: "#120404", border: `1px solid ${T.border}` }}>
 
                   <div className="flex items-start gap-3 p-5 sticky top-0 z-10"
-                    style={{ background: T.card, borderBottom: `1px solid ${T.border}` }}>
+                    style={{ background: "#120404", borderBottom: `1px solid ${T.border}` }}>
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                       style={{ background: "rgba(220,38,38,0.12)", border: `1px solid ${T.redBorder}` }}>
                       <Clapperboard className="w-4 h-4" style={{ color: T.red }} />
@@ -1702,7 +1702,7 @@ export default function AdminPage() {
                 <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}
                   onClick={(e) => e.stopPropagation()}
                   className="w-full sm:max-w-lg my-0 sm:my-auto rounded-none sm:rounded-2xl overflow-hidden"
-                  style={{ background: T.card, border: `1px solid ${T.border}` }}>
+                  style={{ background: "#120404", border: `1px solid ${T.border}` }}>
 
                   <div className="relative aspect-video" style={{ background: `linear-gradient(160deg, ${previewTemplate.accentColor}30 0%, ${T.bg} 85%)` }}>
                     {previewTemplate.previewVideoUrl ? (

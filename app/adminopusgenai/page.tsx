@@ -409,11 +409,19 @@ export default function AdminPage() {
   }
 
   // Raw bytes, same as the template preview-video upload — no base64 inflation.
+  // file.type falls back to extension the same way (see uploadPreviewVideo's
+  // comment — .mov in particular often reports an empty type in the browser).
   async function uploadGalleryFile(file: File) {
     setUploadingGalleryFile(true);
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const contentType = file.type || (
+      ext === "webm" ? "video/webm" : ext === "mov" ? "video/quicktime" : ext === "mp4" ? "video/mp4" :
+      ext === "png" ? "image/png" : ext === "webp" ? "image/webp" :
+      "image/jpeg"
+    );
     const res = await fetch("/api/admin/gallery", {
       method: "POST",
-      headers: { "Content-Type": file.type || "application/octet-stream" },
+      headers: { "Content-Type": contentType, "X-File-Name": encodeURIComponent(file.name) },
       body: file,
     });
     setUploadingGalleryFile(false);
@@ -685,11 +693,21 @@ export default function AdminPage() {
 
   // Posted as raw bytes, not a base64 data URL: base64 would inflate a
   // multi-MB clip by another third for nothing.
+  //
+  // file.type alone isn't reliable enough to gate this on: browsers commonly
+  // report an EMPTY string for .mov files (very likely here — an admin's
+  // most probable source for a "real" video clip is an iPhone/Mac export),
+  // which used to fall through to a hardcoded "video/mp4" default and upload
+  // a QuickTime file mislabeled as MP4 — it "succeeded" but the file this
+  // produced often wouldn't actually play. X-File-Name lets the server cross-
+  // check against the actual extension instead of trusting the MIME sniff alone.
   async function uploadPreviewVideo(id: string, file: File) {
     setSavingPreviewVideo(true);
+    const ext = file.name.split(".").pop()?.toLowerCase();
+    const contentType = file.type || (ext === "webm" ? "video/webm" : ext === "mov" ? "video/quicktime" : "video/mp4");
     const res = await fetch(`/api/admin/templates/${id}/preview-video`, {
       method: "POST",
-      headers: { "Content-Type": file.type || "video/mp4" },
+      headers: { "Content-Type": contentType, "X-File-Name": encodeURIComponent(file.name) },
       body: file,
     });
     setSavingPreviewVideo(false);

@@ -54,9 +54,24 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
   const requestType = (req.headers.get("content-type") ?? "").split(";")[0].trim();
+  // Same fallback as the template preview-video route: a browser can report
+  // an empty/wrong MIME type (.mov especially), so the filename extension
+  // backs it up rather than being trusted blindly either way.
+  const fileName = req.headers.get("x-file-name");
+  const extFromName = fileName ? decodeURIComponent(fileName).split(".").pop()?.toLowerCase() : undefined;
+  const mimeFromExt: string | undefined =
+    extFromName === "webm" ? "video/webm" :
+    extFromName === "mov" ? "video/quicktime" :
+    extFromName === "mp4" ? "video/mp4" :
+    extFromName === "png" ? "image/png" :
+    extFromName === "webp" ? "image/webp" :
+    extFromName === "jpg" || extFromName === "jpeg" ? "image/jpeg" :
+    undefined;
+  const looksLikeUpload = requestType.startsWith("image/") || requestType.startsWith("video/") || !!mimeFromExt;
 
-  if (requestType.startsWith("image/") || requestType.startsWith("video/")) {
-    if (!ALLOWED_TYPES.includes(requestType)) {
+  if (looksLikeUpload) {
+    const resolvedType = ALLOWED_TYPES.includes(requestType) ? requestType : mimeFromExt;
+    if (!resolvedType) {
       return NextResponse.json({ error: "Use a JPEG, PNG, WebP, MP4, WebM, or MOV file." }, { status: 400 });
     }
     const bytes = await req.arrayBuffer();
@@ -67,13 +82,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "That file is over 50MB." }, { status: 413 });
     }
 
-    const isVideo = requestType.startsWith("video/");
-    const ext = requestType.split("/")[1].replace("jpeg", "jpg").replace("quicktime", "mov");
+    const isVideo = resolvedType.startsWith("video/");
+    const ext = resolvedType.split("/")[1].replace("jpeg", "jpg").replace("quicktime", "mov");
     const path = `${crypto.randomUUID()}.${ext}`;
 
     const { error: uploadError } = await admin.storage
       .from(BUCKET)
-      .upload(path, bytes, { contentType: requestType, upsert: false });
+      .upload(path, bytes, { contentType: resolvedType, upsert: false });
     if (uploadError) {
       console.error("Gallery upload error:", uploadError.message);
       return NextResponse.json({ error: "Upload failed" }, { status: 500 });

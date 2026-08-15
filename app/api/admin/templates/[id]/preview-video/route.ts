@@ -8,6 +8,25 @@ const MAX_BYTES = 50 * 1024 * 1024; // matches the bucket's own file_size_limit
 const ALLOWED_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 
 /**
+ * Magic-byte sniff — catches a file whose MIME type/extension claims to be a
+ * video but whose actual bytes aren't (wrong file picked, truncated upload,
+ * a renamed non-video file). MP4 and MOV are both ISO Base Media containers
+ * ("ftyp" at byte offset 4); WebM is Matroska/EBML (fixed 4-byte header).
+ * Not a full validity check — just enough to reject an obviously-wrong file
+ * before it gets stored and silently fails to play on the landing page.
+ */
+function looksLikeVideo(bytes: ArrayBuffer, contentType: string): boolean {
+  if (bytes.byteLength < 12) return false;
+  const bufferBytes = new Uint8Array(bytes, 0, 12);
+  if (contentType === "video/webm") {
+    return bufferBytes[0] === 0x1a && bufferBytes[1] === 0x45 && bufferBytes[2] === 0xdf && bufferBytes[3] === 0xa3;
+  }
+  // mp4 / quicktime
+  const ftyp = String.fromCharCode(bufferBytes[4], bufferBytes[5], bufferBytes[6], bufferBytes[7]);
+  return ftyp === "ftyp";
+}
+
+/**
  * Sets a video template's landing-page preview clip, from either source:
  *
  *   • a raw video body (Content-Type: video/*) — an uploaded file, posted as
@@ -34,15 +53,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const requestType = (req.headers.get("content-type") ?? "").split(";")[0].trim();
+  // Browsers commonly report an empty `file.type` for .mov specifically —
+  // the client sends the real filename as a fallback signal so a video
+  // upload isn't misdetected as the (unrelated) sourceUrl JSON path below
+  // just because the MIME sniff came back generic or wrong.
+  const fileName = req.headers.get("x-file-name");
+  const extFromName = fileName ? decodeURIComponent(fileName).split(".").pop()?.toLowerCase() : undefined;
+  const mimeFromExt =
+    extFromName === "webm" ? "video/webm" :
+    extFromName === "mov" ? "video/quicktime" :
+    extFromName === "mp4" ? "video/mp4" :
+    undefined;
+  const isVideoUpload = requestType.startsWith("video/") || !!mimeFromExt;
+
   let bytes: ArrayBuffer;
   let contentType: string;
 
-  if (requestType.startsWith("video/")) {
-    if (!ALLOWED_TYPES.includes(requestType)) {
+  if (isVideoUpload) {
+    // Prefer the browser's own MIME type when it's one we recognize; the
+    // filename-derived type is the fallback for exactly the case above, not
+    // a silent override of a MIME type that was already correct.
+    const resolvedType = ALLOWED_TYPES.includes(requestType) ? requestType : mimeFromExt;
+    if (!resolvedType) {
       return NextResponse.json({ error: "Use an MP4, WebM, or MOV file." }, { status: 400 });
     }
     bytes = await req.arrayBuffer();
-    contentType = requestType;
+    if (!looksLikeVideo(bytes, resolvedType)) {
+      return NextResponse.json({ error: "That file doesn't look like a valid video. Try re-exporting it." }, { status: 400 });
+    }
+    contentType = resolvedType;
   } else {
     const { sourceUrl } = await req.json().catch(() => ({ sourceUrl: null }));
     if (typeof sourceUrl !== "string" || !/^https:\/\/[a-z0-9.-]*fal\.media\//i.test(sourceUrl)) {

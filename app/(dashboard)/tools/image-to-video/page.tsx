@@ -54,6 +54,18 @@ function ImageToVideoPageInner() {
 
   const [userPlan, setUserPlan] = useState<Plan>("free");
   const [isAdmin, setIsAdmin] = useState(false);
+  // The panel tracks its own generation, but "Change image" here would
+  // unmount it — orphaning a paid, still-running job with no way to cancel
+  // it from this page. Disabled while true; the panel's own Cancel button is
+  // the intended way to stop a generation, not swapping the source image.
+  const [isVideoProcessing, setIsVideoProcessing] = useState(false);
+
+  useEffect(() => {
+    if (!isVideoProcessing) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isVideoProcessing]);
 
   useEffect(() => {
     fetch("/api/me")
@@ -108,6 +120,10 @@ function ImageToVideoPageInner() {
   }
 
   function changeImage() {
+    if (isVideoProcessing) {
+      toast.error("A video is still generating — cancel it below first, or wait for it to finish.");
+      return;
+    }
     setSourceImageUrl(null);
     setUploadPreview(null);
     setGenPrompt("");
@@ -233,7 +249,9 @@ function ImageToVideoPageInner() {
               <img src={sourceImageUrl} alt="Source" className="w-full h-full object-cover" />
               <button
                 onClick={changeImage}
-                className="absolute top-3 right-3 flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold text-white"
+                disabled={isVideoProcessing}
+                title={isVideoProcessing ? "A video is generating — cancel it first" : undefined}
+                className="absolute top-3 right-3 flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold text-white disabled:opacity-40"
                 style={{ background: "rgba(0,0,0,0.6)", border: `1px solid ${W.border}` }}
               >
                 <X className="w-3.5 h-3.5" /> Change image
@@ -244,6 +262,7 @@ function ImageToVideoPageInner() {
               key={activeTemplate?.id ?? "none"}
               imageUrl={sourceImageUrl}
               isEntitled={isEntitled}
+              onProcessingChange={setIsVideoProcessing}
               template={activeTemplate
                 ? { id: activeTemplate.id, name: activeTemplate.name, placeholders: activeTemplate.placeholders, imageSlots: activeTemplate.imageSlots }
                 : null}

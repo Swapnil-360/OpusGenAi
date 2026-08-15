@@ -24,6 +24,23 @@ const STYLE_OPTIONS = ["Luxury / Premium", "Minimal / Clean", "Energetic / Dynam
 const MOVEMENT_OPTIONS = ["Slow Push-In", "Orbit / Rotate", "Pull-Back Reveal", "Static Drift"];
 const QUALITIES: VideoQuality[] = ["standard", "hd", "premium"];
 
+// Purely cosmetic — fal doesn't report real progress for a queued video job,
+// and generation can genuinely take several minutes, especially for the
+// heavier tiers. A silent spinner for that long reads as broken even when
+// it's working fine, so this cycles through what's actually happening in
+// rough order and estimates a plausible percentage from elapsed time —
+// capped well short of 100% so it never claims to be done before it is.
+const PROGRESS_STAGES = [
+  "Analyzing your photo…",
+  "Reading the scene…",
+  "Sketching the motion…",
+  "Adding color & lighting…",
+  "Animating frames…",
+  "Rendering the final video…",
+];
+const PROGRESS_STAGE_SECONDS = 8;
+const PROGRESS_CAP = 92;
+
 /** downloads any src (data: or remote) with the given extension, matching
  *  the pattern used by every result panel in this app. */
 async function downloadFile(src: string, extension: string) {
@@ -50,13 +67,18 @@ interface ImageToVideoPanelProps {
    *  the user to fill in, and the reference-photo slots it needs beyond the
    *  main image (empty = classic single-image template). */
   template?: { id: string; name: string; placeholders: string[]; imageSlots: string[] } | null;
+  /** Fires whenever this panel starts/stops an active (paid, cancellable)
+   *  generation — lets the parent page disable anything that would orphan
+   *  it (e.g. "Change image"), since this component has no way to stop a
+   *  job that's already running server-side if its own state just vanishes. */
+  onProcessingChange?: (isProcessing: boolean) => void;
 }
 
 // Extra images beyond the main one: capped one below MULTI_IMAGE_VIDEO_TIER's
 // total, since the main image always fills the first slot.
 const MAX_EXTRA_IMAGES = MULTI_IMAGE_VIDEO_TIER.maxImages - 1;
 
-export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVideoPanelProps) {
+export function ImageToVideoPanel({ imageUrl, isEntitled, template, onProcessingChange }: ImageToVideoPanelProps) {
   const [quality, setQuality] = useState<VideoQuality>("standard");
   const [style, setStyle] = useState(STYLE_OPTIONS[0]);
   const [movement, setMovement] = useState(MOVEMENT_OPTIONS[0]);
@@ -72,7 +94,11 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [enhancing, setEnhancing] = useState(false);
+  const [currentGenerationId, setCurrentGenerationId] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const filledExtraImages = extraImages.filter(Boolean);
   const isMultiImage = filledExtraImages.length > 0;
@@ -108,8 +134,16 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
   }
 
   useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (elapsedRef.current) clearInterval(elapsedRef.current);
+    };
   }, []);
+
+  useEffect(() => {
+    onProcessingChange?.(videoStatus === "processing");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoStatus]);
 
   async function enhancePrompt() {
     if (!imageUrl || enhancing) return;
@@ -136,9 +170,12 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
 
   function reset() {
     if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+    if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
     setVideoStatus("idle");
     setVideoUrl(null);
     setVideoError(null);
+    setCurrentGenerationId(null);
+    setElapsedSeconds(0);
     // The template itself (and its filled-in fields) survives — only the
     // user's extra direction is cleared, so "Try another motion" after
     // arriving from a template doesn't silently throw that template away.
@@ -154,11 +191,13 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
         const data = await res.json();
         if (data.status === "completed") {
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
           setVideoStatus("done");
           setVideoUrl(data.videoUrl);
           toast.success("Video ready!");
         } else if (data.status === "failed") {
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+          if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
           setVideoStatus("failed");
           setVideoError(data.error || "Video generation failed.");
           toast.error((data.error || "Video generation failed.") + " Credits refunded.");
@@ -190,6 +229,9 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
     setVideoStatus("processing");
     setVideoError(null);
     setVideoUrl(null);
+    setElapsedSeconds(0);
+    if (elapsedRef.current) clearInterval(elapsedRef.current);
+    elapsedRef.current = setInterval(() => setElapsedSeconds((s) => s + 1), 1000);
 
     try {
       const res = await fetch("/api/generate-video", {
@@ -205,6 +247,7 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
         }),
       });
       if (!res.ok) {
+        if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
         const message = await readApiError(res, "Failed to start video generation.");
         setVideoStatus("failed");
         setVideoError(message);
@@ -215,11 +258,48 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
       if (typeof data.credits === "number") {
         window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: data.credits }));
       }
+      setCurrentGenerationId(data.generationId);
       pollStatus(data.generationId);
     } catch {
+      if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
       setVideoStatus("failed");
       setVideoError("Network error. Check your connection.");
       toast.error("Network error. Check your connection.");
+    }
+  }
+
+  async function cancelGeneration() {
+    if (!currentGenerationId || cancelling) return;
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/generate-video/${currentGenerationId}/cancel`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(await readApiError(res, "Couldn't cancel. Try again."));
+        return;
+      }
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+      if (elapsedRef.current) { clearInterval(elapsedRef.current); elapsedRef.current = null; }
+
+      if (data.status === "completed") {
+        // Finished right as Cancel was clicked — the output exists, so it's
+        // shown rather than discarded. No refund: this is a delivered result,
+        // not a cancelled one.
+        setVideoStatus("done");
+        setVideoUrl(data.videoUrl);
+        toast.success("That one finished just as you cancelled it!");
+        return;
+      }
+      if (typeof data.credits === "number") {
+        window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: data.credits }));
+      }
+      setVideoStatus("failed");
+      setVideoError(data.cancelled ? "Cancelled." : (data.error || "Video generation failed."));
+      toast.success(data.cancelled ? "Cancelled — credits refunded." : "Stopped.");
+    } catch {
+      toast.error("Network error. Check your connection.");
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -480,16 +560,49 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
         </>
       )}
 
-      {videoStatus === "processing" && (
-        <div className="flex flex-col items-center justify-center py-6 mt-1">
-          <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin mb-3" />
-          <p className="text-xs font-semibold" style={{ color: W.text }}>Creating your video…</p>
-          <p className="text-[10px] mt-1" style={{ color: W.dim }}>Usually takes 1–2 minutes</p>
-          <p className="text-[9px] mt-2" style={{ color: W.dim }}>
-            Generating with {isMultiImage ? MULTI_IMAGE_VIDEO_TIER.modelLabel : VIDEO_TIERS[quality].modelLabel}
-          </p>
-        </div>
-      )}
+      {videoStatus === "processing" && (() => {
+        const estimatedSeconds = isMultiImage || quality === "premium" ? 150 : quality === "hd" ? 110 : 80;
+        const fakeProgress = Math.min(PROGRESS_CAP, Math.round((elapsedSeconds / estimatedSeconds) * PROGRESS_CAP));
+        const stage = PROGRESS_STAGES[Math.min(
+          Math.floor(elapsedSeconds / PROGRESS_STAGE_SECONDS),
+          PROGRESS_STAGES.length - 1
+        )];
+        const minutes = Math.floor(elapsedSeconds / 60);
+        const seconds = elapsedSeconds % 60;
+        return (
+          <div className="flex flex-col items-center justify-center py-6 mt-1">
+            <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin mb-3" />
+            <p className="text-xs font-semibold" style={{ color: W.text }}>{stage}</p>
+            <p className="text-[10px] mt-1" style={{ color: W.dim }}>
+              {minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`} elapsed
+              {elapsedSeconds > 150 && " — heavier requests can take a few minutes"}
+            </p>
+
+            <div className="w-full max-w-xs mt-3 h-1.5 rounded-full overflow-hidden" style={{ background: W.glassDim }}>
+              <motion.div
+                className="h-full rounded-full"
+                style={{ background: "#dc2626" }}
+                animate={{ width: `${fakeProgress}%` }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+              />
+            </div>
+
+            <p className="text-[9px] mt-2" style={{ color: W.dim }}>
+              Generating with {isMultiImage ? MULTI_IMAGE_VIDEO_TIER.modelLabel : VIDEO_TIERS[quality].modelLabel}
+            </p>
+
+            <button
+              onClick={cancelGeneration}
+              disabled={cancelling}
+              className="flex items-center gap-1.5 h-8 px-3.5 mt-4 rounded-lg text-xs font-semibold disabled:opacity-50"
+              style={{ border: `1px solid ${W.border}`, background: W.glassDim, color: W.muted }}
+            >
+              <X className="w-3.5 h-3.5" />
+              {cancelling ? "Cancelling…" : "Cancel — refunds your credits"}
+            </button>
+          </div>
+        );
+      })()}
 
       {videoStatus === "done" && videoUrl && (
         <div className="mt-3">

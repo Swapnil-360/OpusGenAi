@@ -188,6 +188,10 @@ function GeneratePageInner() {
   const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
   const [genStatus, setGenStatus] = useState<"idle" | "processing" | "done">("idle");
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  // The "Animate this image" card below is keyed to generatedImage — running
+  // a new image generation while a video is in progress would remount it and
+  // silently orphan that paid, still-running job. Guarded in handleGenerate().
+  const [isVideoProcessing, setIsVideoProcessing] = useState(false);
   const [refImage, setRefImage] = useState<string | null>(null);
   const [refFile, setRefFile] = useState<File | null>(null);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
@@ -201,6 +205,13 @@ function GeneratePageInner() {
   // hasn't been manually set to "pro" would see every gated option locked
   // even though the server would let the request through.
   const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!isVideoProcessing) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isVideoProcessing]);
 
   useEffect(() => {
     (async () => {
@@ -342,6 +353,10 @@ function GeneratePageInner() {
 
   async function handleGenerate() {
     if (genStatus === "processing") return;
+    if (isVideoProcessing) {
+      toast.error("A video is still generating below — cancel it first, or wait for it to finish.");
+      return;
+    }
     // With a template applied the prompt lives server-side, so the textarea is
     // optional — but any [FIELD] the template needs must be answered, or the
     // model would render the placeholder label as literal text.
@@ -1042,6 +1057,7 @@ function GeneratePageInner() {
                   key={generatedImage}
                   imageUrl={generatedImage}
                   isEntitled={isAdmin || isPlanAtLeast(userPlan, "pro")}
+                  onProcessingChange={setIsVideoProcessing}
                 />
               )}
             </motion.div>

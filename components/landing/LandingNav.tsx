@@ -11,15 +11,14 @@ import { createClient } from "@/lib/supabase/client";
 
 // "Tools" used to point at a landing-page section (id="tools") that was
 // removed when the Toolbox section was replaced by Video Templates — that
-// nav entry was left behind pointing at nothing. Templates is now two links,
-// not one, since there are two distinct template types a visitor should
-// know about; Image before Video matches the order the sections themselves
-// appear in on the page. Gallery is a real route (not a `#section`), same as
-// Home — the pathname check below handles highlighting it correctly.
+// nav entry was left behind pointing at nothing. One "Templates" link (not
+// split into Image/Video) — it scrolls to the image-template section, which
+// sits right above the video-template section on the page. Gallery is a
+// real route (not a `#section`), same as Home — the pathname check below
+// handles highlighting it correctly.
 const NAV_LINKS = [
   { href: "/", label: "Home", section: null },
-  { href: "#templates", label: "Image Templates", section: "templates" },
-  { href: "#video-templates", label: "Video Templates", section: "video-templates" },
+  { href: "#templates", label: "Templates", section: "templates" },
   { href: "/gallery", label: "Gallery", section: null },
   { href: "#pricing", label: "Pricing", section: "pricing" },
 ];

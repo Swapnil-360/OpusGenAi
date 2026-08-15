@@ -79,14 +79,26 @@ export function LandingNav() {
 
   /* Track active section on scroll — only meaningful on the landing page
    * itself, since these section ids only exist there. On a real route like
-   * /gallery, active is driven by pathname instead (below). */
+   * /gallery, active is driven by pathname instead (below).
+   *
+   * Tracked separately from NAV_LINKS because the page has a `video-templates`
+   * section with no nav link of its own (folded into the single "Templates"
+   * link) — it still needs to count as "Templates" while scrolled into it,
+   * or the pill falls back to "Home" the entire time a visitor is looking at
+   * the video templates. Listed in DOM top-to-bottom order since the loop
+   * below is last-match-wins as the user scrolls down.
+   */
   useEffect(() => {
     if (pathname !== "/") return;
-    const sectionLinks = NAV_LINKS.filter((l) => l.section);
+    const sectionTracking = [
+      { id: "video-templates", label: "Templates" },
+      { id: "templates", label: "Templates" },
+      { id: "pricing", label: "Pricing" },
+    ];
     const handler = () => {
       let found = "Home";
-      for (const { section, label } of sectionLinks) {
-        const el = document.getElementById(section!);
+      for (const { id, label } of sectionTracking) {
+        const el = document.getElementById(id);
         if (el) {
           const { top } = el.getBoundingClientRect();
           if (top <= 120) found = label;

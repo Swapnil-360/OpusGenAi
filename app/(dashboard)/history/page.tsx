@@ -9,7 +9,7 @@ import {
   List, Play, Search, SlidersHorizontal, Sparkles, Star, X,
 } from "lucide-react";
 import { useTemplates } from "@/lib/hooks/use-templates";
-import { VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
+import { VIDEO_TIERS, MULTI_IMAGE_VIDEO_TIER, type VideoQuality } from "@/lib/plans";
 import { formatTimeAgo, truncate } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -32,7 +32,7 @@ type FilterStatus = "all" | "completed" | "failed";
 
 type CombinedEntry = {
   id: string; prompt: string; status: "completed" | "processing" | "failed";
-  images: string[]; videoUrl: string | null; videoQuality: VideoQuality | null;
+  images: string[]; videoUrl: string | null; videoQuality: VideoQuality | "multi" | null;
   creditsUsed: number; aspectRatio: string;
   createdAt: Date; templateId?: string;
 };
@@ -57,7 +57,7 @@ export default function HistoryPage() {
         const { generations: data } = await res.json();
         setAllGenerations(
           (data ?? []).map((g: { id: string; prompt: string | null; status: string; metadata: unknown; credit_cost: number | null; created_at: string }) => {
-            const meta = g.metadata as { images?: string[]; videoUrl?: string; quality?: VideoQuality; aspectRatio?: string; templateId?: string };
+            const meta = g.metadata as { images?: string[]; videoUrl?: string; quality?: VideoQuality | "multi"; aspectRatio?: string; templateId?: string };
             return {
               id: g.id,
               prompt: g.prompt ?? "",
@@ -506,8 +506,10 @@ export default function HistoryPage() {
                 ) : null}
                 {selectedGen.videoUrl && selectedGen.videoQuality && (
                   <p className="text-[10px] text-center -mt-2" style={{ color: W.dim }}>
-                    Generated with {VIDEO_TIERS[selectedGen.videoQuality].modelLabel}
-                    {VIDEO_TIERS[selectedGen.videoQuality].includesAudio && " · includes AI audio"}
+                    {(() => {
+                      const tier = selectedGen.videoQuality === "multi" ? MULTI_IMAGE_VIDEO_TIER : VIDEO_TIERS[selectedGen.videoQuality];
+                      return <>Generated with {tier.modelLabel}{tier.includesAudio && " · includes AI audio"}</>;
+                    })()}
                   </p>
                 )}
                 {!selectedGen.videoUrl && (

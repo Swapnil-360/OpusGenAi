@@ -245,7 +245,7 @@ function ImageToVideoPageInner() {
               imageUrl={sourceImageUrl}
               isEntitled={isEntitled}
               template={activeTemplate
-                ? { id: activeTemplate.id, name: activeTemplate.name, placeholders: activeTemplate.placeholders }
+                ? { id: activeTemplate.id, name: activeTemplate.name, placeholders: activeTemplate.placeholders, imageSlots: activeTemplate.imageSlots }
                 : null}
             />
           </div>

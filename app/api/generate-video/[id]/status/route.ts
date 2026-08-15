@@ -6,7 +6,12 @@ import { getUserCredits, refundCredits, hasUnlimitedCredits } from "@/lib/credit
 import { VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
 
 type VideoMetadata = {
-  quality?: VideoQuality;
+  quality?: VideoQuality | "multi";
+  /** The actual fal model this row was submitted to. Rows created before this
+   *  field existed fall back to deriving it from `quality` below — that
+   *  fallback only covers VIDEO_TIERS' three keys, never "multi", since no
+   *  row using the multi-image tier predates this field. */
+  model?: string;
   resolution: string;
   durationSeconds: number;
   requestId?: string;
@@ -47,11 +52,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ status: "pending" });
   }
 
-  // Which model this row's request_id belongs to — three possible models now,
+  // Which model this row's request_id belongs to — four possible models now,
   // so this can't be a single hardcoded constant like it was for the v1
-  // single-tier version. Falls back to "standard" only for rows submitted
-  // before `quality` was recorded.
-  const model = VIDEO_TIERS[meta.quality ?? "standard"].model;
+  // single-tier version. metadata.model is what every row created since the
+  // multi-image tier shipped actually has; the VIDEO_TIERS lookup is only a
+  // fallback for rows submitted before that field existed (never "multi",
+  // since that tier didn't exist yet either).
+  const model = meta.model ?? VIDEO_TIERS[(meta.quality as VideoQuality) ?? "standard"].model;
 
   try {
     const queueStatus = await fal.queue.status(model, { requestId: meta.requestId, logs: false });

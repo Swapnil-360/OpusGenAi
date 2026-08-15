@@ -17,6 +17,12 @@ export interface Template {
    *  resolved server-side from the template id at generation time — so this
    *  is what lets the UI collect the required values without exposing it. */
   placeholders: string[];
+  /** Video templates only — labels for reference photos beyond the main one
+   *  (e.g. ["Reference Model Photo"]). Empty means "classic single-image
+   *  template". The prompt referencing @Image1/@Image2/... for these slots
+   *  lives server-side same as the rest of the prompt — these labels are
+   *  just enough to render the extra upload boxes. */
+  imageSlots: string[];
   coverImageUrl: string | null;
   /** Video templates only — a short looping preview clip. Null until one has
    *  been generated, in which case coverImageUrl acts as the poster frame. */

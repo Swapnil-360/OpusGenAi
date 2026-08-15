@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Clapperboard, Crown, Download, Lock, RefreshCw, Wand2 } from "lucide-react";
-import { VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
+import { Clapperboard, Crown, Download, ImagePlus, Lock, Plus, RefreshCw, Wand2, X } from "lucide-react";
+import { MULTI_IMAGE_VIDEO_TIER, VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
+import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { toast } from "sonner";
 import { readApiError } from "@/lib/api-error";
 
@@ -45,10 +46,15 @@ interface ImageToVideoPanelProps {
   isEntitled: boolean;
   /** Video template applied via /tools/image-to-video?template=<id>. Its
    *  prompt is never sent to the browser — only the id (forwarded to the
-   *  server, which resolves the real prompt) and the [FIELD] labels it needs
-   *  the user to fill in. */
-  template?: { id: string; name: string; placeholders: string[] } | null;
+   *  server, which resolves the real prompt), the [FIELD] labels it needs
+   *  the user to fill in, and the reference-photo slots it needs beyond the
+   *  main image (empty = classic single-image template). */
+  template?: { id: string; name: string; placeholders: string[]; imageSlots: string[] } | null;
 }
+
+// Extra images beyond the main one: capped one below MULTI_IMAGE_VIDEO_TIER's
+// total, since the main image always fills the first slot.
+const MAX_EXTRA_IMAGES = MULTI_IMAGE_VIDEO_TIER.maxImages - 1;
 
 export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVideoPanelProps) {
   const [quality, setQuality] = useState<VideoQuality>("standard");
@@ -56,11 +62,50 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
   const [movement, setMovement] = useState(MOVEMENT_OPTIONS[0]);
   const [videoPrompt, setVideoPrompt] = useState("");
   const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
+  // Reference photos beyond the main image. Fixed-length (one box per label,
+  // possibly empty) when a template defines imageSlots; a growable 0-2 list
+  // otherwise. Either way, extraImages[i] is a data URL once uploaded, "" until then.
+  const templateSlots = (template?.imageSlots ?? []).slice(0, MAX_EXTRA_IMAGES);
+  const [extraImages, setExtraImages] = useState<string[]>(() => templateSlots.map(() => ""));
+  const [uploadingExtraIndex, setUploadingExtraIndex] = useState<number | null>(null);
   const [videoStatus, setVideoStatus] = useState<"idle" | "processing" | "done" | "failed">("idle");
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const [enhancing, setEnhancing] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const filledExtraImages = extraImages.filter(Boolean);
+  const isMultiImage = filledExtraImages.length > 0;
+
+  async function uploadExtraImage(index: number, file: File) {
+    setUploadingExtraIndex(index);
+    try {
+      const dataUrl = await fileToUploadDataUrl(file);
+      setExtraImages((cur) => {
+        const next = [...cur];
+        next[index] = dataUrl;
+        return next;
+      });
+    } finally {
+      setUploadingExtraIndex(null);
+    }
+  }
+
+  function removeExtraImage(index: number) {
+    setExtraImages((cur) => {
+      const next = [...cur];
+      // A template slot stays as an empty box (it's still required); a
+      // freeform slot the user added is removed outright.
+      if (templateSlots.length > 0) next[index] = "";
+      else next.splice(index, 1);
+      return next;
+    });
+  }
+
+  function addExtraImageSlot() {
+    if (extraImages.length >= MAX_EXTRA_IMAGES) return;
+    setExtraImages((cur) => [...cur, ""]);
+  }
 
   useEffect(() => {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
@@ -138,6 +183,10 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
       toast.error(`Fill in ${missing.join(", ")} before generating.`);
       return;
     }
+    if (templateSlots.length > 0 && filledExtraImages.length < templateSlots.length) {
+      toast.error("Add the reference photo" + (templateSlots.length > 1 ? "s" : "") + " this template needs before generating.");
+      return;
+    }
     setVideoStatus("processing");
     setVideoError(null);
     setVideoUrl(null);
@@ -148,6 +197,7 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl,
+          extraImageUrls: filledExtraImages,
           prompt: videoPrompt.trim(),
           templateId: template?.id,
           placeholderValues,
@@ -196,13 +246,77 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
             </span>
           </div>
           <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>
-            {VIDEO_TIERS[quality].durationSeconds} seconds · {VIDEO_TIERS[quality].resolution} · {VIDEO_TIERS[quality].creditCost} credits
+            {isMultiImage
+              ? `${MULTI_IMAGE_VIDEO_TIER.durationSeconds} seconds · ${MULTI_IMAGE_VIDEO_TIER.resolution} · ${MULTI_IMAGE_VIDEO_TIER.creditCost} credits`
+              : `${VIDEO_TIERS[quality].durationSeconds} seconds · ${VIDEO_TIERS[quality].resolution} · ${VIDEO_TIERS[quality].creditCost} credits`}
           </p>
         </div>
       </div>
 
       {videoStatus === "idle" && (
         <>
+          {/* Reference photos beyond the main image. A template with imageSlots
+              gets one fixed, labeled, required box per slot; freeform gets a
+              growable 0-2 optional list. Either way, 2+ filled images switches
+              the whole job to MULTI_IMAGE_VIDEO_TIER below — a fixed-model,
+              fixed-resolution tier, since the three VIDEO_TIERS models each
+              only take one image_url and have no concept of a second photo. */}
+          {(templateSlots.length > 0 || extraImages.length > 0 || !template) && (
+            <div className="mt-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: W.dim }}>
+                {templateSlots.length > 0 ? "This template also needs" : "Reference photos (optional)"}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {extraImages.map((src, i) => (
+                  <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0"
+                    style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
+                    {src ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={src} alt="" className="w-full h-full object-cover" />
+                        <button onClick={() => removeExtraImage(i)}
+                          className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                          style={{ background: "rgba(0,0,0,0.65)" }}>
+                          <X className="w-2.5 h-2.5 text-white" />
+                        </button>
+                      </>
+                    ) : (
+                      <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer gap-0.5">
+                        <input type="file" accept="image/*" className="hidden" disabled={uploadingExtraIndex === i}
+                          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadExtraImage(i, f); e.target.value = ""; }} />
+                        {uploadingExtraIndex === i ? (
+                          <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                        ) : (
+                          <ImagePlus className="w-3.5 h-3.5" style={{ color: W.dim }} />
+                        )}
+                      </label>
+                    )}
+                    {templateSlots[i] && (
+                      <p className="absolute bottom-0 inset-x-0 text-center text-[7px] font-bold leading-tight py-0.5 truncate px-0.5"
+                        style={{ background: "rgba(0,0,0,0.6)", color: "white" }}>
+                        {templateSlots[i]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+                {!template && extraImages.length < MAX_EXTRA_IMAGES && (
+                  <button onClick={addExtraImageSlot}
+                    className="w-16 h-16 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0 transition-opacity hover:opacity-80"
+                    style={{ border: `1px dashed ${W.border}`, background: W.glassDim }}>
+                    <Plus className="w-3.5 h-3.5" style={{ color: W.dim }} />
+                    <span className="text-[8px] font-semibold" style={{ color: W.dim }}>Add</span>
+                  </button>
+                )}
+              </div>
+              {isMultiImage && (
+                <p className="text-[9px] mt-1.5 leading-relaxed" style={{ color: W.dim }}>
+                  Using {MULTI_IMAGE_VIDEO_TIER.modelLabel} to combine all your photos · {MULTI_IMAGE_VIDEO_TIER.creditCost} credits
+                </p>
+              )}
+            </div>
+          )}
+
+          {!isMultiImage && (
           <div className="flex flex-wrap items-center gap-1.5 mt-3">
             {QUALITIES.map((q) => {
               const tier = VIDEO_TIERS[q];
@@ -226,6 +340,7 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
               );
             })}
           </div>
+          )}
 
           {/* With a template applied its prompt IS the direction — the style /
               movement pickers and the AI prompt writer would only fight it, so
@@ -316,24 +431,35 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
 
           <div className="flex items-center justify-between mt-3 mb-1.5">
             <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: W.dim }}>Production prompt</p>
-            <button
-              onClick={enhancePrompt}
-              disabled={enhancing}
-              className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-60"
-              style={{ color: W.red, background: W.redBg, border: `1px solid ${W.redBorder}` }}
-            >
-              {enhancing ? (
-                <div className="w-2.5 h-2.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-              ) : (
-                <Wand2 className="w-2.5 h-2.5" />
-              )}
-              {enhancing ? "Writing…" : "Write Production Prompt"}
-            </button>
+            {!isMultiImage && (
+              <button
+                onClick={enhancePrompt}
+                disabled={enhancing}
+                className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-60"
+                style={{ color: W.red, background: W.redBg, border: `1px solid ${W.redBorder}` }}
+              >
+                {enhancing ? (
+                  <div className="w-2.5 h-2.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                ) : (
+                  <Wand2 className="w-2.5 h-2.5" />
+                )}
+                {enhancing ? "Writing…" : "Write Production Prompt"}
+              </button>
+            )}
           </div>
+          {isMultiImage && (
+            <p className="text-[10px] mb-1.5 leading-relaxed" style={{ color: W.dim }}>
+              Your main photo is <code>@Image1</code>{filledExtraImages.map((_, i) => (
+                <span key={i}> · reference photo {i + 2} is <code>@Image{i + 2}</code></span>
+              ))} — mention them in your prompt to say how they combine, e.g. &quot;put the outfit from @Image2 on the person in @Image1&quot;.
+            </p>
+          )}
           <textarea
             value={videoPrompt}
             onChange={(e) => setVideoPrompt(e.target.value)}
-            placeholder="Pick a style + camera movement above, then tap Write Production Prompt — or write your own detailed direction here."
+            placeholder={isMultiImage
+              ? "Describe how the photos combine — e.g. @Image1 is the product, @Image2 is the desired background…"
+              : "Pick a style + camera movement above, then tap Write Production Prompt — or write your own detailed direction here."}
             rows={6}
             className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2.5 text-xs leading-relaxed placeholder:opacity-40"
             style={{ color: W.text, border: `1px solid ${W.border}`, background: W.glassDim }}
@@ -359,7 +485,9 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
           <div className="w-8 h-8 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin mb-3" />
           <p className="text-xs font-semibold" style={{ color: W.text }}>Creating your video…</p>
           <p className="text-[10px] mt-1" style={{ color: W.dim }}>Usually takes 1–2 minutes</p>
-          <p className="text-[9px] mt-2" style={{ color: W.dim }}>Generating with {VIDEO_TIERS[quality].modelLabel}</p>
+          <p className="text-[9px] mt-2" style={{ color: W.dim }}>
+            Generating with {isMultiImage ? MULTI_IMAGE_VIDEO_TIER.modelLabel : VIDEO_TIERS[quality].modelLabel}
+          </p>
         </div>
       )}
 
@@ -375,7 +503,9 @@ export function ImageToVideoPanel({ imageUrl, isEntitled, template }: ImageToVid
             style={{ border: `1px solid ${W.border}` }}
           />
           <p className="text-[10px] text-center mt-2" style={{ color: W.dim }}>
-            Generated with {VIDEO_TIERS[quality].modelLabel}{VIDEO_TIERS[quality].includesAudio && " · includes AI audio"}
+            {isMultiImage
+              ? `Generated with ${MULTI_IMAGE_VIDEO_TIER.modelLabel}${MULTI_IMAGE_VIDEO_TIER.includesAudio ? " · includes AI audio" : ""}`
+              : `Generated with ${VIDEO_TIERS[quality].modelLabel}${VIDEO_TIERS[quality].includesAudio ? " · includes AI audio" : ""}`}
           </p>
           <div className="flex gap-2 mt-3">
             <button

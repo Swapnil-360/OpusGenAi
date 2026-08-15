@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, refundCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { getUserPlan } from "@/lib/entitlements";
-import { VIDEO_TIERS, canUseVideoQuality, type VideoQuality } from "@/lib/plans";
+import { VIDEO_TIERS, canUseVideoQuality, canUseMultiImageVideo, MULTI_IMAGE_VIDEO_TIER, type VideoQuality } from "@/lib/plans";
 import { resolveTemplatePrompt } from "@/lib/template-prompt";
 import { rejectIfBot } from "@/lib/bot-protect";
 
@@ -12,9 +12,13 @@ const DEFAULT_MOTION_PROMPT = "smooth cinematic camera motion, subtle zoom, natu
 const DATA_URL_RE = /^data:image\/[a-zA-Z0-9.+-]+;base64,/;
 const FAL_URL_RE = /^https:\/\/[^/]*fal\.(media|ai|run)\//;
 
+// One below MULTI_IMAGE_VIDEO_TIER.maxImages — the main image always takes
+// the first slot, so this is how many more the client can attach.
+const MAX_EXTRA_IMAGES = MULTI_IMAGE_VIDEO_TIER.maxImages - 1;
+
 export async function POST(req: NextRequest) {
   try {
-    const { imageUrl, prompt: userPrompt, templateId, placeholderValues, quality: rawQuality } = await req.json();
+    const { imageUrl, extraImageUrls: rawExtraImageUrls, prompt: userPrompt, templateId, placeholderValues, quality: rawQuality } = await req.json();
 
     // Either an image this app already generated (https://*.fal.media/...,
     // unchanged) or a fresh local upload (data:image/...;base64,) — the
@@ -28,6 +32,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "An image is required." }, { status: 400 });
     }
 
+    // Reference photos beyond the main one — validated the same way, then
+    // capped server-side rather than trusting the client's own MAX_EXTRA
+    // limit. 0 extras is the common case and behaves exactly as before this
+    // feature existed; the array's presence, not just its length, decides
+    // whether this job uses the single-image models or MULTI_IMAGE_VIDEO_TIER.
+    const extraImageUrls: string[] = Array.isArray(rawExtraImageUrls)
+      ? rawExtraImageUrls
+          .filter((u): u is string => typeof u === "string" && (FAL_URL_RE.test(u) || DATA_URL_RE.test(u)))
+          .slice(0, MAX_EXTRA_IMAGES)
+      : [];
+    const isMultiImage = extraImageUrls.length > 0;
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -37,13 +53,17 @@ export async function POST(req: NextRequest) {
     const botResponse = await rejectIfBot();
     if (botResponse) return botResponse;
 
+    // Multi-image jobs always use MULTI_IMAGE_VIDEO_TIER's fixed model/price —
+    // the client's quality field is only meaningful for the single-image path,
+    // same "server decides, never the client" rule as everywhere else.
     const quality: VideoQuality = rawQuality in VIDEO_TIERS ? rawQuality : "standard";
-    const tier = VIDEO_TIERS[quality];
+    const tier = isMultiImage ? MULTI_IMAGE_VIDEO_TIER : VIDEO_TIERS[quality];
 
     const isUnlimited = hasUnlimitedCredits(user.email);
     if (!isUnlimited) {
       const plan = await getUserPlan(user.id);
-      if (!canUseVideoQuality(plan, quality)) {
+      const entitled = isMultiImage ? canUseMultiImageVideo(plan) : canUseVideoQuality(plan, quality);
+      if (!entitled) {
         return NextResponse.json({ error: "Upgrade to Pro to unlock Image-to-Video." }, { status: 403 });
       }
     }
@@ -51,13 +71,16 @@ export async function POST(req: NextRequest) {
     // Fresh uploads need a real URL before fal's queue can use them; a prior
     // generation already has one. Resolved before any credit is charged, so
     // a broken upload never costs the user anything.
-    let resolvedImageUrl: string;
+    let resolvedImageUrls: string[];
     try {
-      resolvedImageUrl = DATA_URL_RE.test(imageUrl) ? await uploadDataUrlToFal(imageUrl) : imageUrl;
+      resolvedImageUrls = await Promise.all(
+        [imageUrl, ...extraImageUrls].map((u) => (DATA_URL_RE.test(u) ? uploadDataUrlToFal(u) : u))
+      );
     } catch (uploadError) {
       console.error("uploadDataUrlToFal failed:", uploadError);
       return NextResponse.json({ error: "Failed to process the uploaded image." }, { status: 400 });
     }
+    const resolvedImageUrl = resolvedImageUrls[0];
 
     // Template prompts never reach the browser, so resolve here from the id.
     // Done before charging, same reasoning as the upload above — an invalid
@@ -81,6 +104,18 @@ export async function POST(req: NextRequest) {
     }
     if (!motionPrompt) motionPrompt = DEFAULT_MOTION_PROMPT;
 
+    // reference-to-video needs each image explicitly mapped via @ImageN or it
+    // may only loosely use them. A template's own prompt is expected to
+    // already do this (the admin authors it against the slots they defined),
+    // so this is only a fallback for freeform multi-image jobs — and a safety
+    // net if a template prompt ever forgets it.
+    if (isMultiImage && !/@Image\d/.test(motionPrompt)) {
+      const mapping = resolvedImageUrls
+        .map((_, i) => (i === 0 ? "@Image1 is the main photo." : `@Image${i + 1} is an additional reference photo the user provided.`))
+        .join(" ");
+      motionPrompt = `${motionPrompt} Reference images: ${mapping}`;
+    }
+
     const cost = tier.creditCost;
     const credits = await getUserCredits(user.id);
     if (!isUnlimited && credits < cost) {
@@ -96,7 +131,20 @@ export async function POST(req: NextRequest) {
     // status route if the job later fails on fal's side.
     const newCredits = isUnlimited
       ? UNLIMITED_CREDITS_DISPLAY
-      : await chargeCredits(user.id, cost, credits, `Image-to-video (${quality})`);
+      : await chargeCredits(user.id, cost, credits, isMultiImage ? "Image-to-video (multi-image)" : `Image-to-video (${quality})`);
+
+    // metadata.quality stays a real VideoQuality for single-image rows (so old
+    // rows and the status route's fallback keep working unchanged) and becomes
+    // "multi" for these — metadata.model is what the status route actually
+    // uses to resolve the fal model going forward, so it doesn't need a
+    // VIDEO_TIERS-shaped lookup key for a tier that isn't in that record.
+    const baseMetadata = {
+      quality: isMultiImage ? "multi" : quality,
+      model: tier.model,
+      resolution: tier.resolution,
+      durationSeconds: tier.durationSeconds,
+      imageCount: resolvedImageUrls.length,
+    };
 
     const { data: row, error: insertError } = await admin
       .from("generations")
@@ -107,7 +155,7 @@ export async function POST(req: NextRequest) {
         prompt: motionPrompt,
         input_image_url: resolvedImageUrl,
         credit_cost: cost,
-        metadata: { quality, resolution: tier.resolution, durationSeconds: tier.durationSeconds },
+        metadata: baseMetadata,
       })
       .select("id")
       .single();
@@ -120,18 +168,26 @@ export async function POST(req: NextRequest) {
 
     try {
       const { request_id } = await fal.queue.submit(tier.model, {
-        input: {
-          prompt: motionPrompt,
-          image_url: resolvedImageUrl,
-          resolution: tier.resolution,
-          duration: String(tier.durationSeconds),
-          generate_audio: true,
-        },
+        input: isMultiImage
+          ? {
+              prompt: motionPrompt,
+              image_urls: resolvedImageUrls,
+              resolution: tier.resolution,
+              duration: String(tier.durationSeconds),
+              generate_audio: true,
+            }
+          : {
+              prompt: motionPrompt,
+              image_url: resolvedImageUrl,
+              resolution: tier.resolution,
+              duration: String(tier.durationSeconds),
+              generate_audio: true,
+            },
       });
 
       await admin
         .from("generations")
-        .update({ metadata: { quality, resolution: tier.resolution, durationSeconds: tier.durationSeconds, requestId: request_id } })
+        .update({ metadata: { ...baseMetadata, requestId: request_id } })
         .eq("id", row.id);
 
       return NextResponse.json({ generationId: row.id, credits: newCredits });

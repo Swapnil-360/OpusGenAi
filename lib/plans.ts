@@ -169,6 +169,35 @@ export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
   },
 };
 
+// Combining 2+ source photos into one video needs a different model family
+// entirely — the three VIDEO_TIERS models above each take exactly one
+// image_url and have no concept of a second reference photo. fal's
+// "reference-to-video" endpoints do (up to 9 images via image_urls,
+// referenced in the prompt as @Image1/@Image2/...), at a flat per-second
+// rate that (per fal's docs) doesn't vary with how many images are supplied,
+// only duration/resolution/whether a video was also attached — so one fixed
+// tier covers 2 or 3 images the same way VIDEO_TIERS.standard covers every
+// single-image case, no separate pricing per image count needed.
+//
+// Fast tier chosen over standard reference-to-video specifically to hold this
+// to a single fixed resolution/price point rather than adding a second
+// quality ladder on top of an already-three-option one — 720p is plenty for
+// the "combine a product shot with a reference photo" use case this serves.
+export const MULTI_IMAGE_VIDEO_TIER = {
+  label: "Multi-Image",
+  blurb: "Combine 2-3 of your own photos into one video",
+  model: "bytedance/seedance-2.0/fast/reference-to-video",
+  modelLabel: "Seedance 2.0 Fast (multi-image)",
+  includesAudio: true,
+  resolution: "720p" as const,
+  durationSeconds: 5,
+  apiCost: 1.21, // 5s * $0.2419/s (fast tier, no separate video input) — fal docs
+  creditCost: 20,
+  minPlan: "pro" as const,
+  /** Total images including the main one — e.g. 3 = 1 main + up to 2 extra. */
+  maxImages: 3,
+};
+
 const PLAN_RANK: Record<Plan, number> = { free: 0, basic: 1, pro: 2 };
 
 /** True if `plan` meets or exceeds `required` — e.g. isPlanAtLeast("pro", "basic") === true. */
@@ -182,4 +211,8 @@ export function canUseQuality(plan: Plan, quality: Quality): boolean {
 
 export function canUseVideoQuality(plan: Plan, quality: VideoQuality): boolean {
   return isPlanAtLeast(plan, VIDEO_TIERS[quality].minPlan);
+}
+
+export function canUseMultiImageVideo(plan: Plan): boolean {
+  return isPlanAtLeast(plan, MULTI_IMAGE_VIDEO_TIER.minPlan);
 }

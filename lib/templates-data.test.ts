@@ -11,6 +11,7 @@ function makeTemplate(overrides: Partial<Template>): Template {
     description: "",
     tags: [],
     placeholders: [],
+    imageSlots: [],
     coverImageUrl: null,
     previewVideoUrl: null,
     accentColor: "#000",

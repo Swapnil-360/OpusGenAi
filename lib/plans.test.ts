@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { canUseQuality, canUseVideoQuality, isPlanAtLeast, PLAN_LIMITS, QUALITY_TIERS, VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
+import {
+  canUseQuality, canUseVideoQuality, canUseMultiImageVideo, isPlanAtLeast,
+  MULTI_IMAGE_VIDEO_TIER, PLAN_LIMITS, QUALITY_TIERS, VIDEO_TIERS, type VideoQuality,
+} from "@/lib/plans";
 
 describe("isPlanAtLeast", () => {
   it("ranks pro above basic above free", () => {
@@ -79,5 +82,25 @@ describe("VIDEO_TIERS", () => {
   it("premium costs more credits than either standard or hd", () => {
     expect(VIDEO_TIERS.premium.creditCost).toBeGreaterThan(VIDEO_TIERS.standard.creditCost);
     expect(VIDEO_TIERS.premium.creditCost).toBeGreaterThan(VIDEO_TIERS.hd.creditCost);
+  });
+});
+
+describe("MULTI_IMAGE_VIDEO_TIER", () => {
+  it("is Pro-only, same as every VIDEO_TIERS entry", () => {
+    expect(MULTI_IMAGE_VIDEO_TIER.minPlan).toBe("pro");
+    expect(canUseMultiImageVideo("basic")).toBe(false);
+    expect(canUseMultiImageVideo("pro")).toBe(true);
+  });
+
+  it("stays in the same ~40-70% margin band as the single-image video tiers", () => {
+    const revenuePerCredit = PLAN_LIMITS.pro.price / PLAN_LIMITS.pro.credits;
+    const revenue = MULTI_IMAGE_VIDEO_TIER.creditCost * revenuePerCredit;
+    const margin = (revenue - MULTI_IMAGE_VIDEO_TIER.apiCost) / revenue;
+    expect(margin).toBeGreaterThan(0.4);
+    expect(margin).toBeLessThan(0.7);
+  });
+
+  it("allows a main photo plus at least one extra reference photo", () => {
+    expect(MULTI_IMAGE_VIDEO_TIER.maxImages).toBeGreaterThanOrEqual(2);
   });
 });

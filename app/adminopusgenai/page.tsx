@@ -130,6 +130,12 @@ type TemplateFormState = {
   description: string;
   tags: string; // comma-separated in the form, split into an array on save
   prompt: string;
+  // Video templates only — comma-separated labels for reference-photo slots
+  // beyond the main image (e.g. "Reference Model Photo"). The prompt above
+  // must reference them as @Image2, @Image3, ... in slot order (@Image1 is
+  // always the main photo) — this field only controls which upload boxes
+  // the video generator shows, it doesn't touch the prompt itself.
+  imageSlotLabels: string;
   accentColor: string;
   isPro: boolean;
   sortOrder: number;
@@ -143,6 +149,7 @@ const EMPTY_TEMPLATE_FORM: TemplateFormState = {
   description: "",
   tags: "",
   prompt: "",
+  imageSlotLabels: "",
   accentColor: "#dc2626",
   isPro: false,
   sortOrder: 0,
@@ -158,6 +165,7 @@ function rowToAdminTemplate(row: {
   id: string; name: string; template_type: TemplateType; category: string;
   description: string; tags: string[] | null; prompt: string;
   cover_image_url: string | null; preview_video_url: string | null;
+  image_slot_labels: string[] | null;
   accent_color: string; is_pro: boolean; sort_order: number;
 }): AdminTemplate {
   return {
@@ -168,6 +176,7 @@ function rowToAdminTemplate(row: {
     description: row.description,
     tags: row.tags ?? [],
     prompt: row.prompt,
+    imageSlots: row.image_slot_labels ?? [],
     coverImageUrl: row.cover_image_url,
     previewVideoUrl: row.preview_video_url,
     accentColor: row.accent_color,
@@ -185,6 +194,7 @@ function templateToForm(tpl: AdminTemplate): TemplateFormState {
     description: tpl.description,
     tags: tpl.tags.join(", "),
     prompt: tpl.prompt,
+    imageSlotLabels: tpl.imageSlots.join(", "),
     accentColor: tpl.accentColor,
     isPro: tpl.isPro,
     sortOrder: tpl.sortOrder,
@@ -484,6 +494,7 @@ export default function AdminPage() {
       description: templateForm.description,
       tags: templateForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
       prompt: templateForm.prompt,
+      imageSlotLabels: templateForm.imageSlotLabels.split(",").map((t) => t.trim()).filter(Boolean),
       accentColor: templateForm.accentColor,
       isPro: templateForm.isPro,
       sortOrder: templateForm.sortOrder,
@@ -1258,6 +1269,24 @@ export default function AdminPage() {
                     style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
                 </div>
 
+                {templateForm.templateType === "video" && (
+                  <div className="mb-5">
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>
+                      Extra reference photos <span style={{ color: T.dim }}>(comma-separated labels, optional)</span>
+                    </label>
+                    <input value={templateForm.imageSlotLabels}
+                      onChange={(e) => setTemplateForm((f) => f && { ...f, imageSlotLabels: e.target.value })}
+                      placeholder="e.g. Reference Model Photo, Desired Background Photo"
+                      className="w-full h-9 px-3 rounded-xl text-sm outline-none"
+                      style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
+                    <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: T.dim }}>
+                      The user&apos;s own photo is always <code>@Image1</code> in the prompt above. Each label here adds
+                      one more upload box, in order — <code>@Image2</code> for the first, <code>@Image3</code> for the
+                      second. Leave empty for a normal single-photo template.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2.5">
                   <motion.button whileTap={{ scale: 0.97 }} onClick={saveTemplate} disabled={savingTemplate}
                     className="flex items-center gap-2 h-9 px-5 rounded-xl text-sm font-bold text-white disabled:opacity-60"
@@ -1308,6 +1337,11 @@ export default function AdminPage() {
                         }>
                         {tpl.templateType}
                       </span>
+                      {tpl.imageSlots.length > 0 && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ background: "rgba(56,189,248,0.12)", color: T.blue }}>
+                          +{tpl.imageSlots.length} photo{tpl.imageSlots.length === 1 ? "" : "s"}
+                        </span>
+                      )}
                       {tpl.isPro && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>PRO</span>}
                     </div>
                     <p className="text-xs truncate mt-0.5" style={{ color: T.dim }}>{tpl.description}</p>

@@ -27,7 +27,7 @@ export async function GET() {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("templates")
-    .select("id,name,template_type,category,description,tags,prompt,cover_image_url,preview_video_url,accent_color,is_pro,sort_order")
+    .select("id,name,template_type,category,description,tags,prompt,cover_image_url,preview_video_url,image_slot_labels,accent_color,is_pro,sort_order")
     .order("sort_order", { ascending: true });
 
   if (error) {
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { name, templateType, category, description, tags, prompt, accentColor, isPro, sortOrder } = await req.json();
+  const { name, templateType, category, description, tags, prompt, imageSlotLabels, accentColor, isPro, sortOrder } = await req.json();
 
   if (!name?.trim() || !category?.trim() || !description?.trim() || !prompt?.trim()) {
     return NextResponse.json({ error: "Name, category, description, and prompt are required" }, { status: 400 });
@@ -67,6 +67,7 @@ export async function POST(req: NextRequest) {
       description: description.trim(),
       tags: Array.isArray(tags) ? tags : [],
       prompt: prompt.trim(),
+      image_slot_labels: Array.isArray(imageSlotLabels) ? imageSlotLabels : [],
       accent_color: accentColor || "#dc2626",
       is_pro: !!isPro,
       sort_order: typeof sortOrder === "number" ? sortOrder : 0,

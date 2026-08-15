@@ -14,6 +14,7 @@ interface TemplateRow {
   /** Only present on the authenticated /api/templates path — the public path
    *  can't see it, and neither carries the prompt itself. */
   placeholders?: string[];
+  image_slot_labels?: string[];
   cover_image_url: string | null;
   preview_video_url: string | null;
   accent_color: string;
@@ -30,6 +31,7 @@ function mapRow(row: TemplateRow): Template {
     description: row.description,
     tags: row.tags ?? [],
     placeholders: row.placeholders ?? [],
+    imageSlots: row.image_slot_labels ?? [],
     coverImageUrl: row.cover_image_url,
     previewVideoUrl: row.preview_video_url,
     accentColor: row.accent_color,

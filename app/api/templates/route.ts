@@ -28,7 +28,7 @@ export async function GET() {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("templates")
-    .select("id,name,template_type,category,description,tags,prompt,cover_image_url,preview_video_url,accent_color,is_pro,sort_order")
+    .select("id,name,template_type,category,description,tags,prompt,cover_image_url,preview_video_url,image_slot_labels,accent_color,is_pro,sort_order")
     .order("sort_order", { ascending: true });
 
   if (error) {

@@ -66,12 +66,26 @@ export const CACHE_TAGS = {
 } as const;
 
 /**
+ * Bumped whenever a cached fetcher's *return shape* changes (columns added
+ * to a select(), fields renamed on the returned object, etc.) — folded into
+ * every cache key below. Without this, a route deployed with a new shape
+ * could still read back an old-shaped object cached by the previous
+ * deployment, which fails as a confusing `undefined` field deep in the
+ * response rather than a clean error. Bump this, don't touch call sites.
+ */
+const CACHE_SCHEMA_VERSION = "v1";
+
+/**
  * Cache-aside wrapper: returns a zero-arg function that serves from the
  * Next.js Data Cache on hit, and transparently falls back to calling `fetcher`
- * directly — bypassing the cache entirely — if the cache layer itself throws
- * for any reason. A caching bug must never be able to take the app down;
- * worst case here is the same DB round trip callers would have made anyway
- * if this cache didn't exist.
+ * directly — bypassing the cache entirely — if the cache layer itself fails
+ * for any reason, including failing to even set itself up. A caching bug
+ * must never be able to take the app down; worst case here is the same DB
+ * round trip callers would have made anyway if this cache didn't exist.
+ * `unstable_cache()` itself is built lazily inside the returned function
+ * (not eagerly at module load, where every route file calls this) so that a
+ * setup-time failure is caught by the same try/catch as a read-time one,
+ * instead of crashing the route module on import.
  *
  * `keyParts` must include every dimension that distinguishes this data (see
  * CACHE_TAGS usage at call sites) — there is deliberately no per-user
@@ -83,16 +97,20 @@ export function cachedQuery<T>(
   keyParts: string[],
   options: { tags: string[]; revalidateSeconds: number }
 ): () => Promise<T> {
-  const cached = unstable_cache(fetcher, keyParts, {
-    tags: options.tags,
-    revalidate: options.revalidateSeconds,
-  });
+  const fullKeyParts = [...keyParts, CACHE_SCHEMA_VERSION];
+  let cached: (() => Promise<T>) | null = null;
 
   return async () => {
     try {
+      if (!cached) {
+        cached = unstable_cache(fetcher, fullKeyParts, {
+          tags: options.tags,
+          revalidate: options.revalidateSeconds,
+        });
+      }
       return await cached();
     } catch (err) {
-      console.error(`cache read failed for [${keyParts.join(":")}], falling back to direct fetch:`, err);
+      console.error(`cache read failed for [${fullKeyParts.join(":")}], falling back to direct fetch:`, err);
       return fetcher();
     }
   };

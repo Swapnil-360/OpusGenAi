@@ -31,25 +31,48 @@ describe("cachedQuery", () => {
     const getData = cachedQuery(fetcher, ["k"], { tags: ["t"], revalidateSeconds: 60 });
 
     await expect(getData()).resolves.toEqual({ value: 42 });
-    expect(unstableCacheMock).toHaveBeenCalledWith(fetcher, ["k"], { tags: ["t"], revalidate: 60 });
+    expect(unstableCacheMock).toHaveBeenCalledTimes(1);
+    const [passedFetcher, passedKeyParts, passedOptions] = unstableCacheMock.mock.calls[0];
+    expect(passedFetcher).toBe(fetcher);
+    expect(passedOptions).toEqual({ tags: ["t"], revalidate: 60 });
+    // Exact key: caller's parts unchanged, followed by exactly one internal
+    // schema-version segment — not asserting the literal version string,
+    // since that's expected to be bumped over time.
+    expect(passedKeyParts.slice(0, -1)).toEqual(["k"]);
+    expect(passedKeyParts).toHaveLength(2);
   });
 
-  it("passes keyParts and options straight through to unstable_cache unchanged — wrong dimensions here would let one user's cached entry answer for another's", async () => {
+  it("only builds the underlying unstable_cache wrapper once per returned function, on first call — not on every invocation", async () => {
     const fetcher = vi.fn(async () => "x");
     unstableCacheMock.mockImplementation((fn: () => Promise<unknown>) => fn);
 
     const { cachedQuery } = await import("./cache");
-    cachedQuery(fetcher, ["templates", "all"], { tags: ["templates"], revalidateSeconds: 1800 });
+    const getData = cachedQuery(fetcher, ["k"], { tags: ["t"], revalidateSeconds: 60 });
 
-    expect(unstableCacheMock).toHaveBeenCalledWith(fetcher, ["templates", "all"], {
-      tags: ["templates"],
-      revalidate: 1800,
-    });
+    await getData();
+    await getData();
+    await getData();
+
+    expect(unstableCacheMock).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back to calling the fetcher directly if the cache layer itself throws — a caching bug must never take the route down", async () => {
+  it("passes keyParts and options straight through to unstable_cache unchanged (plus the internal version segment) — wrong dimensions here would let one user's cached entry answer for another's", async () => {
+    const fetcher = vi.fn(async () => "x");
+    unstableCacheMock.mockImplementation((fn: () => Promise<unknown>) => fn);
+
+    const { cachedQuery } = await import("./cache");
+    const getData = cachedQuery(fetcher, ["templates", "all"], { tags: ["templates"], revalidateSeconds: 1800 });
+    await getData();
+
+    const [, passedKeyParts, passedOptions] = unstableCacheMock.mock.calls[0];
+    expect(passedKeyParts.slice(0, -1)).toEqual(["templates", "all"]);
+    expect(passedOptions).toEqual({ tags: ["templates"], revalidate: 1800 });
+  });
+
+  it("falls back to calling the fetcher directly if a cache READ throws — a caching bug must never take the route down", async () => {
     const fetcher = vi.fn(async () => "fresh-from-db");
-    // Simulate the Data Cache throwing on read.
+    // Simulate the Data Cache throwing on read (construction succeeds, the
+    // returned wrapped function is what fails).
     unstableCacheMock.mockImplementation(() => async () => {
       throw new Error("cache backend unavailable");
     });
@@ -59,6 +82,21 @@ describe("cachedQuery", () => {
 
     await expect(getData()).resolves.toBe("fresh-from-db");
     expect(fetcher).toHaveBeenCalledTimes(1); // the fallback path, not the (broken) cached path
+  });
+
+  it("falls back to calling the fetcher directly if unstable_cache() itself throws while SETTING UP — construction happens lazily inside the same try/catch as reads, specifically so this can't crash the route module on import", async () => {
+    const fetcher = vi.fn(async () => "fresh-from-db");
+    // Simulate unstable_cache() throwing synchronously when called, before
+    // it ever returns a wrapped function.
+    unstableCacheMock.mockImplementation(() => {
+      throw new Error("could not initialize cache context");
+    });
+
+    const { cachedQuery } = await import("./cache");
+    const getData = cachedQuery(fetcher, ["k"], { tags: ["t"], revalidateSeconds: 60 });
+
+    await expect(getData()).resolves.toBe("fresh-from-db");
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it("lets a genuine database error from the fallback propagate — must not be silently swallowed into an empty/wrong result", async () => {

@@ -679,7 +679,7 @@ export default function LandingPage() {
 
         {/* ══ MARQUEE ══════════════════════════════════════════════════════════ */}
         <div className="px-4 sm:px-6 py-10 md:py-14">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-7xl mx-auto">
             <div className="flex items-center gap-4 mb-5">
               <div className="h-px flex-1" style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.14))" }} />
               <p className="text-[10px] font-bold uppercase tracking-[0.25em] shrink-0" style={{ color: "rgba(255,255,255,0.38)" }}>

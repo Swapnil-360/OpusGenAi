@@ -85,11 +85,15 @@ export default function ReplaceBgPage() {
 
       if (generationId) {
         try {
-          const supabase = createClient();
-          await supabase
-            .from("generations")
-            .update({ metadata: { images: [finalImage], aspectRatio: "1:1", productPreserved: true } })
-            .eq("id", generationId);
+          // Saved through the server rather than writing to the generations
+          // table straight from the browser — that direct write needed a
+          // table-wide UPDATE grant for every signed-in user, which also let
+          // any row's credit_cost and metadata be rewritten.
+          await fetch(`/api/generations/${generationId}/composite`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image: finalImage }),
+          });
         } catch (err) {
           console.error("Failed to save final composited image:", err);
         }

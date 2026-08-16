@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { fal } from "@/lib/fal";
 import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { rejectIfBot } from "@/lib/bot-protect";
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Background generation failed. Try again." }, { status: 502 });
     }
 
-    const { data: insertedRow, error: insertError } = await supabase
+    const { data: insertedRow, error: insertError } = await createAdminClient()
       .from("generations")
       .insert({
         user_id: user.id,
@@ -65,9 +66,21 @@ export async function POST(req: NextRequest) {
       .single();
     if (insertError) console.error("generations insert failed:", insertError.message);
 
-    const newCredits = isUnlimited
-      ? UNLIMITED_CREDITS_DISPLAY
-      : await chargeCredits(user.id, CREDIT_COST, credits, "Replace background");
+    // Atomic: deducts only if the balance still covers it, so concurrent
+    // requests can't both clear the read-only check above and both go free.
+    let newCredits: number;
+    if (isUnlimited) {
+      newCredits = UNLIMITED_CREDITS_DISPLAY;
+    } else {
+      const charged = await chargeCredits(user.id, CREDIT_COST, "Replace background");
+      if (charged === null) {
+        return NextResponse.json(
+          { error: "You're out of credits. Upgrade your plan to keep generating." },
+          { status: 402 }
+        );
+      }
+      newCredits = charged;
+    }
 
     return NextResponse.json({ image, credits: newCredits, generationId: insertedRow?.id ?? null });
   } catch (e) {

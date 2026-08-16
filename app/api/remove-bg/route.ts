@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
 import { rejectIfBot } from "@/lib/bot-protect";
+import { isWithinImageSizeLimit, IMAGE_TOO_LARGE_MESSAGE } from "@/lib/request-limits";
 
 const CREDIT_COST = 1;
 
@@ -14,6 +16,11 @@ export async function POST(req: NextRequest) {
     const { image } = await req.json();
     if (typeof image !== "string" || !image.startsWith("data:image/")) {
       return NextResponse.json({ error: "Image is required" }, { status: 400 });
+    }
+    // This image is stored verbatim in the history row's metadata, so an
+    // unbounded one would be written straight into Postgres.
+    if (!isWithinImageSizeLimit(image)) {
+      return NextResponse.json({ error: IMAGE_TOO_LARGE_MESSAGE }, { status: 413 });
     }
 
     const supabase = await createClient();
@@ -34,7 +41,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { error: insertError } = await supabase.from("generations").insert({
+    // Charged before the history row is written: the atomic charge is what
+    // actually enforces the balance (the read above only powers the friendly
+    // early exit), so a user who loses a concurrent race gets no row either.
+    let newCredits: number;
+    if (isUnlimited) {
+      newCredits = UNLIMITED_CREDITS_DISPLAY;
+    } else {
+      const charged = await chargeCredits(user.id, CREDIT_COST, "Remove background");
+      if (charged === null) {
+        return NextResponse.json(
+          { error: "You're out of credits. Upgrade your plan to keep generating." },
+          { status: 402 }
+        );
+      }
+      newCredits = charged;
+    }
+
+    const { error: insertError } = await createAdminClient().from("generations").insert({
       user_id: user.id,
       tool_id: "remove-bg",
       status: "completed",
@@ -44,10 +68,6 @@ export async function POST(req: NextRequest) {
       metadata: { images: [image] },
     });
     if (insertError) console.error("generations insert failed:", insertError.message);
-
-    const newCredits = isUnlimited
-      ? UNLIMITED_CREDITS_DISPLAY
-      : await chargeCredits(user.id, CREDIT_COST, credits, "Remove background");
 
     return NextResponse.json({ credits: newCredits });
   } catch (err) {

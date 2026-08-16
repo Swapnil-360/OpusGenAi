@@ -16,12 +16,37 @@ vi.mock("@/lib/credits", () => ({
   hasUnlimitedCredits: (...a: unknown[]) => hasUnlimitedCreditsMock(...a),
 }));
 
-function makeAdminMock() {
-  const update = vi.fn().mockReturnThis();
-  const eq = vi.fn().mockResolvedValue({ error: null });
-  const from = vi.fn().mockReturnValue({ update: (...a: unknown[]) => { update(...a); return { eq }; } });
+/**
+ * Minimal stand-in for the supabase-js query builder.
+ *
+ * Both chains this module builds have to work: the completion write
+ * (`update().eq().eq()`, awaited directly) and the failure claim
+ * (`update().eq().eq().select().maybeSingle()`), which is what makes a refund
+ * happen at most once. `claimed` controls whether this mock represents the
+ * caller that won that claim — pass false to simulate another request having
+ * already settled the row.
+ */
+function makeAdminMock({ claimed = true, creditCost = 10 }: { claimed?: boolean; creditCost?: number } = {}) {
+  const update = vi.fn();
+  const maybeSingle = vi.fn().mockResolvedValue({
+    data: claimed ? { id: "gen-1", credit_cost: creditCost } : null,
+    error: null,
+  });
+
+  // Every .eq() returns a thenable that is also chainable, so the same object
+  // serves an awaited two-.eq() chain and one that continues into .select().
+  const chain: Record<string, unknown> = {
+    eq: () => chain,
+    select: () => ({ maybeSingle }),
+    then: (resolve: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(resolve),
+  };
+
+  const from = vi.fn().mockReturnValue({
+    update: (...a: unknown[]) => { update(...a); return chain; },
+  });
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { from } as any;
+  return { from, update, maybeSingle } as any;
 }
 
 const BASE_ROW = {
@@ -100,15 +125,31 @@ describe("settlePendingVideoRow", () => {
   it("marks failed and refunds the row's actual credit_cost (not a tier constant) when fal errors", async () => {
     queueStatusMock.mockRejectedValue(new Error("fal blew up"));
     hasUnlimitedCreditsMock.mockReturnValue(false);
-    getUserCreditsMock.mockResolvedValue(5);
-    refundCreditsMock.mockResolvedValue(15);
-    const admin = makeAdminMock();
+    refundCreditsMock.mockResolvedValue(103);
+    // The amount comes from the row the claiming UPDATE returned, so the mock
+    // reports the same cost the row carries.
+    const admin = makeAdminMock({ creditCost: 88 });
     const { settlePendingVideoRow } = await import("./video-status");
 
     const result = await settlePendingVideoRow(admin, { ...BASE_ROW, credit_cost: 88 }, "user@example.com");
 
     expect(result.status).toBe("failed");
-    expect(refundCreditsMock).toHaveBeenCalledWith("user-1", 88, 5, expect.any(String));
+    expect(refundCreditsMock).toHaveBeenCalledWith("user-1", 88, expect.any(String));
+  });
+
+  it("refunds nothing when another caller already settled the row — a failed job must not be refunded twice", async () => {
+    // The live status poll, History's reconciliation pass and the cancel route
+    // can all try to settle the same generation at once. Only the caller whose
+    // UPDATE actually moves the row out of `pending` may refund it.
+    queueStatusMock.mockRejectedValue(new Error("fal blew up"));
+    hasUnlimitedCreditsMock.mockReturnValue(false);
+    const admin = makeAdminMock({ claimed: false });
+    const { settlePendingVideoRow } = await import("./video-status");
+
+    const result = await settlePendingVideoRow(admin, BASE_ROW, "user@example.com");
+
+    expect(result.status).toBe("failed");
+    expect(refundCreditsMock).not.toHaveBeenCalled();
   });
 
   it("does not refund an unlimited (admin) account on failure", async () => {

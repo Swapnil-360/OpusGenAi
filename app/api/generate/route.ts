@@ -8,6 +8,12 @@ import { getUserPlan } from "@/lib/entitlements";
 import { QUALITY_TIERS, canUseQuality, type Quality } from "@/lib/plans";
 import { buildScenePrompt, buildProductEditPrompt, buildPortraitEditPrompt, buildCampaignEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
 import { rejectIfBot } from "@/lib/bot-protect";
+import {
+  sanitizePrompt,
+  sanitizePlaceholderValues,
+  isWithinImageSizeLimit,
+  IMAGE_TOO_LARGE_MESSAGE,
+} from "@/lib/request-limits";
 
 const CREDIT_COST = 1;
 
@@ -43,9 +49,13 @@ export async function POST(req: NextRequest) {
     // the id, placeholders filled from the user's answers, and whatever extra
     // direction they typed appended. Without a template, the user's own text
     // is the whole prompt.
-    let prompt = String(userPrompt);
+    const cleanUserPrompt = sanitizePrompt(userPrompt);
+    let prompt = cleanUserPrompt;
     let templateType = rawTemplateType;
     if (templateId) {
+      if (typeof templateId !== "string") {
+        return NextResponse.json({ error: "Invalid template." }, { status: 400 });
+      }
       const admin = createAdminClient();
       const { data: tpl } = await admin
         .from("templates")
@@ -60,8 +70,8 @@ export async function POST(req: NextRequest) {
       templateType = tpl.template_type;
       prompt = resolveTemplatePrompt(
         tpl.prompt,
-        typeof placeholderValues === "object" && placeholderValues ? placeholderValues : {},
-        String(userPrompt)
+        sanitizePlaceholderValues(placeholderValues),
+        cleanUserPrompt
       );
     }
 
@@ -101,8 +111,11 @@ export async function POST(req: NextRequest) {
     let image: string | undefined;
 
     if (isPremium) {
-      if (!inputImage) {
+      if (!inputImage || typeof inputImage !== "string") {
         return NextResponse.json({ error: "Product photo is required for this mode." }, { status: 400 });
+      }
+      if (!isWithinImageSizeLimit(inputImage)) {
+        return NextResponse.json({ error: IMAGE_TOO_LARGE_MESSAGE }, { status: 413 });
       }
       const imageUrl = await uploadDataUrlToFal(inputImage);
       const editPrompt =
@@ -145,8 +158,35 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Persist + charge (server-side, so it can't be skipped) ──
-    const { data: insertedRow, error: insertError } = await supabase
+    // ── Charge first, then persist ──
+    // The charge is atomic and conditional (see chargeCredits): it is what
+    // actually enforces the balance, not the read above. Ordering it before
+    // the insert means a user who ran out mid-flight can't end up with a
+    // generation row that was never paid for.
+    let newCredits: number;
+    if (isUnlimited) {
+      newCredits = UNLIMITED_CREDITS_DISPLAY;
+    } else {
+      const charged = await chargeCredits(
+        user.id,
+        cost,
+        isPremium ? `Premium AI product photo (${quality})` : "Image generation"
+      );
+      if (charged === null) {
+        return NextResponse.json(
+          { error: "You're out of credits. Upgrade your plan to keep generating." },
+          { status: 402 }
+        );
+      }
+      newCredits = charged;
+    }
+
+    // Written with the service-role client, like every other generation write.
+    // The session client depended on an RLS grant for the `authenticated`
+    // role that this app has already had silently break once (see the note in
+    // lib/credits.ts), which failed the insert without failing the request —
+    // the user got their image but no history row.
+    const { data: insertedRow, error: insertError } = await createAdminClient()
       .from("generations")
       .insert({
         user_id: user.id,
@@ -168,10 +208,6 @@ export async function POST(req: NextRequest) {
       .select("id")
       .single();
     if (insertError) console.error("generations insert failed:", insertError.message);
-
-    const newCredits = isUnlimited
-      ? UNLIMITED_CREDITS_DISPLAY
-      : await chargeCredits(user.id, cost, credits, isPremium ? `Premium AI product photo (${quality})` : "Image generation");
 
     return NextResponse.json({ image, credits: newCredits, generationId: insertedRow?.id ?? null });
   } catch (e) {

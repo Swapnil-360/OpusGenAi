@@ -30,17 +30,39 @@ export async function getUserCredits(userId: string): Promise<number> {
   return profile?.credits ?? 0;
 }
 
-/** Decrements credits via RPC and logs a transaction. Returns the new balance. */
+/**
+ * Atomically charges `cost` credits. Returns the new balance, or **null** when
+ * the user could not afford it (or the profile is missing) — callers must
+ * treat null as "nothing was charged, reject the request", normally with a 402.
+ *
+ * The guard and the decrement happen inside one SQL statement (see the
+ * charge_credits function). That matters because the old shape — read the
+ * balance in one query, decide, then decrement in another — left a window as
+ * wide as a whole AI generation between the check and the charge: two
+ * concurrent requests both saw a sufficient balance, both generated, and the
+ * decrement floored at zero rather than failing, so the second generation was
+ * effectively free. Reading the balance first is now only useful for showing
+ * a friendly "out of credits" message *before* doing expensive work; this
+ * call is what actually enforces it.
+ */
 export async function chargeCredits(
   userId: string,
   cost: number,
-  currentCredits: number,
   description: string
-): Promise<number> {
+): Promise<number | null> {
   const admin = createAdminClient();
 
-  const { error: rpcError } = await admin.rpc("decrement_credits", { uid: userId, amount: cost });
-  if (rpcError) console.error("decrement_credits failed:", rpcError.message);
+  const { data: newBalance, error: rpcError } = await admin.rpc("charge_credits", {
+    uid: userId,
+    amount: cost,
+  });
+  if (rpcError) {
+    console.error("charge_credits failed:", rpcError.message);
+    return null;
+  }
+  // NULL from the function means the WHERE guard (credits >= amount) matched
+  // no row — insufficient balance. Nothing was deducted.
+  if (newBalance === null || newBalance === undefined) return null;
 
   const { error: txError } = await admin.from("credit_transactions").insert({
     user_id: userId,
@@ -50,29 +72,37 @@ export async function chargeCredits(
   });
   if (txError) console.error("credit_transactions insert failed:", txError.message);
 
-  return rpcError ? currentCredits : Math.max(0, currentCredits - cost);
+  return newBalance as number;
 }
 
-/** Adds credits back and logs a transaction. Returns the new balance. A plain
- * update, not an RPC — unlike chargeCredits' floor at zero, a refund has no
- * invariant to protect atomically, and after the decrement_credits RPC
- * exposure (it was anon-callable with no ownership check), the fix is fewer
- * RPC surfaces, not more. Used when an async job (image-to-video) is charged
- * up front, at submit time, but then fails on fal's side. */
+/**
+ * Adds credits back and logs a transaction. Returns the new balance, or null
+ * if the refund itself failed.
+ *
+ * Increments in place via SQL rather than writing back a balance read earlier
+ * in the request: the read-modify-write version silently discarded any charge
+ * that landed in between (a user starting a new generation while an older one
+ * was being refunded would have had that charge erased).
+ *
+ * Callers are responsible for making sure a given generation is only refunded
+ * once — see markRowRefunded in lib/video-status.ts, which claims the row's
+ * terminal state before any refund is issued.
+ */
 export async function refundCredits(
   userId: string,
   amount: number,
-  currentCredits: number,
   description: string
-): Promise<number> {
+): Promise<number | null> {
   const admin = createAdminClient();
-  const newBalance = currentCredits + amount;
 
-  const { error: updateError } = await admin
-    .from("profiles")
-    .update({ credits: newBalance, updated_at: new Date().toISOString() })
-    .eq("id", userId);
-  if (updateError) console.error("refundCredits update failed:", updateError.message);
+  const { data: newBalance, error: rpcError } = await admin.rpc("refund_credits", {
+    uid: userId,
+    amount,
+  });
+  if (rpcError) {
+    console.error("refund_credits failed:", rpcError.message);
+    return null;
+  }
 
   const { error: txError } = await admin.from("credit_transactions").insert({
     user_id: userId,
@@ -82,5 +112,5 @@ export async function refundCredits(
   });
   if (txError) console.error("credit_transactions insert failed:", txError.message);
 
-  return updateError ? currentCredits : newBalance;
+  return (newBalance ?? null) as number | null;
 }

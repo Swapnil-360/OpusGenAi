@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fal } from "@/lib/fal";
-import { getUserCredits, refundCredits, hasUnlimitedCredits } from "@/lib/credits";
-import { resolveVideoModel, settlePendingVideoRow, type VideoRowMetadata } from "@/lib/video-status";
+import { resolveVideoModel, settlePendingVideoRow, failAndRefundOnce, type VideoRowMetadata } from "@/lib/video-status";
 
 /**
  * User-initiated cancel for a still-pending video generation.
@@ -71,14 +70,18 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   // Still pending after the cancel attempt and a fresh status check — treat
   // it as cancelled on our side regardless of what fal's queue ends up doing
   // with the job it was told to stop.
-  const newCredits = hasUnlimitedCredits(user.email)
-    ? null
-    : await refundCredits(user.id, row.credit_cost, await getUserCredits(user.id), "Image-to-video (cancelled by user)");
-
-  await admin
-    .from("generations")
-    .update({ status: "failed", error_message: "Cancelled by you." })
-    .eq("id", id);
+  //
+  // The mark-failed and the refund are one claimed transition: the refund only
+  // happens for the caller that actually moves the row out of `pending`. A
+  // second Cancel (double-click, retry, or a replayed request) finds the row
+  // already settled and refunds nothing.
+  const newCredits = await failAndRefundOnce(
+    admin,
+    row,
+    user.email,
+    "Cancelled by you.",
+    "Image-to-video (cancelled by user)"
+  );
 
   return NextResponse.json({ status: "failed", error: "Cancelled by you.", cancelled: true, credits: newCredits });
 }

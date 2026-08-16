@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
 import { rejectIfBot } from "@/lib/bot-protect";
+import { rejectIfRateLimited, AI_ASSIST_LIMIT } from "@/lib/rate-limit";
+import { sanitizePrompt, isWithinImageSizeLimit, IMAGE_TOO_LARGE_MESSAGE } from "@/lib/request-limits";
 
 const SYSTEM_PROMPT =
   "You are a senior creative director at a premium ad agency, writing production-ready prompts for " +
@@ -28,6 +30,9 @@ export async function POST(req: NextRequest) {
     if (typeof imageUrl !== "string" || !(FAL_URL_RE.test(imageUrl) || DATA_URL_RE.test(imageUrl))) {
       return NextResponse.json({ error: "An image is required." }, { status: 400 });
     }
+    if (!isWithinImageSizeLimit(imageUrl)) {
+      return NextResponse.json({ error: IMAGE_TOO_LARGE_MESSAGE }, { status: 413 });
+    }
 
     // Auth required (prevents anonymous abuse) — no credit charge, this call
     // costs ~$0.001, same reasoning as /api/enhance-prompt.
@@ -40,16 +45,25 @@ export async function POST(req: NextRequest) {
     const botResponse = await rejectIfBot();
     if (botResponse) return botResponse;
 
+    // Costs real money per call but deducts no credits, so the credit system
+    // isn't bounding it — this is what stops an unbounded loop.
+    const limited = await rejectIfRateLimited(user.id, AI_ASSIST_LIMIT);
+    if (limited) return limited;
+
     const resolvedUrl = DATA_URL_RE.test(imageUrl) ? await uploadDataUrlToFal(imageUrl) : imageUrl;
 
-    const styleText = typeof style === "string" && style.trim() ? style.trim() : "Luxury / Premium";
-    const movementText = typeof movement === "string" && movement.trim() ? movement.trim() : "Slow Push-In";
+    // All three are interpolated into the model prompt below, and tokens are
+    // what this call is billed on — so they're length-capped rather than
+    // passed through at whatever size the request carried.
+    const styleText = sanitizePrompt(style, 120) || "Luxury / Premium";
+    const movementText = sanitizePrompt(movement, 120) || "Slow Push-In";
+    const hintText = sanitizePrompt(hint, 600);
 
     let instruction =
       `Write a production-ready cinematic video prompt for this exact product. ` +
       `Style: ${styleText}. Camera movement: ${movementText}.`;
-    if (typeof hint === "string" && hint.trim()) {
-      instruction += ` Additional creative direction from the client: "${hint.trim()}"`;
+    if (hintText) {
+      instruction += ` Additional creative direction from the client: "${hintText}"`;
     }
 
     const result = await fal.subscribe("openrouter/router/vision", {

@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fal } from "@/lib/fal";
-import { getUserCredits, refundCredits, hasUnlimitedCredits } from "@/lib/credits";
+import { refundCredits, hasUnlimitedCredits } from "@/lib/credits";
 import { VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
 
 export type VideoRowMetadata = {
@@ -70,7 +70,8 @@ export async function settlePendingVideoRow(
     await admin
       .from("generations")
       .update({ status: "completed", metadata: { ...meta, videoUrl }, completed_at: new Date().toISOString() })
-      .eq("id", row.id);
+      .eq("id", row.id)
+      .eq("status", "pending");
 
     return { status: "completed", videoUrl };
   } catch (err) {
@@ -81,19 +82,57 @@ export async function settlePendingVideoRow(
     console.error(`settlePendingVideoRow: generation ${row.id} failed:`, err);
     const errorMessage = err instanceof Error ? err.message : "Video generation failed.";
 
-    await admin
-      .from("generations")
-      .update({ status: "failed", error_message: errorMessage })
-      .eq("id", row.id);
-
-    if (!hasUnlimitedCredits(userEmail)) {
-      const credits = await getUserCredits(row.user_id);
-      // Refunds exactly what this row actually charged — not a tier
-      // constant — so a failed Premium (88cr) job refunds 88, not whatever
-      // Standard costs.
-      await refundCredits(row.user_id, row.credit_cost, credits, "Image-to-video (generation failed)");
-    }
+    const refunded = await failAndRefundOnce(
+      admin,
+      row,
+      userEmail,
+      errorMessage,
+      "Image-to-video (generation failed)"
+    );
+    // Losing the claim means another in-flight caller (the live status poll
+    // and History's reconciliation pass can easily overlap) already settled
+    // and refunded this row. Report the outcome, don't refund twice.
+    void refunded;
 
     return { status: "failed", error: errorMessage };
   }
+}
+
+/**
+ * Marks a pending row failed and refunds it — **at most once**, no matter how
+ * many callers race to settle the same generation.
+ *
+ * The claim is the `.eq("status", "pending")` filter: whichever caller's
+ * UPDATE matches the row first flips it out of `pending` and gets the row
+ * back, and every later caller matches zero rows and skips the refund. Both
+ * the live status poll and History's reconciliation pass can settle the same
+ * row concurrently, and the cancel route can race either of them, so without
+ * this a single failed generation could be refunded several times over.
+ *
+ * Returns the new balance when this caller issued the refund, or null when it
+ * lost the claim (or the user is on an unlimited account, which is never
+ * charged and so never refunded).
+ */
+export async function failAndRefundOnce(
+  admin: SupabaseClient,
+  row: PendingVideoRow,
+  userEmail: string | null | undefined,
+  errorMessage: string,
+  refundDescription: string
+): Promise<number | null> {
+  const { data: claimed } = await admin
+    .from("generations")
+    .update({ status: "failed", error_message: errorMessage })
+    .eq("id", row.id)
+    .eq("status", "pending")
+    .select("id, credit_cost")
+    .maybeSingle();
+
+  if (!claimed) return null;
+
+  if (hasUnlimitedCredits(userEmail)) return null;
+
+  // Refunds what the row was actually charged, read back from the row this
+  // update just claimed rather than from anything the caller passed in.
+  return refundCredits(row.user_id, claimed.credit_cost, refundDescription);
 }

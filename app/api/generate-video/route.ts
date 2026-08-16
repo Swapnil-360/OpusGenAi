@@ -7,6 +7,13 @@ import { getUserPlan } from "@/lib/entitlements";
 import { VIDEO_TIERS, canUseVideoQuality, canUseMultiImageVideo, hasReachedBasicVideoLimit, BASIC_STANDARD_VIDEO_LIMIT, MULTI_IMAGE_VIDEO_TIER, type VideoQuality } from "@/lib/plans";
 import { resolveTemplatePrompt } from "@/lib/template-prompt";
 import { rejectIfBot } from "@/lib/bot-protect";
+import { failAndRefundOnce } from "@/lib/video-status";
+import {
+  sanitizePrompt,
+  sanitizePlaceholderValues,
+  isWithinImageSizeLimit,
+  IMAGE_TOO_LARGE_MESSAGE,
+} from "@/lib/request-limits";
 
 const DEFAULT_MOTION_PROMPT = "smooth cinematic camera motion, subtle zoom, natural movement";
 const DATA_URL_RE = /^data:image\/[a-zA-Z0-9.+-]+;base64,/;
@@ -31,6 +38,9 @@ export async function POST(req: NextRequest) {
     if (typeof imageUrl !== "string" || !(FAL_URL_RE.test(imageUrl) || DATA_URL_RE.test(imageUrl))) {
       return NextResponse.json({ error: "An image is required." }, { status: 400 });
     }
+    if (!isWithinImageSizeLimit(imageUrl)) {
+      return NextResponse.json({ error: IMAGE_TOO_LARGE_MESSAGE }, { status: 413 });
+    }
 
     // Reference photos beyond the main one — validated the same way, then
     // capped server-side rather than trusting the client's own MAX_EXTRA
@@ -39,7 +49,12 @@ export async function POST(req: NextRequest) {
     // whether this job uses the single-image models or MULTI_IMAGE_VIDEO_TIER.
     const extraImageUrls: string[] = Array.isArray(rawExtraImageUrls)
       ? rawExtraImageUrls
-          .filter((u): u is string => typeof u === "string" && (FAL_URL_RE.test(u) || DATA_URL_RE.test(u)))
+          .filter(
+            (u): u is string =>
+              typeof u === "string" &&
+              (FAL_URL_RE.test(u) || DATA_URL_RE.test(u)) &&
+              isWithinImageSizeLimit(u)
+          )
           .slice(0, MAX_EXTRA_IMAGES)
       : [];
     const isMultiImage = extraImageUrls.length > 0;
@@ -106,8 +121,11 @@ export async function POST(req: NextRequest) {
     // Template prompts never reach the browser, so resolve here from the id.
     // Done before charging, same reasoning as the upload above — an invalid
     // template shouldn't cost the user credits.
-    let motionPrompt = typeof userPrompt === "string" ? userPrompt.trim() : "";
+    let motionPrompt = sanitizePrompt(userPrompt);
     if (templateId) {
+      if (typeof templateId !== "string") {
+        return NextResponse.json({ error: "Invalid template." }, { status: 400 });
+      }
       const { data: tpl } = await admin
         .from("templates")
         .select("prompt")
@@ -118,7 +136,7 @@ export async function POST(req: NextRequest) {
       }
       motionPrompt = resolveTemplatePrompt(
         tpl.prompt,
-        typeof placeholderValues === "object" && placeholderValues ? placeholderValues : {},
+        sanitizePlaceholderValues(placeholderValues),
         motionPrompt
       );
     }
@@ -149,9 +167,28 @@ export async function POST(req: NextRequest) {
     // money once it's queued regardless of whether the client stays
     // connected. Refunded below if the submit call itself fails, and by the
     // status route if the job later fails on fal's side.
-    const newCredits = isUnlimited
-      ? UNLIMITED_CREDITS_DISPLAY
-      : await chargeCredits(user.id, cost, credits, isMultiImage ? "Image-to-video (multi-image)" : `Image-to-video (${quality})`);
+    //
+    // This charge is also the real balance enforcement: it deducts only if
+    // the balance still covers the cost at that instant, so two requests
+    // fired together can't both clear the earlier read-only check and both
+    // get a video.
+    let newCredits: number;
+    if (isUnlimited) {
+      newCredits = UNLIMITED_CREDITS_DISPLAY;
+    } else {
+      const charged = await chargeCredits(
+        user.id,
+        cost,
+        isMultiImage ? "Image-to-video (multi-image)" : `Image-to-video (${quality})`
+      );
+      if (charged === null) {
+        return NextResponse.json(
+          { error: "You're out of credits. Upgrade your plan to keep generating." },
+          { status: 402 }
+        );
+      }
+      newCredits = charged;
+    }
 
     // metadata.quality stays a real VideoQuality for single-image rows (so old
     // rows and the status route's fallback keep working unchanged) and becomes
@@ -182,7 +219,9 @@ export async function POST(req: NextRequest) {
 
     if (insertError || !row) {
       console.error("generations insert failed:", insertError?.message);
-      if (!isUnlimited) await refundCredits(user.id, cost, newCredits, "Image-to-video (failed to start)");
+      // No row was created, so there is nothing for the settle path to claim
+      // later — this refund can't collide with one.
+      if (!isUnlimited) await refundCredits(user.id, cost, "Image-to-video (failed to start)");
       return NextResponse.json({ error: "Failed to start generation. Try again." }, { status: 500 });
     }
 
@@ -213,14 +252,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ generationId: row.id, credits: newCredits });
     } catch (submitError) {
       console.error("fal.queue.submit failed:", submitError);
-      await admin
-        .from("generations")
-        .update({ status: "failed", error_message: "Failed to start video generation." })
-        .eq("id", row.id);
-      const refunded = isUnlimited
-        ? newCredits
-        : await refundCredits(user.id, cost, newCredits, "Image-to-video (submit failed)");
-      return NextResponse.json({ error: "Failed to start video generation.", credits: refunded }, { status: 502 });
+      // Marks failed and refunds as one claimed transition, so this can't
+      // double-refund against a settle pass that saw the row first.
+      const refunded = await failAndRefundOnce(
+        admin,
+        { id: row.id, user_id: user.id, status: "pending", error_message: null, credit_cost: cost, metadata: baseMetadata },
+        user.email,
+        "Failed to start video generation.",
+        "Image-to-video (submit failed)"
+      );
+      return NextResponse.json(
+        { error: "Failed to start video generation.", credits: refunded ?? newCredits },
+        { status: 502 }
+      );
     }
   } catch (e) {
     console.error("generate-video route error:", e);

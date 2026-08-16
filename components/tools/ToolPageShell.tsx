@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Check, Download, ImageUp, X, Zap } from "lucide-react";
 import { CreditBadge } from "@/components/shared/CreditBadge";
 import { MOCK_CURRENT_USER } from "@/lib/mock-data";
+import { cn } from "@/lib/utils";
 
 const S = {
   border: "rgba(255,255,255,0.09)",
@@ -77,10 +78,18 @@ interface UploadZoneProps {
   onUpload: (file: File, preview: string) => void;
   onRemove: () => void;
   accentColor: string;
+  /** "default" (every other tool page) is a full-width hero square. "compact"
+   *  is a small fixed-size tile, centered rather than stretched — used where
+   *  this is one input among several (e.g. the video generator, which also
+   *  has a quality strip and a photo grid once an image is picked) and a
+   *  384px empty square reads as too much dead space next to everything
+   *  else on the page. */
+  size?: "default" | "compact";
 }
 
-export function UploadZone({ label = "Drop image here", preview, onUpload, onRemove, accentColor }: UploadZoneProps) {
+export function UploadZone({ label = "Drop image here", preview, onUpload, onRemove, accentColor, size = "default" }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const compact = size === "compact";
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -98,7 +107,7 @@ export function UploadZone({ label = "Drop image here", preview, onUpload, onRem
 
   if (preview) {
     return (
-      <div className="relative rounded-2xl overflow-hidden aspect-square w-full max-w-sm group"
+      <div className={cn("relative rounded-2xl overflow-hidden aspect-square group", compact ? "w-40 mx-auto" : "w-full max-w-sm")}
         style={{ border: `1px solid ${S.border}` }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={preview} alt="Input" className="w-full h-full object-cover" />
@@ -120,24 +129,29 @@ export function UploadZone({ label = "Drop image here", preview, onUpload, onRem
 
   return (
     <label
-      className="cursor-pointer block"
+      className={cn("cursor-pointer block", compact && "w-40 mx-auto")}
       onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
       onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
       onDrop={handleDrop}
     >
       <motion.div
-        className="border-2 border-dashed rounded-2xl p-8 text-center aspect-square w-full max-w-sm flex flex-col items-center justify-center"
+        className={cn(
+          "border-2 border-dashed rounded-2xl text-center aspect-square flex flex-col items-center justify-center",
+          compact ? "p-3 w-40" : "p-8 w-full max-w-sm"
+        )}
         animate={isDragging
           ? { borderColor: accentColor, backgroundColor: `${accentColor}14`, scale: 1.02 }
           : { borderColor: S.border, backgroundColor: "transparent", scale: 1 }}
         whileHover={!isDragging ? { borderColor: accentColor, backgroundColor: `${accentColor}08` } : undefined}
         transition={{ duration: 0.15 }}
       >
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4" style={{ background: S.glass }}>
-          <ImageUp className="w-7 h-7" style={{ color: isDragging ? accentColor : S.muted }} />
+        <div className={cn("rounded-2xl flex items-center justify-center", compact ? "w-9 h-9 mb-2" : "w-14 h-14 mb-4")} style={{ background: S.glass }}>
+          <ImageUp className={compact ? "w-4 h-4" : "w-7 h-7"} style={{ color: isDragging ? accentColor : S.muted }} />
         </div>
-        <p className="text-sm font-semibold mb-1" style={{ color: S.text }}>{isDragging ? "Drop it here" : label}</p>
-        <p className="text-xs" style={{ color: S.muted }}>or click to browse · JPG, PNG, WebP</p>
+        <p className={cn("font-semibold", compact ? "text-xs mb-0.5" : "text-sm mb-1")} style={{ color: S.text }}>{isDragging ? "Drop it here" : label}</p>
+        <p className={compact ? "text-[10px]" : "text-xs"} style={{ color: S.muted }}>
+          {compact ? "or click to browse" : "or click to browse · JPG, PNG, WebP"}
+        </p>
       </motion.div>
       <input type="file" accept="image/*" className="hidden" onChange={handleChange} />
     </label>

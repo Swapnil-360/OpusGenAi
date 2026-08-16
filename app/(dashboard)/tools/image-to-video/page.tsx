@@ -187,10 +187,10 @@ function ImageToVideoPageInner() {
         )}
 
         {!sourceImageUrl ? (
-          <div className="rounded-2xl p-5"
+          <div className="rounded-2xl p-4"
             style={{ border: `1px solid ${W.redBorder}`, background: "linear-gradient(180deg, rgba(220,38,38,0.06) 0%, transparent 60%)" }}
           >
-            <div className="flex gap-1.5 mb-5 p-1 rounded-xl" style={{ background: W.glassDim, border: `1px solid ${W.border}` }}>
+            <div className="flex gap-1.5 mb-4 p-1 rounded-xl" style={{ background: W.glassDim, border: `1px solid ${W.border}` }}>
               <button
                 onClick={() => setTab("upload")}
                 className="flex-1 h-9 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 transition-all"
@@ -209,11 +209,12 @@ function ImageToVideoPageInner() {
 
             {tab === "upload" ? (
               <UploadZone
-                label="Drop your product photo here"
+                label="Drop your product photo"
                 preview={uploadPreview}
                 onUpload={handleUpload}
                 onRemove={handleRemoveUpload}
                 accentColor="#dc2626"
+                size="compact"
               />
             ) : (
               <div className="space-y-3">

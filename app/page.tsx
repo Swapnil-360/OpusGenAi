@@ -678,53 +678,50 @@ export default function LandingPage() {
         </section>
 
         {/* ══ MARQUEE ══════════════════════════════════════════════════════════ */}
-        <div
-          className="relative overflow-hidden py-5"
-          style={{
-            borderTop: "1px solid rgba(255,255,255,0.05)",
-            borderBottom: "1px solid rgba(255,255,255,0.05)",
-            background: "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)",
-          }}
-        >
-          <div
-            className="absolute left-0 top-0 bottom-0 w-28 pointer-events-none z-10"
-            style={{
-              background: "linear-gradient(to right, #0f0404, transparent)",
-            }}
-          />
-          <div
-            className="absolute right-0 top-0 bottom-0 w-28 pointer-events-none z-10"
-            style={{
-              background: "linear-gradient(to left, #0f0404, transparent)",
-            }}
-          />
-          <motion.div
-            className="flex whitespace-nowrap"
-            animate={{ x: "-50%" }}
-            transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
-          >
-            {[...CAPABILITIES, ...CAPABILITIES].map((cap, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2 px-4 py-2 mx-1.5 rounded-full shrink-0"
-                style={{
-                  background: "rgba(255,255,255,0.05)",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  backdropFilter: "blur(14px)",
-                  WebkitBackdropFilter: "blur(14px)",
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 16px rgba(0,0,0,0.25)",
-                }}
+        <div className="px-4 sm:px-6 py-10 md:py-14">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center gap-4 mb-5">
+              <div className="h-px flex-1" style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.14))" }} />
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] shrink-0" style={{ color: "rgba(255,255,255,0.38)" }}>
+                Platform Capabilities
+              </p>
+              <div className="h-px flex-1" style={{ background: "linear-gradient(to left, transparent, rgba(255,255,255,0.14))" }} />
+            </div>
+
+            {/* Single frosted-glass capsule (was a row of individually-boxed
+                pills) — one continuous panel the ticker scrolls inside of,
+                clipped by its own rounded edge rather than a color-matched
+                fade, since the panel itself now reads as a distinct surface
+                floating over the page instead of blending into it. */}
+            <div
+              className="relative overflow-hidden rounded-full py-4"
+              style={{
+                background: "rgba(255,255,255,0.045)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07), 0 16px 40px rgba(0,0,0,0.35)",
+              }}
+            >
+              <motion.div
+                className="flex whitespace-nowrap"
+                animate={{ x: "-50%" }}
+                transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
               >
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: "#f87171", boxShadow: "0 0 6px rgba(248,113,113,0.8)" }} />
-                <span
-                  className="text-[13px] sm:text-sm font-semibold tracking-wide uppercase"
-                  style={{ color: "rgba(255,255,255,0.75)", letterSpacing: "0.04em" }}
-                >
-                  {cap}
-                </span>
-              </div>
-            ))}
-          </motion.div>
+                {[...CAPABILITIES, ...CAPABILITIES].map((cap, i) => (
+                  <div key={i} className="flex items-center gap-2.5 px-4 shrink-0">
+                    <span className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: "#f87171", boxShadow: "0 0 6px rgba(248,113,113,0.8)" }} />
+                    <span
+                      className="text-[13px] sm:text-sm font-semibold tracking-wide uppercase"
+                      style={{ color: "rgba(255,255,255,0.72)", letterSpacing: "0.04em" }}
+                    >
+                      {cap}
+                    </span>
+                  </div>
+                ))}
+              </motion.div>
+            </div>
+          </div>
         </div>
 
         {/* ══ VIDEO TEMPLATES ══════════════════════════════════════════════════ */}

@@ -218,7 +218,17 @@ const Card = ({ tpl, index, total, progress, config, onSelect }: CardProps) => {
         "w-32 h-44 sm:w-44 sm:h-60 lg:w-52 lg:h-68",
       )}
     >
-      {tpl.coverImageUrl ? (
+      {tpl.templateType === "video" && tpl.previewVideoUrl ? (
+        // Same always-playing (not hover-to-play) treatment as the landing
+        // page's video template grid — a visitor should see the actual
+        // motion output here too, not just a static cover.
+        <video
+          src={tpl.previewVideoUrl}
+          poster={tpl.coverImageUrl ?? undefined}
+          autoPlay muted loop playsInline preload="auto"
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-transform duration-700 group-hover:scale-110"
+        />
+      ) : tpl.coverImageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={tpl.coverImageUrl}

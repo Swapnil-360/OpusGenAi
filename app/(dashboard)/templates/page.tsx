@@ -295,16 +295,24 @@ function TemplatesPageInner() {
                 <X className="w-4 h-4" />
               </button>
 
-              {/* Image pane — object-contain against an accent-tinted backdrop,
-                  so a square/portrait cover is shown whole rather than cropped,
-                  and the leftover space reads as an intentional preview mat.
-                  Fixed pane width/height on desktop means the modal's own size
-                  no longer swings with each cover's aspect ratio. */}
+              {/* Image/video pane — object-contain against an accent-tinted
+                  backdrop, so a square/portrait cover is shown whole rather
+                  than cropped, and the leftover space reads as an intentional
+                  preview mat. Fixed pane width/height on desktop means the
+                  modal's own size no longer swings with each cover's aspect
+                  ratio. */}
               <div
                 className="relative shrink-0 md:w-[55%] md:h-full flex items-center justify-center p-3 md:p-5"
                 style={{ background: `linear-gradient(155deg, ${preview.accentColor}1f 0%, #0a0202 80%)` }}
               >
-                {preview.coverImageUrl ? (
+                {preview.templateType === "video" && preview.previewVideoUrl ? (
+                  <video
+                    src={preview.previewVideoUrl}
+                    poster={preview.coverImageUrl ?? undefined}
+                    autoPlay muted loop playsInline preload="auto"
+                    className="max-w-full max-h-[34vh] md:max-h-full object-contain rounded-xl"
+                  />
+                ) : preview.coverImageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={preview.coverImageUrl}

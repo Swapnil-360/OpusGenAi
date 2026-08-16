@@ -15,6 +15,7 @@ interface TemplateRow {
    *  can't see it, and neither carries the prompt itself. */
   placeholders?: string[];
   image_slot_labels?: string[];
+  image_slots_optional?: boolean;
   cover_image_url: string | null;
   preview_video_url: string | null;
   accent_color: string;
@@ -32,6 +33,7 @@ function mapRow(row: TemplateRow): Template {
     tags: row.tags ?? [],
     placeholders: row.placeholders ?? [],
     imageSlots: row.image_slot_labels ?? [],
+    imageSlotsOptional: row.image_slots_optional ?? false,
     coverImageUrl: row.cover_image_url,
     previewVideoUrl: row.preview_video_url,
     accentColor: row.accent_color,

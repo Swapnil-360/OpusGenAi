@@ -266,7 +266,10 @@ function ImageToVideoPageInner() {
               standardVideosUsed={standardVideosUsed}
               onProcessingChange={setIsVideoProcessing}
               template={activeTemplate
-                ? { id: activeTemplate.id, name: activeTemplate.name, placeholders: activeTemplate.placeholders, imageSlots: activeTemplate.imageSlots }
+                ? {
+                    id: activeTemplate.id, name: activeTemplate.name, placeholders: activeTemplate.placeholders,
+                    imageSlots: activeTemplate.imageSlots, imageSlotsOptional: activeTemplate.imageSlotsOptional,
+                  }
                 : null}
             />
           </div>

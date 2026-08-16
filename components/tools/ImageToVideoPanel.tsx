@@ -80,8 +80,9 @@ interface ImageToVideoPanelProps {
    *  prompt is never sent to the browser — only the id (forwarded to the
    *  server, which resolves the real prompt), the [FIELD] labels it needs
    *  the user to fill in, and the reference-photo slots it needs beyond the
-   *  main image (empty = classic single-image template). */
-  template?: { id: string; name: string; placeholders: string[]; imageSlots: string[] } | null;
+   *  main image (empty = classic single-image template, unless
+   *  imageSlotsOptional makes it an unstructured multi-photo one instead). */
+  template?: { id: string; name: string; placeholders: string[]; imageSlots: string[]; imageSlotsOptional: boolean } | null;
   /** Fires whenever this panel starts/stops an active (paid, cancellable)
    *  generation — lets the parent page disable anything that would orphan
    *  it (e.g. "Change image"), since this component has no way to stop a
@@ -429,12 +430,14 @@ export function ImageToVideoPanel({ imageUrl, plan, isAdmin, standardVideosUsed,
       {videoStatus === "idle" && !basicLimitReached && !(templateSlots.length > 0 && !canUseMulti) && (
         <>
           {/* Reference photos beyond the main image. A template with imageSlots
-              gets one fixed, labeled, required box per slot; freeform gets a
-              growable 0-2 optional list. Either way, 2+ filled images switches
-              the whole job to MULTI_IMAGE_VIDEO_TIER below — a fixed-model,
-              fixed-resolution tier, since the three VIDEO_TIERS models each
-              only take one image_url and have no concept of a second photo. */}
-          {(templateSlots.length > 0 || extraImages.length > 0 || !template) && (
+              gets one fixed, labeled, required box per slot; a template with
+              imageSlotsOptional (or no template at all) gets the same growable
+              0-2 optional list as a freeform generation. Either way, 2+ filled
+              images switches the whole job to MULTI_IMAGE_VIDEO_TIER below —
+              a fixed-model, fixed-resolution tier, since the three VIDEO_TIERS
+              models each only take one image_url and have no concept of a
+              second photo. */}
+          {(templateSlots.length > 0 || extraImages.length > 0 || !template || template?.imageSlotsOptional) && (
             <div className="mt-3">
               <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: W.dim }}>
                 {templateSlots.length > 0 ? "This template also needs" : "Reference photos (optional)"}
@@ -472,7 +475,7 @@ export function ImageToVideoPanel({ imageUrl, plan, isAdmin, standardVideosUsed,
                     )}
                   </div>
                 ))}
-                {!template && extraImages.length < MAX_EXTRA_IMAGES && (
+                {(!template || template.imageSlotsOptional) && extraImages.length < MAX_EXTRA_IMAGES && (
                   canUseMulti ? (
                     <button onClick={addExtraImageSlot}
                       className="w-16 h-16 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0 transition-opacity hover:opacity-80"

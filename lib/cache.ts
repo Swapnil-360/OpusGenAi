@@ -73,7 +73,7 @@ export const CACHE_TAGS = {
  * deployment, which fails as a confusing `undefined` field deep in the
  * response rather than a clean error. Bump this, don't touch call sites.
  */
-const CACHE_SCHEMA_VERSION = "v1";
+const CACHE_SCHEMA_VERSION = "v2"; // v2: /api/templates' cached select gained image_slots_optional
 
 /**
  * Cache-aside wrapper: returns a zero-arg function that serves from the

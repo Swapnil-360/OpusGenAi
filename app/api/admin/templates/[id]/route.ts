@@ -34,6 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (Array.isArray(body.tags)) update.tags = body.tags;
   if (typeof body.prompt === "string") update.prompt = body.prompt.trim();
   if (Array.isArray(body.imageSlotLabels)) update.image_slot_labels = body.imageSlotLabels;
+  if (typeof body.imageSlotsOptional === "boolean") update.image_slots_optional = body.imageSlotsOptional;
   if (typeof body.accentColor === "string") update.accent_color = body.accentColor;
   if (typeof body.isPro === "boolean") update.is_pro = body.isPro;
   if (typeof body.sortOrder === "number") update.sort_order = body.sortOrder;

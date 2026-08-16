@@ -165,8 +165,14 @@ type TemplateFormState = {
   // beyond the main image (e.g. "Reference Model Photo"). The prompt above
   // must reference them as @Image2, @Image3, ... in slot order (@Image1 is
   // always the main photo) — this field only controls which upload boxes
-  // the video generator shows, it doesn't touch the prompt itself.
+  // the video generator shows, it doesn't touch the prompt itself. Ignored
+  // entirely when imageSlotsOptional is on.
   imageSlotLabels: string;
+  // Video templates only — when on, extra photos are an optional, unlabeled,
+  // growable add-a-photo flow (same as no template applied) instead of
+  // imageSlotLabels' fixed required boxes. For a prompt written to adapt to
+  // whatever's uploaded rather than needing a specific shot per slot.
+  imageSlotsOptional: boolean;
   accentColor: string;
   isPro: boolean;
   sortOrder: number;
@@ -181,6 +187,7 @@ const EMPTY_TEMPLATE_FORM: TemplateFormState = {
   tags: "",
   prompt: "",
   imageSlotLabels: "",
+  imageSlotsOptional: false,
   accentColor: "#dc2626",
   isPro: false,
   sortOrder: 0,
@@ -197,6 +204,7 @@ function rowToAdminTemplate(row: {
   description: string; tags: string[] | null; prompt: string;
   cover_image_url: string | null; preview_video_url: string | null;
   image_slot_labels: string[] | null;
+  image_slots_optional: boolean | null;
   accent_color: string; is_pro: boolean; sort_order: number;
 }): AdminTemplate {
   return {
@@ -208,6 +216,7 @@ function rowToAdminTemplate(row: {
     tags: row.tags ?? [],
     prompt: row.prompt,
     imageSlots: row.image_slot_labels ?? [],
+    imageSlotsOptional: row.image_slots_optional ?? false,
     coverImageUrl: row.cover_image_url,
     previewVideoUrl: row.preview_video_url,
     accentColor: row.accent_color,
@@ -226,6 +235,7 @@ function templateToForm(tpl: AdminTemplate): TemplateFormState {
     tags: tpl.tags.join(", "),
     prompt: tpl.prompt,
     imageSlotLabels: tpl.imageSlots.join(", "),
+    imageSlotsOptional: tpl.imageSlotsOptional,
     accentColor: tpl.accentColor,
     isPro: tpl.isPro,
     sortOrder: tpl.sortOrder,
@@ -616,6 +626,7 @@ export default function AdminPage() {
       tags: templateForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
       prompt: templateForm.prompt,
       imageSlotLabels: templateForm.imageSlotLabels.split(",").map((t) => t.trim()).filter(Boolean),
+      imageSlotsOptional: templateForm.imageSlotsOptional,
       accentColor: templateForm.accentColor,
       isPro: templateForm.isPro,
       sortOrder: templateForm.sortOrder,
@@ -1445,13 +1456,32 @@ export default function AdminPage() {
 
                 {templateForm.templateType === "video" && (
                   <div className="mb-5">
-                    <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>
-                      Extra reference photos <span style={{ color: T.dim }}>(comma-separated labels, optional)</span>
+                    <button type="button" onClick={() => setTemplateForm((f) => f && { ...f, imageSlotsOptional: !f.imageSlotsOptional })}
+                      className="flex items-center gap-2.5 w-full text-left p-3 rounded-xl mb-3"
+                      style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
+                      <div className="w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0"
+                        style={templateForm.imageSlotsOptional
+                          ? { borderColor: T.redPrimary, background: T.redPrimary }
+                          : { borderColor: T.border, background: "transparent" }}>
+                        {templateForm.imageSlotsOptional && <Check className="w-2.5 h-2.5 text-white" />}
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium" style={{ color: T.text }}>Extra photos are optional, not fixed roles</p>
+                        <p className="text-[11px] mt-0.5" style={{ color: T.dim }}>
+                          Users can add up to 2 extra photos of their own choosing (like a template-free generation),
+                          instead of the specific labeled slots below. Best for a prompt that adapts to whatever&apos;s
+                          uploaded — e.g. &quot;use each reference image according to its role.&quot;
+                        </p>
+                      </div>
+                    </button>
+
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: templateForm.imageSlotsOptional ? T.dim : T.muted }}>
+                      Extra reference photos <span style={{ color: T.dim }}>(comma-separated labels{templateForm.imageSlotsOptional ? " — unused while optional is on" : ", optional"})</span>
                     </label>
-                    <input value={templateForm.imageSlotLabels}
+                    <input value={templateForm.imageSlotLabels} disabled={templateForm.imageSlotsOptional}
                       onChange={(e) => setTemplateForm((f) => f && { ...f, imageSlotLabels: e.target.value })}
                       placeholder="e.g. Reference Model Photo, Desired Background Photo"
-                      className="w-full h-9 px-3 rounded-xl text-sm outline-none"
+                      className="w-full h-9 px-3 rounded-xl text-sm outline-none disabled:opacity-40"
                       style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.text }} />
                     <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: T.dim }}>
                       The user&apos;s own photo is always <code>@Image1</code> in the prompt above. Each label here adds

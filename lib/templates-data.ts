@@ -17,12 +17,23 @@ export interface Template {
    *  resolved server-side from the template id at generation time — so this
    *  is what lets the UI collect the required values without exposing it. */
   placeholders: string[];
-  /** Video templates only — labels for reference photos beyond the main one
-   *  (e.g. ["Reference Model Photo"]). Empty means "classic single-image
-   *  template". The prompt referencing @Image1/@Image2/... for these slots
-   *  lives server-side same as the rest of the prompt — these labels are
-   *  just enough to render the extra upload boxes. */
+  /** Video templates only — labels for FIXED, REQUIRED reference-photo slots
+   *  beyond the main one (e.g. ["Reference Model Photo"]) — every labeled
+   *  slot must be filled before generating. Empty means either a classic
+   *  single-image template, or (if `imageSlotsOptional` is true) a template
+   *  that accepts extra photos without assigning them fixed roles. The
+   *  prompt referencing @Image1/@Image2/... for these lives server-side same
+   *  as the rest of the prompt — these labels are just enough to render the
+   *  extra upload boxes. */
   imageSlots: string[];
+  /** Video templates only. When true, extra reference photos beyond the main
+   *  one are optional and unstructured — the same growable "add a photo"
+   *  flow as a template-free generation, just still available with this
+   *  template applied — rather than `imageSlots`' fixed, required, labeled
+   *  boxes. For a template whose prompt adapts to whatever content is
+   *  uploaded (e.g. "use each reference image according to its role") rather
+   *  than needing a specific numbered shot in each slot. */
+  imageSlotsOptional: boolean;
   coverImageUrl: string | null;
   /** Video templates only — a short looping preview clip. Null until one has
    *  been generated, in which case coverImageUrl acts as the poster frame. */
@@ -105,6 +116,7 @@ export const VIDEO_CATEGORIES: { id: string; label: string }[] = [
   { id: "food-packaging", label: "Food Packaging" },
   { id: "electronics", label: "Electronics" },
   { id: "generic", label: "Generic Product" },
+  { id: "campaign", label: "Marketing Campaign" },
 ];
 
 export function getTemplateById(templates: Template[], id: string): Template | undefined {

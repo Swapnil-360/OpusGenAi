@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Crown, Layers, Lock, Search, Sparkles, X } from "lucide-react";
 import {
@@ -11,6 +11,7 @@ import {
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { toast } from "sonner";
 import { FeaturedCarousel } from "@/components/templates/featured-carousel";
+import { isPlanAtLeast, type Plan } from "@/lib/plans";
 
 const W = {
   bg: "#0f0404",
@@ -34,13 +35,53 @@ const TYPES: { id: TemplateType; label: string; hint: string }[] = [
   { id: "video", label: "Video", hint: "Motion for the video generator" },
 ];
 
+// useSearchParams needs a Suspense boundary under the App Router — same
+// pattern the video generator page uses for its own ?template= deep link.
 export default function TemplatesPage() {
+  return (
+    <Suspense fallback={<div className="h-full" style={{ background: "#0f0404" }} />}>
+      <TemplatesPageInner />
+    </Suspense>
+  );
+}
+
+function TemplatesPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { templates, loading, error, refetch } = useTemplates({ authenticated: true });
-  const [activeType, setActiveType] = useState<TemplateType>("production");
+  const requestedType = searchParams.get("type");
+  const [activeType, setActiveType] = useState<TemplateType>(
+    requestedType === "video" || requestedType === "campaign" || requestedType === "universal" ? requestedType : "production"
+  );
   const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<Template | null>(null);
+  const [userPlan, setUserPlan] = useState<Plan>("free");
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((me) => {
+        if (me?.plan) setUserPlan(me.plan);
+        if (typeof me?.isAdmin === "boolean") setIsAdmin(me.isAdmin);
+      })
+      .catch(() => {});
+  }, []);
+
+  const canBrowseVideo = isAdmin || isPlanAtLeast(userPlan, "basic");
+
+  // Landing page's video template cards deep-link here with a specific
+  // template id — open its preview automatically instead of leaving the
+  // visitor to find it again in the grid themselves. Skipped for a video
+  // template on a Free plan — the locked-tab state above is the right thing
+  // to see, not a preview modal offering a template they can't use yet.
+  useEffect(() => {
+    const requestedTemplateId = searchParams.get("template");
+    if (!requestedTemplateId || templates.length === 0) return;
+    const match = templates.find((t) => t.id === requestedTemplateId);
+    if (match && (match.templateType !== "video" || canBrowseVideo)) setPreview(match);
+  }, [searchParams, templates, canBrowseVideo]);
 
   const categories =
     activeType === "production" ? PRODUCTION_CATEGORIES
@@ -177,7 +218,26 @@ export default function TemplatesPage() {
 
       {/* Carousel */}
       <div className="flex-1 overflow-y-auto py-4">
-        {loading ? (
+        {activeType === "video" && !canBrowseVideo ? (
+          // Video templates need at least Basic — shown here, before anyone
+          // uploads a photo, rather than only failing later at generate time.
+          <div className="flex flex-col items-center text-center py-20 px-6">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-3" style={{ background: W.redBg, border: `1px solid ${W.redBorder}` }}>
+              <Lock className="w-5 h-5" style={{ color: W.red }} />
+            </div>
+            <p className="text-sm font-bold" style={{ color: W.text }}>Video templates need Basic or Pro</p>
+            <p className="text-xs mt-1 max-w-xs" style={{ color: W.muted }}>
+              Upgrade to bring your product photos to life with AI-generated motion.
+            </p>
+            <button
+              onClick={() => { window.location.href = "/account"; }}
+              className="mt-4 h-9 px-4 rounded-lg text-xs font-bold text-white"
+              style={{ background: "#dc2626" }}
+            >
+              Upgrade plan
+            </button>
+          </div>
+        ) : loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-6 h-6 border-2 rounded-full animate-spin" style={{ borderColor: W.border, borderTopColor: W.red }} />
           </div>

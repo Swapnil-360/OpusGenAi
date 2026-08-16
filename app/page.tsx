@@ -759,16 +759,18 @@ export default function LandingPage() {
               </div>
             </FadeIn>
 
-            {/* Each card links straight into the video generator with the
-                template pre-selected, so the motion prompt is already filled
-                and the user only has to add their own product photo.
-                previewVideoUrl plays when one exists; until then coverImageUrl
-                is the poster, falling back to an accent gradient. */}
+            {/* Cards route into the templates browser (video tab), same as the
+                image templates below, rather than jumping straight into the
+                generator — browsing there is also where Free-plan visitors
+                learn video templates need Basic/Pro, instead of discovering
+                that only after uploading a photo. previewVideoUrl plays when
+                one exists; until then coverImageUrl is the poster, falling
+                back to an accent gradient. */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 items-stretch">
               {VIDEO_TEMPLATES.map((tpl, i) => (
                 <FadeIn key={tpl.id} delay={i * 0.06}>
                   <Link
-                    href={`/tools/image-to-video?template=${tpl.id}`}
+                    href={`/templates?type=video&template=${tpl.id}`}
                     className="group block rounded-2xl overflow-hidden h-full transition-all"
                     style={{ border: "1px solid rgba(255,255,255,0.08)", background: "#140505" }}
                   >

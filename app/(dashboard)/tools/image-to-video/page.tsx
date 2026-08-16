@@ -9,7 +9,8 @@ import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
 import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { readApiError } from "@/lib/api-error";
 import { useTemplates } from "@/lib/hooks/use-templates";
-import { VIDEO_TIERS, type Plan, type VideoQuality } from "@/lib/plans";
+import { VIDEO_TIERS, type VideoQuality } from "@/lib/plans";
+import { useMe } from "@/lib/hooks/use-me";
 import { toast } from "sonner";
 
 const W = {
@@ -52,9 +53,12 @@ function ImageToVideoPageInner() {
   const [genPrompt, setGenPrompt] = useState("");
   const [genStatus, setGenStatus] = useState<"idle" | "processing">("idle");
 
-  const [userPlan, setUserPlan] = useState<Plan>("free");
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [standardVideosUsed, setStandardVideosUsed] = useState(0);
+  // Shared cache (lib/hooks/use-me.ts) — instant on navigation instead of
+  // this page paying its own /api/me round trip every time it's visited.
+  const { me } = useMe();
+  const userPlan = me?.plan ?? "free";
+  const isAdmin = me?.isAdmin ?? false;
+  const standardVideosUsed = me?.standardVideosUsed ?? 0;
   // The panel tracks its own generation, but "Change image" here would
   // unmount it — orphaning a paid, still-running job with no way to cancel
   // it from this page. Disabled while true; the panel's own Cancel button is
@@ -67,17 +71,6 @@ function ImageToVideoPageInner() {
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isVideoProcessing]);
-
-  useEffect(() => {
-    fetch("/api/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((me) => {
-        if (me?.plan) setUserPlan(me.plan);
-        if (typeof me?.isAdmin === "boolean") setIsAdmin(me.isAdmin);
-        if (typeof me?.standardVideosUsed === "number") setStandardVideosUsed(me.standardVideosUsed);
-      })
-      .catch(() => {});
-  }, []);
 
   async function handleUpload(file: File, preview: string) {
     setUploadPreview(preview);

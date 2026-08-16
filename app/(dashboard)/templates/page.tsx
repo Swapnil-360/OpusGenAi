@@ -11,7 +11,8 @@ import {
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { toast } from "sonner";
 import { FeaturedCarousel } from "@/components/templates/featured-carousel";
-import { isPlanAtLeast, type Plan } from "@/lib/plans";
+import { isPlanAtLeast } from "@/lib/plans";
+import { useMe } from "@/lib/hooks/use-me";
 
 const W = {
   bg: "#0f0404",
@@ -56,18 +57,11 @@ function TemplatesPageInner() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [search, setSearch] = useState("");
   const [preview, setPreview] = useState<Template | null>(null);
-  const [userPlan, setUserPlan] = useState<Plan>("free");
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((me) => {
-        if (me?.plan) setUserPlan(me.plan);
-        if (typeof me?.isAdmin === "boolean") setIsAdmin(me.isAdmin);
-      })
-      .catch(() => {});
-  }, []);
+  // Shared cache (lib/hooks/use-me.ts) — instant on navigation instead of
+  // this page paying its own /api/me round trip every time it's visited.
+  const { me } = useMe();
+  const userPlan = me?.plan ?? "free";
+  const isAdmin = me?.isAdmin ?? false;
 
   const canBrowseVideo = isAdmin || isPlanAtLeast(userPlan, "basic");
 

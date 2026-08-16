@@ -17,6 +17,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FeedbackButton } from "@/components/shared/FeedbackModal";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { useMe } from "@/lib/hooks/use-me";
+import type { Plan } from "@/lib/plans";
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
 const S = {
@@ -54,7 +56,7 @@ type SidebarUser = {
   email: string;
   avatarUrl: string | null;
   credits: number;
-  plan: "free" | "pro";
+  plan: Plan;
   isAdmin: boolean;
 };
 
@@ -378,8 +380,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [sidebarUser, setSidebarUser] = useState<SidebarUser>(DEFAULT_USER);
   const [guideOpen, setGuideOpen] = useState(false);
+
+  // Shared cache — every other dashboard page mounting alongside/after this
+  // layout reads the same snapshot instead of each re-fetching /api/me
+  // itself. Renders instantly from cache on navigation (no "Loading…" flash
+  // between pages), while still revalidating credits/plan in the background.
+  const { me, unauthorized } = useMe();
+  const sidebarUser: SidebarUser = me
+    ? { name: me.name, email: me.email, avatarUrl: me.avatarUrl, credits: me.credits, plan: me.plan, isAdmin: me.isAdmin }
+    : DEFAULT_USER;
 
   // Checked after mount, never during render — localStorage isn't available on
   // the server and reading it inline would desync hydration.
@@ -388,40 +398,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   useEffect(() => {
-    // One server round trip for everything the sidebar shows. Middleware has
-    // already validated/refreshed the session cookie, so this never waits on a
-    // client-side token refresh — which is what used to leave this stuck on
-    // "Loading…" when returning with an expired access token.
-    async function loadUser() {
-      try {
-        const res = await fetch("/api/me", { cache: "no-store" });
-        if (res.status === 401) { router.push("/login"); return; }
-        if (!res.ok) return;
-        const me = await res.json();
-        setSidebarUser({
-          name: me.name,
-          email: me.email,
-          avatarUrl: me.avatarUrl,
-          credits: me.credits,
-          plan: "free",
-          isAdmin: me.isAdmin,
-        });
-      } catch {
-        // Network blip — leave the placeholder rather than bouncing to /login.
-      }
-    }
-    loadUser();
-
-    // Live credit updates broadcast by pages after a paid action
-    function onCredits(e: Event) {
-      const credits = (e as CustomEvent<number>).detail;
-      if (typeof credits === "number") {
-        setSidebarUser((prev) => ({ ...prev, credits }));
-      }
-    }
-    window.addEventListener("opusgen:credits", onCredits);
-    return () => window.removeEventListener("opusgen:credits", onCredits);
-  }, []);
+    if (unauthorized) router.push("/login");
+  }, [unauthorized, router]);
 
   async function handleSignOut() {
     const supabase = createClient();

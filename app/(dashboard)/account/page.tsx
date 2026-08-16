@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -14,6 +14,7 @@ import { DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from "@/lib/notifi
 import { planLabel } from "@/lib/utils";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { useMe } from "@/lib/hooks/use-me";
 
 const W = {
   bg: "#0f0404",
@@ -101,38 +102,51 @@ export default function AccountPage() {
   const [enrollData, setEnrollData] = useState<{ factorId: string; qrCode: string; secret: string } | null>(null);
   const [verifyCode, setVerifyCode] = useState("");
 
+  // Shared cache (see lib/hooks/use-me.ts) — renders instantly from whatever
+  // the layout (or another dashboard page) already fetched this session,
+  // instead of this page paying its own redundant /api/me round trip on
+  // every visit, then quietly revalidates in the background.
+  const { me, unauthorized } = useMe();
+  const nameSeededRef = useRef(false);
+  const notifSeededRef = useRef(false);
+
   useEffect(() => {
-    // Profile/credits/plan all arrive in one server round trip. Doing this
-    // client-side meant waiting on getSession() — which blocks on a token
-    // refresh when returning with an expired session — before four more
-    // queries could even start, so the page sat on placeholder values.
-    async function load() {
-      try {
-        const res = await fetch("/api/me", { cache: "no-store" });
-        if (res.status === 401) { router.push("/login"); return; }
-        if (!res.ok) return;
-        const me = await res.json();
+    if (unauthorized) router.push("/login");
+  }, [unauthorized, router]);
 
-        setAuthUser({ email: me.email, id: me.id });
-        setName(me.name ?? "");
-        setCredits(me.credits);
-        setAvatarUrl(me.avatarUrl);
-        setTotalGenerations(me.totalGenerations);
-        setIsAdmin(me.isAdmin);
-        setUserPlan(me.plan ?? "free");
-        if (me.notificationPrefs) {
-          setNotifications((prev) => ({ ...prev, ...(me.notificationPrefs as Partial<typeof notifications>) }));
-        }
-      } catch {
-        return;
-      }
-
-      // Needs the auth client (no server equivalent) and only drives the
-      // Security tab, so it loads separately rather than blocking the page.
-      const { data: factors } = await supabase.auth.mfa.listFactors();
-      setMfaFactorId(factors?.totp.find((f) => f.status === "verified")?.id ?? null);
+  useEffect(() => {
+    if (!me) return;
+    // Safe to always sync — nothing on this page edits these directly (the
+    // avatar "Change photo" button is a stub, and credits/plan/admin/total
+    // are pure display).
+    setAuthUser({ email: me.email, id: me.id });
+    setCredits(me.credits);
+    setAvatarUrl(me.avatarUrl);
+    setTotalGenerations(me.totalGenerations);
+    setIsAdmin(me.isAdmin);
+    setUserPlan(me.plan ?? "free");
+    // Seeded once, not resynced — the name field and notification toggles
+    // are locally edited before their own save round trip completes, and a
+    // later background revalidation landing mid-edit would otherwise
+    // silently overwrite what the user just typed/toggled.
+    if (!nameSeededRef.current) {
+      nameSeededRef.current = true;
+      setName(me.name ?? "");
     }
-    load();
+    if (!notifSeededRef.current && me.notificationPrefs) {
+      notifSeededRef.current = true;
+      setNotifications((prev) => ({ ...prev, ...(me.notificationPrefs as Partial<typeof notifications>) }));
+    }
+  }, [me]);
+
+  useEffect(() => {
+    // Needs the auth client (no server equivalent) and only drives the
+    // Security tab, so it loads independently rather than blocking the rest
+    // of the page on it.
+    supabase.auth.mfa.listFactors().then(({ data: factors }) => {
+      setMfaFactorId(factors?.totp.find((f) => f.status === "verified")?.id ?? null);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function toggleNotification(key: keyof typeof notifications) {

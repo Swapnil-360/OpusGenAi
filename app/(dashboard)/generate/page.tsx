@@ -17,7 +17,8 @@ import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { readApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/client";
 import { DEFAULT_NOTIFICATION_PREFS, LOW_CREDIT_THRESHOLD, type NotificationPrefs } from "@/lib/notification-prefs";
-import { QUALITY_TIERS, canUseQuality, type Plan, type Quality } from "@/lib/plans";
+import { QUALITY_TIERS, canUseQuality, type Quality } from "@/lib/plans";
+import { useMe } from "@/lib/hooks/use-me";
 import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -196,16 +197,19 @@ function GeneratePageInner() {
   const [refFile, setRefFile] = useState<File | null>(null);
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
   const [quality, setQuality] = useState<Quality>("standard");
+  // Shared cache (lib/hooks/use-me.ts) — instant on navigation instead of
+  // this page paying its own /api/me round trip every time it's visited.
   // UI affordance only — locking options here is purely so a Free/Basic user
   // isn't surprised by a 403. The server re-derives entitlement from the DB
   // independently on every request; this value is never trusted for cost.
-  const [userPlan, setUserPlan] = useState<Plan>("free");
+  const { me } = useMe();
+  const userPlan = me?.plan ?? "free";
   // Admin bypasses entitlement server-side regardless of the plan column
   // (same as unlimited credits) — without this, an admin whose own row
   // hasn't been manually set to "pro" would see every gated option locked
   // even though the server would let the request through.
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [standardVideosUsed, setStandardVideosUsed] = useState(0);
+  const isAdmin = me?.isAdmin ?? false;
+  const standardVideosUsed = me?.standardVideosUsed ?? 0;
 
   useEffect(() => {
     if (!isVideoProcessing) return;
@@ -227,14 +231,6 @@ function GeneratePageInner() {
       const saved = data?.notification_prefs as Partial<NotificationPrefs> | null;
       if (saved) setNotifPrefs((prev) => ({ ...prev, ...saved }));
     })();
-    fetch("/api/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((me) => {
-        if (me?.plan) setUserPlan(me.plan);
-        if (typeof me?.isAdmin === "boolean") setIsAdmin(me.isAdmin);
-        if (typeof me?.standardVideosUsed === "number") setStandardVideosUsed(me.standardVideosUsed);
-      })
-      .catch(() => {});
   }, []);
   const [fullViewSrc, setFullViewSrc] = useState<string | null>(null);
   const [isEnhancing, setIsEnhancing] = useState(false);

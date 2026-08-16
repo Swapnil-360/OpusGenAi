@@ -88,13 +88,18 @@ interface ImageToVideoPanelProps {
    *  it (e.g. "Change image"), since this component has no way to stop a
    *  job that's already running server-side if its own state just vanishes. */
   onProcessingChange?: (isProcessing: boolean) => void;
+  /** Swaps out the main photo — rendered as the "change" affordance on its
+   *  tile in the unified photo grid below. The parent owns imageUrl, so this
+   *  panel can't clear it itself; the parent is also what guards against
+   *  orphaning an in-progress generation. */
+  onChangeImage?: () => void;
 }
 
 // Extra images beyond the main one: capped one below MULTI_IMAGE_VIDEO_TIER's
 // total, since the main image always fills the first slot.
 const MAX_EXTRA_IMAGES = MULTI_IMAGE_VIDEO_TIER.maxImages - 1;
 
-export function ImageToVideoPanel({ imageUrl, plan, isAdmin, standardVideosUsed, template, onProcessingChange }: ImageToVideoPanelProps) {
+export function ImageToVideoPanel({ imageUrl, plan, isAdmin, standardVideosUsed, template, onProcessingChange, onChangeImage }: ImageToVideoPanelProps) {
   // Basic and Pro both unlock at least Standard quality now; HD/Premium and
   // multi-image stay Pro-only via their own minPlan. Admin bypasses all of
   // it, same as the server's hasUnlimitedCredits check.
@@ -429,82 +434,115 @@ export function ImageToVideoPanel({ imageUrl, plan, isAdmin, standardVideosUsed,
 
       {videoStatus === "idle" && !basicLimitReached && !(templateSlots.length > 0 && !canUseMulti) && (
         <>
-          {/* Reference photos beyond the main image. A template with imageSlots
-              gets one fixed, labeled, required box per slot; a template with
-              imageSlotsOptional (or no template at all) gets the same growable
-              0-2 optional list as a freeform generation. Either way, 2+ filled
-              images switches the whole job to MULTI_IMAGE_VIDEO_TIER below —
-              a fixed-model, fixed-resolution tier, since the three VIDEO_TIERS
-              models each only take one image_url and have no concept of a
-              second photo. */}
-          {(templateSlots.length > 0 || extraImages.length > 0 || !template || template?.imageSlotsOptional) && (
-            <div className="mt-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: W.dim }}>
-                {templateSlots.length > 0 ? "This template also needs" : "Reference photos (optional)"}
+          {/* Unified photo grid — the main image is tile 1, reference photos
+              beyond it fill the rest, all in one row of same-sized boxes
+              (previously the main photo was a separate full-width hero
+              preview above this smaller "reference photos" strip, which read
+              as two different upload UIs stitched together). A template with
+              imageSlots gets one fixed, labeled, required box per extra slot;
+              a template with imageSlotsOptional (or no template at all) gets
+              the same growable 0-2 optional list as a freeform generation.
+              Either way, 2+ filled images switches the whole job to
+              MULTI_IMAGE_VIDEO_TIER below — a fixed-model, fixed-resolution
+              tier, since the three VIDEO_TIERS models each only take one
+              image_url and have no concept of a second photo. */}
+          <div className="mt-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: W.dim }}>
+              {templateSlots.length > 0 ? "Photos this template needs" : "Photos"}
+            </p>
+            {/* A template written to adapt to whatever's uploaded (rather
+                than one fixed shot per numbered slot) benefits the most from
+                being told what kinds of photos actually help it — otherwise
+                someone adds one photo, gets a fine result, and never learns
+                a second one would've made it much better. */}
+            {template?.imageSlotsOptional && (
+              <p className="text-[10px] mb-2 leading-relaxed max-w-sm" style={{ color: W.muted }}>
+                This template blends several photos into one campaign — add a
+                product-only shot, a shot with a person holding or using it,
+                or a texture/detail close-up for the best result. One photo
+                still works, just with less to cut between.
               </p>
-              <div className="flex flex-wrap gap-2">
-                {extraImages.map((src, i) => (
-                  <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0"
-                    style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
-                    {src ? (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={src} alt="" className="w-full h-full object-cover" />
-                        <button onClick={() => removeExtraImage(i)}
-                          className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
-                          style={{ background: "rgba(0,0,0,0.65)" }}>
-                          <X className="w-2.5 h-2.5 text-white" />
-                        </button>
-                      </>
-                    ) : (
-                      <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer gap-0.5">
-                        <input type="file" accept="image/*" className="hidden" disabled={uploadingExtraIndex === i}
-                          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadExtraImage(i, f); e.target.value = ""; }} />
-                        {uploadingExtraIndex === i ? (
-                          <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-                        ) : (
-                          <ImagePlus className="w-3.5 h-3.5" style={{ color: W.dim }} />
-                        )}
-                      </label>
-                    )}
-                    {templateSlots[i] && (
-                      <p className="absolute bottom-0 inset-x-0 text-center text-[7px] font-bold leading-tight py-0.5 truncate px-0.5"
-                        style={{ background: "rgba(0,0,0,0.6)", color: "white" }}>
-                        {templateSlots[i]}
-                      </p>
-                    )}
-                  </div>
-                ))}
-                {(!template || template.imageSlotsOptional) && extraImages.length < MAX_EXTRA_IMAGES && (
-                  canUseMulti ? (
-                    <button onClick={addExtraImageSlot}
-                      className="w-16 h-16 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0 transition-opacity hover:opacity-80"
-                      style={{ border: `1px dashed ${W.border}`, background: W.glassDim }}>
-                      <Plus className="w-3.5 h-3.5" style={{ color: W.dim }} />
-                      <span className="text-[8px] font-semibold" style={{ color: W.dim }}>Add</span>
-                    </button>
-                  ) : extraImages.length === 0 ? (
-                    // Only shown once, as a locked teaser — not a lock icon
-                    // repeated in every empty slot, which would look broken
-                    // since a freeform list here has no fixed slot count.
-                    <button onClick={() => toast.info("Combining multiple photos needs the Pro plan.", {
-                        action: { label: "Upgrade", onClick: () => { window.location.href = "/account"; } },
-                      })}
-                      className="w-16 h-16 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0"
-                      style={{ border: `1px dashed ${W.border}`, background: W.glassDim, opacity: 0.6 }}>
-                      <Lock className="w-3.5 h-3.5" style={{ color: W.dim }} />
-                      <span className="text-[7px] font-semibold" style={{ color: W.dim }}>Pro</span>
-                    </button>
-                  ) : null
+            )}
+            <div className="flex flex-wrap gap-2">
+              {/* Main photo — always tile 1. */}
+              <div className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0"
+                style={{ border: `1px solid ${W.redBorder}`, background: W.glassDim }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                {onChangeImage && (
+                  <button onClick={onChangeImage} title="Change photo"
+                    className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                    style={{ background: "rgba(0,0,0,0.65)" }}>
+                    <X className="w-2.5 h-2.5 text-white" />
+                  </button>
                 )}
-              </div>
-              {isMultiImage && (
-                <p className="text-[9px] mt-1.5 leading-relaxed" style={{ color: W.dim }}>
-                  Using {MULTI_IMAGE_VIDEO_TIER.modelLabel} to combine all your photos · {MULTI_IMAGE_VIDEO_TIER.creditCost} credits
+                <p className="absolute bottom-0 inset-x-0 text-center text-[7px] font-bold leading-tight py-0.5"
+                  style={{ background: "rgba(220,38,38,0.8)", color: "white" }}>
+                  Main
                 </p>
+              </div>
+
+              {extraImages.map((src, i) => (
+                <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0"
+                  style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
+                  {src ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      <button onClick={() => removeExtraImage(i)}
+                        className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                        style={{ background: "rgba(0,0,0,0.65)" }}>
+                        <X className="w-2.5 h-2.5 text-white" />
+                      </button>
+                    </>
+                  ) : (
+                    <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer gap-0.5">
+                      <input type="file" accept="image/*" className="hidden" disabled={uploadingExtraIndex === i}
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadExtraImage(i, f); e.target.value = ""; }} />
+                      {uploadingExtraIndex === i ? (
+                        <div className="w-3.5 h-3.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                      ) : (
+                        <ImagePlus className="w-3.5 h-3.5" style={{ color: W.dim }} />
+                      )}
+                    </label>
+                  )}
+                  {templateSlots[i] && (
+                    <p className="absolute bottom-0 inset-x-0 text-center text-[7px] font-bold leading-tight py-0.5 truncate px-0.5"
+                      style={{ background: "rgba(0,0,0,0.6)", color: "white" }}>
+                      {templateSlots[i]}
+                    </p>
+                  )}
+                </div>
+              ))}
+              {(!template || template.imageSlotsOptional) && extraImages.length < MAX_EXTRA_IMAGES && (
+                canUseMulti ? (
+                  <button onClick={addExtraImageSlot}
+                    className="w-20 h-20 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0 transition-opacity hover:opacity-80"
+                    style={{ border: `1px dashed ${W.border}`, background: W.glassDim }}>
+                    <Plus className="w-4 h-4" style={{ color: W.dim }} />
+                    <span className="text-[9px] font-semibold" style={{ color: W.dim }}>Add photo</span>
+                  </button>
+                ) : extraImages.length === 0 ? (
+                  // Only shown once, as a locked teaser — not a lock icon
+                  // repeated in every empty slot, which would look broken
+                  // since a freeform list here has no fixed slot count.
+                  <button onClick={() => toast.info("Combining multiple photos needs the Pro plan.", {
+                      action: { label: "Upgrade", onClick: () => { window.location.href = "/account"; } },
+                    })}
+                    className="w-20 h-20 rounded-xl flex flex-col items-center justify-center gap-0.5 shrink-0"
+                    style={{ border: `1px dashed ${W.border}`, background: W.glassDim, opacity: 0.6 }}>
+                    <Lock className="w-4 h-4" style={{ color: W.dim }} />
+                    <span className="text-[8px] font-semibold" style={{ color: W.dim }}>Pro</span>
+                  </button>
+                ) : null
               )}
             </div>
-          )}
+            {isMultiImage && (
+              <p className="text-[9px] mt-1.5 leading-relaxed" style={{ color: W.dim }}>
+                Using {MULTI_IMAGE_VIDEO_TIER.modelLabel} to combine all your photos · {MULTI_IMAGE_VIDEO_TIER.creditCost} credits
+              </p>
+            )}
+          </div>
 
           {!isMultiImage && (
           <div className="flex flex-wrap items-center gap-1.5 mt-3">

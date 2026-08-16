@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Clapperboard, ImageUp, Sparkles, X } from "lucide-react";
+import { Clapperboard, ImageUp, Sparkles } from "lucide-react";
 import { UploadZone } from "@/components/tools/ToolPageShell";
 import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
 import { fileToUploadDataUrl } from "@/lib/mask-canvas";
@@ -243,36 +243,31 @@ function ImageToVideoPageInner() {
             )}
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="relative rounded-2xl overflow-hidden aspect-square w-full max-w-sm mx-auto" style={{ border: `1px solid ${W.border}` }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={sourceImageUrl} alt="Source" className="w-full h-full object-cover" />
-              <button
-                onClick={changeImage}
-                disabled={isVideoProcessing}
-                title={isVideoProcessing ? "A video is generating — cancel it first" : undefined}
-                className="absolute top-3 right-3 flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold text-white disabled:opacity-40"
-                style={{ background: "rgba(0,0,0,0.6)", border: `1px solid ${W.border}` }}
-              >
-                <X className="w-3.5 h-3.5" /> Change image
-              </button>
-            </div>
-
-            <ImageToVideoPanel
-              key={activeTemplate?.id ?? "none"}
-              imageUrl={sourceImageUrl}
-              plan={userPlan}
-              isAdmin={isAdmin}
-              standardVideosUsed={standardVideosUsed}
-              onProcessingChange={setIsVideoProcessing}
-              template={activeTemplate
-                ? {
-                    id: activeTemplate.id, name: activeTemplate.name, placeholders: activeTemplate.placeholders,
-                    imageSlots: activeTemplate.imageSlots, imageSlotsOptional: activeTemplate.imageSlotsOptional,
-                  }
-                : null}
-            />
-          </div>
+          // The main photo now renders as the first tile in the panel's own
+          // photo grid (unified with reference-photo slots, same box style),
+          // rather than a separate full-width hero preview above it — the
+          // two used to look like different UI systems stitched together.
+          <ImageToVideoPanel
+            key={activeTemplate?.id ?? "none"}
+            imageUrl={sourceImageUrl}
+            plan={userPlan}
+            isAdmin={isAdmin}
+            standardVideosUsed={standardVideosUsed}
+            onProcessingChange={setIsVideoProcessing}
+            onChangeImage={() => {
+              if (isVideoProcessing) {
+                toast.error("A video is still generating — cancel it below first, or wait for it to finish.");
+                return;
+              }
+              changeImage();
+            }}
+            template={activeTemplate
+              ? {
+                  id: activeTemplate.id, name: activeTemplate.name, placeholders: activeTemplate.placeholders,
+                  imageSlots: activeTemplate.imageSlots, imageSlotsOptional: activeTemplate.imageSlotsOptional,
+                }
+              : null}
+          />
         )}
       </div>
     </div>

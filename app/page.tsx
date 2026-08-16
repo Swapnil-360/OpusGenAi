@@ -482,7 +482,12 @@ export default function LandingPage() {
         <LandingNav />
 
         {/* ══ HERO ════════════════════════════════════════════════════════════ */}
-        <section className="relative lg:min-h-screen flex items-start md:items-center overflow-hidden">
+        {/* No forced min-h-screen — on a tall viewport that used to center the
+            hero content with a large, empty gap below it before the next
+            section could start; height now comes purely from the content's
+            own padding (pt-14/pb-4 … lg:py-20 below), same as every other
+            section on this page. */}
+        <section className="relative flex items-start md:items-center overflow-hidden">
           {/* Grid */}
           <div
             className="absolute inset-0 pointer-events-none"
@@ -678,7 +683,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══ MARQUEE ══════════════════════════════════════════════════════════ */}
-        <div className="px-4 sm:px-6 py-10 md:py-14">
+        <div className="px-4 sm:px-6 py-8 md:py-10">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center gap-4 mb-5">
               <div className="h-px flex-1" style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.14))" }} />

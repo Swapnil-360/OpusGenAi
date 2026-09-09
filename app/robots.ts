@@ -15,6 +15,10 @@ export default function robots(): MetadataRoute.Robots {
         "/history",
         "/account",
         "/templates",
+        // The per-tool workspaces (remove-bg, upscale, image-to-video, …) are
+        // signed-in surfaces too — they were being left crawlable while every
+        // other dashboard route was excluded.
+        "/tools/",
         "/adminopusgenai",
         "/mfa-challenge",
         "/api/",

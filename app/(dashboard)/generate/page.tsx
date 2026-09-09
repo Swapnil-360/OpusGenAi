@@ -6,38 +6,86 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Aperture, Check, ChevronDown, Download, ExternalLink,
-  ImagePlus, Lock, RefreshCw, ScanText,
-  Sparkles, Wand2, X, Zap, Layers,
-  Globe, ShoppingBag, Megaphone, LayoutTemplate, Heart,
-  Droplets, Gem, Watch, Pill, Footprints, Briefcase, Smartphone, Flame,
+  Aperture,
+  Check,
+  ChevronDown,
+  Download,
+  ExternalLink,
+  ImagePlus,
+  Lock,
+  RefreshCw,
+  ScanText,
+  Sparkles,
+  Wand2,
+  X,
+  Zap,
+  Layers,
+  Globe,
+  ShoppingBag,
+  Megaphone,
+  LayoutTemplate,
+  Heart,
+  Droplets,
+  Gem,
+  Watch,
+  Pill,
+  Footprints,
+  Briefcase,
+  Smartphone,
+  Flame,
 } from "lucide-react";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { readApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/client";
-import { DEFAULT_NOTIFICATION_PREFS, LOW_CREDIT_THRESHOLD, type NotificationPrefs } from "@/lib/notification-prefs";
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  LOW_CREDIT_THRESHOLD,
+  type NotificationPrefs,
+} from "@/lib/notification-prefs";
 import { QUALITY_TIERS, canUseQuality, type Quality } from "@/lib/plans";
 import { useMe } from "@/lib/hooks/use-me";
 import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { triggerUpgradeModal } from "@/components/dashboard/UpgradeModal";
 import { toast } from "sonner";
 
 /* ─── Static data ──────────────────────────────────────────────────── */
 const SIZE_PRESETS = [
-  { id: "square",      label: "Square",    ratio: "1:1",  w: 1, h: 1 },
-  { id: "ig-portrait", label: "Portrait",  ratio: "4:5",  w: 4, h: 5 },
-  { id: "ig-story",    label: "Story",     ratio: "9:16", w: 9, h: 16 },
-  { id: "fb-post",     label: "FB Post",   ratio: "16:9", w: 16, h: 9 },
-  { id: "linkedin",    label: "LinkedIn",  ratio: "4:3",  w: 4, h: 3 },
+  { id: "square", label: "Square", ratio: "1:1", w: 1, h: 1 },
+  { id: "ig-portrait", label: "Portrait", ratio: "4:5", w: 4, h: 5 },
+  { id: "ig-story", label: "Story", ratio: "9:16", w: 9, h: 16 },
+  { id: "fb-post", label: "FB Post", ratio: "16:9", w: 16, h: 9 },
+  { id: "linkedin", label: "LinkedIn", ratio: "4:3", w: 4, h: 3 },
 ] as const;
 type SizePreset = (typeof SIZE_PRESETS)[number];
 
 const AI_ACTIONS = [
-  { icon: RefreshCw,  label: "Random Prompt",  desc: "Fill with a random product prompt" },
-  { icon: Wand2,      label: "Improve Prompt",  desc: "Enhance your prompt for better results" },
-  { icon: Sparkles,   label: "Edit With AI",    desc: "Quick AI edits to your prompt" },
-  { icon: ScanText,   label: "Describe Image",  desc: "Upload an image and describe it" },
+  {
+    icon: RefreshCw,
+    label: "Random Prompt",
+    desc: "Fill with a random product prompt",
+  },
+  {
+    icon: Wand2,
+    label: "Improve Prompt",
+    desc: "Enhance your prompt for better results",
+  },
+  {
+    icon: Sparkles,
+    label: "Edit With AI",
+    desc: "Quick AI edits to your prompt",
+  },
+  {
+    icon: ScanText,
+    label: "Describe Image",
+    desc: "Upload an image and describe it",
+  },
 ] as const;
 
 const ALL_PROMPTS = [
@@ -63,27 +111,32 @@ const USE_CASES = [
   {
     label: "Website / Product Page",
     icon: Globe,
-    prompt: "clean white seamless studio background, soft even lighting, minimal shadow, sharp focus, professional e-commerce product photography, centered composition",
+    prompt:
+      "clean white seamless studio background, soft even lighting, minimal shadow, sharp focus, professional e-commerce product photography, centered composition",
   },
   {
     label: "Marketplace Listing",
     icon: ShoppingBag,
-    prompt: "pure white background, bright even studio lighting, no shadows, sharp focus, standard e-commerce marketplace listing style",
+    prompt:
+      "pure white background, bright even studio lighting, no shadows, sharp focus, standard e-commerce marketplace listing style",
   },
   {
     label: "Social Media Post",
     icon: Heart,
-    prompt: "warm flat surface with soft natural light, blurred simple backdrop, shallow depth of field, trendy minimal social-media aesthetic, inviting mood, no busy interior scene",
+    prompt:
+      "warm flat surface with soft natural light, blurred simple backdrop, shallow depth of field, trendy minimal social-media aesthetic, inviting mood, no busy interior scene",
   },
   {
     label: "Poster / Ad Banner",
     icon: LayoutTemplate,
-    prompt: "bold dramatic background with strong negative space for text overlay, high contrast studio lighting, cinematic advertising style",
+    prompt:
+      "bold dramatic background with strong negative space for text overlay, high contrast studio lighting, cinematic advertising style",
   },
   {
     label: "Marketing Campaign",
     icon: Megaphone,
-    prompt: "editorial advertising background, moody cinematic lighting, premium brand campaign aesthetic, shallow depth of field",
+    prompt:
+      "editorial advertising background, moody cinematic lighting, premium brand campaign aesthetic, shallow depth of field",
   },
 ] as const;
 
@@ -95,74 +148,115 @@ const PRODUCT_SCENE_PRESETS = [
   {
     label: "Perfume / Body Spray",
     icon: Droplets,
-    prompt: "on a solid pure white studio background with soft even lighting, subtle water droplets and a soft reflection below, professional cosmetic product photography",
+    prompt:
+      "on a solid pure white studio background with soft even lighting, subtle water droplets and a soft reflection below, professional cosmetic product photography",
   },
   {
     label: "Skincare",
     icon: Sparkles,
-    prompt: "on a solid white marble surface with soft natural side lighting, a few water droplets nearby, clean minimalist skincare photography",
+    prompt:
+      "on a solid white marble surface with soft natural side lighting, a few water droplets nearby, clean minimalist skincare photography",
   },
   {
     label: "Jewelry",
     icon: Gem,
-    prompt: "on a solid black velvet surface with a single dramatic spotlight creating sparkle and highlights, luxury jewelry photography",
+    prompt:
+      "on a solid black velvet surface with a single dramatic spotlight creating sparkle and highlights, luxury jewelry photography",
   },
   {
     label: "Watch",
     icon: Watch,
-    prompt: "on a brushed titanium surface with dramatic side lighting and sharp reflections, luxury watch photography",
+    prompt:
+      "on a brushed titanium surface with dramatic side lighting and sharp reflections, luxury watch photography",
   },
   {
     label: "Supplement / Bottle",
     icon: Pill,
-    prompt: "on a solid white studio background with soft even lighting and a subtle floor reflection, clean pharmaceutical product photography",
+    prompt:
+      "on a solid white studio background with soft even lighting and a subtle floor reflection, clean pharmaceutical product photography",
   },
   {
     label: "Sneakers / Shoes",
     icon: Footprints,
-    prompt: "floating on a solid white seamless background with soft studio lighting and a soft shadow beneath, clean sneaker product photography",
+    prompt:
+      "floating on a solid white seamless background with soft studio lighting and a soft shadow beneath, clean sneaker product photography",
   },
   {
     label: "Handbag",
     icon: Briefcase,
-    prompt: "on a warm wooden table with soft natural window light, editorial handbag product photography",
+    prompt:
+      "on a warm wooden table with soft natural window light, editorial handbag product photography",
   },
   {
     label: "Electronics",
     icon: Smartphone,
-    prompt: "on a solid dark gradient background with cool blue rim lighting and sharp reflections, modern tech product photography",
+    prompt:
+      "on a solid dark gradient background with cool blue rim lighting and sharp reflections, modern tech product photography",
   },
   {
     label: "Candle",
     icon: Flame,
-    prompt: "on a solid concrete surface with warm ambient lighting and a soft shadow, cozy lifestyle candle photography",
+    prompt:
+      "on a solid concrete surface with warm ambient lighting and a soft shadow, cozy lifestyle candle photography",
   },
 ] as const;
 
 const QUICK_EXAMPLES = [
-  { label: "Skincare",  prompt: "Premium skincare serum on white marble with soft natural light and dried flowers" },
-  { label: "Sneakers",  prompt: "Minimalist white sneakers floating on a clean studio background with shadow" },
-  { label: "Candle",    prompt: "Luxury soy candle on concrete surface with moody warm ambient lighting" },
-  { label: "Jewelry",   prompt: "Gold ring on black velvet with dramatic single spotlight creating sparkle" },
-  { label: "Handbag",   prompt: "Premium leather handbag on wood table with warm afternoon window light" },
-  { label: "Beauty",    prompt: "Lipstick and compact on pink satin fabric with soft studio fill lighting" },
-  { label: "Watch",     prompt: "Luxury mechanical watch on brushed titanium surface with dramatic side light" },
-  { label: "Perfume",   prompt: "Crystal perfume bottle on mirrored surface with soft bokeh city lights" },
+  {
+    label: "Skincare",
+    prompt:
+      "Premium skincare serum on white marble with soft natural light and dried flowers",
+  },
+  {
+    label: "Sneakers",
+    prompt:
+      "Minimalist white sneakers floating on a clean studio background with shadow",
+  },
+  {
+    label: "Candle",
+    prompt:
+      "Luxury soy candle on concrete surface with moody warm ambient lighting",
+  },
+  {
+    label: "Jewelry",
+    prompt:
+      "Gold ring on black velvet with dramatic single spotlight creating sparkle",
+  },
+  {
+    label: "Handbag",
+    prompt:
+      "Premium leather handbag on wood table with warm afternoon window light",
+  },
+  {
+    label: "Beauty",
+    prompt:
+      "Lipstick and compact on pink satin fabric with soft studio fill lighting",
+  },
+  {
+    label: "Watch",
+    prompt:
+      "Luxury mechanical watch on brushed titanium surface with dramatic side light",
+  },
+  {
+    label: "Perfume",
+    prompt:
+      "Crystal perfume bottle on mirrored surface with soft bokeh city lights",
+  },
 ] as const;
 
 /* ─── Tokens ────────────────────────────────────────────────────────── */
 const W = {
-  text:      "rgba(255,255,255,0.90)",
-  muted:     "rgba(255,255,255,0.48)",
-  dim:       "rgba(255,255,255,0.26)",
-  border:    "rgba(255,255,255,0.08)",
-  glass:     "rgba(255,255,255,0.05)",
-  glassDim:  "rgba(255,255,255,0.03)",
-  red:       "#f87171",
-  redBg:     "rgba(220,38,38,0.12)",
+  text: "rgba(255,255,255,0.90)",
+  muted: "rgba(255,255,255,0.48)",
+  dim: "rgba(255,255,255,0.26)",
+  border: "rgba(255,255,255,0.08)",
+  glass: "rgba(255,255,255,0.05)",
+  glassDim: "rgba(255,255,255,0.03)",
+  red: "#f87171",
+  redBg: "rgba(220,38,38,0.12)",
   redBorder: "rgba(220,38,38,0.30)",
-  surface:   "#0d0303",
-  card:      "#110404",
+  surface: "#0d0303",
+  card: "#110404",
 };
 
 /* ─── Page ──────────────────────────────────────────────────────────── */
@@ -186,8 +280,12 @@ function GeneratePageInner() {
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   // Values for a template's [FIELD] placeholders — the only template text the
   // user supplies, since the prompt itself stays server-side.
-  const [placeholderValues, setPlaceholderValues] = useState<Record<string, string>>({});
-  const [genStatus, setGenStatus] = useState<"idle" | "processing" | "done">("idle");
+  const [placeholderValues, setPlaceholderValues] = useState<
+    Record<string, string>
+  >({});
+  const [genStatus, setGenStatus] = useState<"idle" | "processing" | "done">(
+    "idle",
+  );
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   // The "Animate this image" card below is keyed to generatedImage — running
   // a new image generation while a video is in progress would remount it and
@@ -195,7 +293,9 @@ function GeneratePageInner() {
   const [isVideoProcessing, setIsVideoProcessing] = useState(false);
   const [refImage, setRefImage] = useState<string | null>(null);
   const [refFile, setRefFile] = useState<File | null>(null);
-  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(
+    DEFAULT_NOTIFICATION_PREFS,
+  );
   const [quality, setQuality] = useState<Quality>("standard");
   // Shared cache (lib/hooks/use-me.ts) — instant on navigation instead of
   // this page paying its own /api/me round trip every time it's visited.
@@ -213,7 +313,10 @@ function GeneratePageInner() {
 
   useEffect(() => {
     if (!isVideoProcessing) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isVideoProcessing]);
@@ -221,14 +324,17 @@ function GeneratePageInner() {
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user) return;
       const { data } = await supabase
         .from("profiles")
         .select("notification_prefs")
         .eq("id", session.user.id)
         .single();
-      const saved = data?.notification_prefs as Partial<NotificationPrefs> | null;
+      const saved =
+        data?.notification_prefs as Partial<NotificationPrefs> | null;
       if (saved) setNotifPrefs((prev) => ({ ...prev, ...saved }));
     })();
   }, []);
@@ -250,7 +356,11 @@ function GeneratePageInner() {
       const res = await fetch("/api/enhance-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), image, hasProductPhoto: !!refFile }),
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          image,
+          hasProductPhoto: !!refFile,
+        }),
       });
 
       toast.dismiss("enhance-progress");
@@ -278,7 +388,9 @@ function GeneratePageInner() {
     // browser just navigates instead of downloading (download attr is
     // ignored cross-origin).
     const isRemote = src.startsWith("http");
-    const url = isRemote ? URL.createObjectURL(await (await fetch(src)).blob()) : src;
+    const url = isRemote
+      ? URL.createObjectURL(await (await fetch(src)).blob())
+      : src;
     const a = document.createElement("a");
     a.href = url;
     a.download = `opusgen-${Date.now()}.${extension}`;
@@ -299,7 +411,10 @@ function GeneratePageInner() {
   // it does not guarantee pixel-identical product pixels, but in testing it
   // reliably preserved shape/logo/text and correctly followed scene prompts.
   async function generateWithProduct(productFile: File) {
-    toast.loading("Generating with premium AI…", { id: "gen-progress", duration: 60000 });
+    toast.loading("Generating with premium AI…", {
+      id: "gen-progress",
+      duration: 60000,
+    });
 
     const imageDataUrl = await fileToUploadDataUrl(productFile);
 
@@ -319,13 +434,19 @@ function GeneratePageInner() {
 
     toast.dismiss("gen-progress");
 
-    if (!res.ok) throw new Error(await readApiError(res, "Generation failed. Try again."));
+    if (!res.ok)
+      throw new Error(await readApiError(res, "Generation failed. Try again."));
 
     const { image, credits } = await res.json();
     if (typeof credits === "number") {
-      window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
+      window.dispatchEvent(
+        new CustomEvent("opusgen:credits", { detail: credits }),
+      );
     }
-    return { image: image as string, credits: typeof credits === "number" ? credits : null };
+    return {
+      image: image as string,
+      credits: typeof credits === "number" ? credits : null,
+    };
   }
 
   async function generateFromPromptOnly() {
@@ -340,26 +461,39 @@ function GeneratePageInner() {
       }),
     });
 
-    if (!res.ok) throw new Error(await readApiError(res, "Generation failed. Try again."));
+    if (!res.ok)
+      throw new Error(await readApiError(res, "Generation failed. Try again."));
 
     const { image, credits } = await res.json();
     if (typeof credits === "number") {
-      window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
+      window.dispatchEvent(
+        new CustomEvent("opusgen:credits", { detail: credits }),
+      );
     }
-    return { image: image as string, credits: typeof credits === "number" ? credits : null };
+    return {
+      image: image as string,
+      credits: typeof credits === "number" ? credits : null,
+    };
   }
 
   async function handleGenerate() {
     if (genStatus === "processing") return;
     if (isVideoProcessing) {
-      toast.error("A video is still generating below — cancel it first, or wait for it to finish.");
+      toast.error(
+        "A video is still generating below — cancel it first, or wait for it to finish.",
+      );
       return;
     }
     // With a template applied the prompt lives server-side, so the textarea is
     // optional — but any [FIELD] the template needs must be answered, or the
     // model would render the placeholder label as literal text.
-    if (!selectedTemplate && !prompt.trim()) { toast.error("Type a prompt first."); return; }
-    const missing = (appliedTemplate?.placeholders ?? []).filter((p) => !placeholderValues[p]?.trim());
+    if (!selectedTemplate && !prompt.trim()) {
+      toast.error("Type a prompt first.");
+      return;
+    }
+    const missing = (appliedTemplate?.placeholders ?? []).filter(
+      (p) => !placeholderValues[p]?.trim(),
+    );
     if (missing.length > 0) {
       toast.error(`Fill in ${missing.join(", ")} before generating.`);
       return;
@@ -375,15 +509,28 @@ function GeneratePageInner() {
       setGeneratedImage(finalImage);
       setGenStatus("done");
       if (notifPrefs.generationDone) toast.success("Image generated!");
-      if (notifPrefs.billing && remaining !== null && remaining <= LOW_CREDIT_THRESHOLD) {
+      if (
+        notifPrefs.billing &&
+        remaining !== null &&
+        remaining <= LOW_CREDIT_THRESHOLD
+      ) {
         toast.warning(
-          remaining === 0 ? "Out of credits" : `Low on credits — ${remaining} left`,
-          { description: "Upgrade your plan to keep generating.", id: "low-credits" }
+          remaining === 0
+            ? "Out of credits"
+            : `Low on credits — ${remaining} left`,
+          {
+            description: "Upgrade your plan to keep generating.",
+            id: "low-credits",
+          },
         );
       }
     } catch (err) {
       toast.dismiss("gen-progress");
-      toast.error(err instanceof Error ? err.message : "Network error. Check your connection.");
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : "Network error. Check your connection.",
+      );
       setGenStatus("idle");
     }
   }
@@ -416,15 +563,20 @@ function GeneratePageInner() {
   }
 
   const imagesReady = genStatus === "done" && !!generatedImage;
-  const appliedTemplate = selectedTemplate ? templates.find((t) => t.id === selectedTemplate) : null;
+  const appliedTemplate = selectedTemplate
+    ? templates.find((t) => t.id === selectedTemplate)
+    : null;
 
   return (
-    <div className="h-full overflow-y-auto" style={{ background: "#0f0404" }} onClick={() => closeAll()}>
+    <div
+      className="h-full overflow-y-auto"
+      style={{ background: "#0f0404" }}
+      onClick={() => closeAll()}
+    >
       <div
         className="max-w-3xl mx-auto px-5 py-6 flex flex-col gap-5"
         onClick={(e) => e.stopPropagation()}
       >
-
         {/* ── Page header ── */}
         <div className="flex items-center gap-2.5">
           <div
@@ -434,8 +586,16 @@ function GeneratePageInner() {
             <Aperture className="w-3.5 h-3.5" style={{ color: W.red }} />
           </div>
           <div>
-            <h1 className="text-sm font-semibold leading-none" style={{ color: W.text }}>Generate Images</h1>
-            <p className="text-[11px] mt-0.5" style={{ color: W.muted }}>AI product photography · Upload your product for AI scene placement (3 credits · premium)</p>
+            <h1
+              className="text-sm font-semibold leading-none"
+              style={{ color: W.text }}
+            >
+              Generate Images
+            </h1>
+            <p className="text-[11px] mt-0.5" style={{ color: W.muted }}>
+              AI product photography · Upload your product for AI scene
+              placement (3 credits · premium)
+            </p>
           </div>
         </div>
 
@@ -446,19 +606,30 @@ function GeneratePageInner() {
             animate={{ opacity: promptFocused ? 1 : 0 }}
             transition={{ duration: 0.4 }}
             style={{
-              background: "radial-gradient(ellipse at 50% 30%, rgba(220,38,38,0.18) 0%, transparent 70%)",
+              background:
+                "radial-gradient(ellipse at 50% 30%, rgba(220,38,38,0.18) 0%, transparent 70%)",
               filter: "blur(18px)",
             }}
           />
 
-          <div className="relative rounded-2xl overflow-hidden" style={{ padding: "1.5px" }}>
-            <div className="absolute inset-0 rounded-2xl" style={{ background: "rgba(255,255,255,0.07)" }} />
+          <div
+            className="relative rounded-2xl overflow-hidden"
+            style={{ padding: "1.5px" }}
+          >
+            <div
+              className="absolute inset-0 rounded-2xl"
+              style={{ background: "rgba(255,255,255,0.07)" }}
+            />
             <motion.div
               className="absolute pointer-events-none"
               style={{
-                width: "200%", height: "200%", top: "-50%", left: "-50%",
+                width: "200%",
+                height: "200%",
+                top: "-50%",
+                left: "-50%",
                 willChange: "transform",
-                background: "conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(255,255,255,0.10) 50deg, transparent 110deg)",
+                background:
+                  "conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(255,255,255,0.10) 50deg, transparent 110deg)",
               }}
               animate={{ rotate: 360 }}
               transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
@@ -466,9 +637,13 @@ function GeneratePageInner() {
             <motion.div
               className="absolute pointer-events-none"
               style={{
-                width: "200%", height: "200%", top: "-50%", left: "-50%",
+                width: "200%",
+                height: "200%",
+                top: "-50%",
+                left: "-50%",
                 willChange: "transform",
-                background: "conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(251,113,133,0.45) 30deg, rgba(239,68,68,0.95) 60deg, rgba(251,146,60,0.5) 90deg, transparent 160deg)",
+                background:
+                  "conic-gradient(from 0deg at 50% 50%, transparent 0deg, rgba(251,113,133,0.45) 30deg, rgba(239,68,68,0.95) 60deg, rgba(251,146,60,0.5) 90deg, transparent 160deg)",
               }}
               animate={{ rotate: 360, opacity: promptFocused ? 1 : 0 }}
               transition={{
@@ -477,20 +652,41 @@ function GeneratePageInner() {
               }}
             />
 
-            <div className="relative rounded-2xl overflow-hidden" style={{ background: W.surface }}>
+            <div
+              className="relative rounded-2xl overflow-hidden"
+              style={{ background: W.surface }}
+            >
               <motion.div
                 className="absolute top-0 left-0 right-0 h-12 pointer-events-none"
                 animate={{ opacity: promptFocused ? 1 : 0 }}
                 transition={{ duration: 0.3 }}
-                style={{ background: "radial-gradient(ellipse at 50% 0%, rgba(220,38,38,0.10) 0%, transparent 70%)" }}
+                style={{
+                  background:
+                    "radial-gradient(ellipse at 50% 0%, rgba(220,38,38,0.10) 0%, transparent 70%)",
+                }}
               />
 
               {refImage && (
                 <div className="flex items-center gap-2 px-4 pt-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={refImage} alt="Product" className="w-8 h-8 rounded-lg object-cover shrink-0" style={{ border: `1px solid ${W.border}` }} />
-                  <span className="text-[11px]" style={{ color: W.muted }}>Product photo — AI recreates the scene and automatically isolates it from any clutter in frame.</span>
-                  <button onClick={() => { setRefImage(null); setRefFile(null); }} className="ml-auto shrink-0" style={{ color: W.dim }}>
+                  <img
+                    src={refImage}
+                    alt="Product"
+                    className="w-8 h-8 rounded-lg object-cover shrink-0"
+                    style={{ border: `1px solid ${W.border}` }}
+                  />
+                  <span className="text-[11px]" style={{ color: W.muted }}>
+                    Product photo — AI recreates the scene and automatically
+                    isolates it from any clutter in frame.
+                  </span>
+                  <button
+                    onClick={() => {
+                      setRefImage(null);
+                      setRefFile(null);
+                    }}
+                    className="ml-auto shrink-0"
+                    style={{ color: W.dim }}
+                  >
                     <X className="w-3 h-3" />
                   </button>
                 </div>
@@ -507,9 +703,18 @@ function GeneratePageInner() {
                         key={q}
                         onClick={() => {
                           if (!unlocked) {
-                            toast.info(`${q.toUpperCase()} needs the ${tier.minPlan === "basic" ? "Basic" : "Pro"} plan.`, {
-                              action: { label: "Upgrade", onClick: () => { window.location.href = "/account"; } },
-                            });
+                            toast.info(
+                              `${q.toUpperCase()} needs the ${tier.minPlan === "basic" ? "Basic" : "Pro"} plan.`,
+                              {
+                                action: {
+                                  label: "Upgrade",
+                                  onClick: () => {
+                                    window.location.href = "/account";
+                                  },
+                                },
+                              },
+                            );
+                            triggerUpgradeModal(tier.minPlan);
                             return;
                           }
                           setQuality(q);
@@ -537,15 +742,37 @@ function GeneratePageInner() {
                   this shows what's active and collects only the fields the
                   template genuinely needs from the user. */}
               {appliedTemplate && (
-                <div className="mx-4 mt-3 rounded-xl p-3" style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}>
+                <div
+                  className="mx-4 mt-3 rounded-xl p-3"
+                  style={{
+                    border: `1px solid ${W.redBorder}`,
+                    background: W.redBg,
+                  }}
+                >
                   <div className="flex items-start gap-2.5">
-                    <Layers className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: W.red }} />
+                    <Layers
+                      className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                      style={{ color: W.red }}
+                    />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold" style={{ color: W.text }}>{appliedTemplate.name}</p>
-                      <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>{appliedTemplate.description}</p>
+                      <p
+                        className="text-xs font-bold"
+                        style={{ color: W.text }}
+                      >
+                        {appliedTemplate.name}
+                      </p>
+                      <p
+                        className="text-[10px] mt-0.5"
+                        style={{ color: W.dim }}
+                      >
+                        {appliedTemplate.description}
+                      </p>
                     </div>
                     <button
-                      onClick={() => { setSelectedTemplate(null); setPlaceholderValues({}); }}
+                      onClick={() => {
+                        setSelectedTemplate(null);
+                        setPlaceholderValues({});
+                      }}
                       className="shrink-0 p-1 rounded-md transition-opacity opacity-60 hover:opacity-100"
                       style={{ color: W.muted }}
                       aria-label="Remove template"
@@ -556,17 +783,31 @@ function GeneratePageInner() {
 
                   {appliedTemplate.placeholders.length > 0 && (
                     <div className="mt-3 space-y-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: W.dim }}>
+                      <p
+                        className="text-[10px] font-bold uppercase tracking-wider"
+                        style={{ color: W.dim }}
+                      >
                         This template needs
                       </p>
                       {appliedTemplate.placeholders.map((field) => (
                         <input
                           key={field}
                           value={placeholderValues[field] ?? ""}
-                          onChange={(e) => setPlaceholderValues((v) => ({ ...v, [field]: e.target.value }))}
-                          placeholder={field.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                          onChange={(e) =>
+                            setPlaceholderValues((v) => ({
+                              ...v,
+                              [field]: e.target.value,
+                            }))
+                          }
+                          placeholder={field
+                            .toLowerCase()
+                            .replace(/\b\w/g, (c) => c.toUpperCase())}
                           className="w-full h-8 px-2.5 rounded-lg text-xs outline-none"
-                          style={{ background: W.glassDim, border: `1px solid ${W.border}`, color: W.text }}
+                          style={{
+                            background: W.glassDim,
+                            border: `1px solid ${W.border}`,
+                            color: W.text,
+                          }}
                         />
                       ))}
                     </div>
@@ -580,11 +821,13 @@ function GeneratePageInner() {
                 onFocus={() => setPromptFocused(true)}
                 onBlur={() => setPromptFocused(false)}
                 rows={appliedTemplate ? 3 : 6}
-                placeholder={appliedTemplate
-                  ? "Anything to add? (optional) — e.g. use a darker background, add soft rim lighting…"
-                  : refFile
-                  ? "Describe the full scene you want — e.g. on white marble surface with soft morning light, e-commerce product photography…"
-                  : "Describe your product scene — e.g. luxury perfume bottle on black marble with cinematic side lighting, editorial style…"}
+                placeholder={
+                  appliedTemplate
+                    ? "Anything to add? (optional) — e.g. use a darker background, add soft rim lighting…"
+                    : refFile
+                      ? "Describe the full scene you want — e.g. on white marble surface with soft morning light, e-commerce product photography…"
+                      : "Describe your product scene — e.g. luxury perfume bottle on black marble with cinematic side lighting, editorial style…"
+                }
                 className="w-full bg-transparent resize-none outline-none px-4 pt-4 pb-2 text-sm leading-relaxed placeholder:opacity-35"
                 style={{ color: W.text }}
                 maxLength={4000}
@@ -600,7 +843,10 @@ function GeneratePageInner() {
                   open={showAiMenu}
                   onOpenChange={(open) => {
                     setShowAiMenu(open);
-                    if (open) { setShowSizePicker(false); setShowTemplatePicker(false); }
+                    if (open) {
+                      setShowSizePicker(false);
+                      setShowTemplatePicker(false);
+                    }
                   }}
                 >
                   <DropdownMenuTrigger asChild>
@@ -608,13 +854,25 @@ function GeneratePageInner() {
                       disabled={isEnhancing}
                       onClick={(e) => e.stopPropagation()}
                       className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium transition-all disabled:opacity-60"
-                      style={showAiMenu
-                        ? { border: `1px solid ${W.redBorder}`, background: W.redBg, color: W.red }
-                        : { border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+                      style={
+                        showAiMenu
+                          ? {
+                              border: `1px solid ${W.redBorder}`,
+                              background: W.redBg,
+                              color: W.red,
+                            }
+                          : {
+                              border: `1px solid ${W.border}`,
+                              background: W.glass,
+                              color: W.muted,
+                            }
+                      }
                     >
-                      {isEnhancing
-                        ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        : <Sparkles className="w-3 h-3" />}
+                      {isEnhancing ? (
+                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3 h-3" />
+                      )}
                       {isEnhancing ? "Analyzing…" : "Enhance"}
                     </button>
                   </DropdownMenuTrigger>
@@ -623,7 +881,11 @@ function GeneratePageInner() {
                     side="top"
                     sideOffset={8}
                     className="w-60 rounded-2xl p-1.5"
-                    style={{ background: W.card, border: `1px solid ${W.border}`, boxShadow: "0 20px 50px rgba(0,0,0,0.7)" }}
+                    style={{
+                      background: W.card,
+                      border: `1px solid ${W.border}`,
+                      boxShadow: "0 20px 50px rgba(0,0,0,0.7)",
+                    }}
                     onClick={(e) => e.stopPropagation()}
                   >
                     {AI_ACTIONS.map(({ icon: Icon, label, desc }) => (
@@ -632,7 +894,10 @@ function GeneratePageInner() {
                         disabled={isEnhancing}
                         onSelect={() => {
                           if (label === "Random Prompt") {
-                            const pick = ALL_PROMPTS[Math.floor(Math.random() * ALL_PROMPTS.length)];
+                            const pick =
+                              ALL_PROMPTS[
+                                Math.floor(Math.random() * ALL_PROMPTS.length)
+                              ];
                             setPrompt(pick);
                             toast.success("Random prompt applied!");
                           } else if (label === "Improve Prompt") {
@@ -643,14 +908,28 @@ function GeneratePageInner() {
                         }}
                         className="flex items-start gap-3 px-3 py-2.5 rounded-xl cursor-pointer"
                         style={{ color: W.text }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = W.glass)}
-                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = W.glass)
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.background = "transparent")
+                        }
                       >
-                        <Icon className="w-3.5 h-3.5 mt-0.5 shrink-0" style={{ color: W.red }} />
+                        <Icon
+                          className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                          style={{ color: W.red }}
+                        />
                         <div>
-                          <p className="text-[12px] font-semibold" style={{ color: W.text }}>{label}</p>
+                          <p
+                            className="text-[12px] font-semibold"
+                            style={{ color: W.text }}
+                          >
+                            {label}
+                          </p>
                           <p className="text-[10px]" style={{ color: W.muted }}>
-                            {label === "Improve Prompt" && refFile ? "Analyzes your photo + prompt" : desc}
+                            {label === "Improve Prompt" && refFile
+                              ? "Analyzes your photo + prompt"
+                              : desc}
                           </p>
                         </div>
                       </DropdownMenuItem>
@@ -671,41 +950,92 @@ function GeneratePageInner() {
         {/* ── Add product photo ── */}
         {!refImage && (
           <div className="-mt-2">
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) { setRefFile(f); setRefImage(URL.createObjectURL(f)); }
-            }} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) {
+                  setRefFile(f);
+                  setRefImage(URL.createObjectURL(f));
+                }
+              }}
+            />
             <button
               onClick={() => fileRef.current?.click()}
               className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-left transition-all"
-              style={{ border: `1px dashed ${W.border}`, background: W.glassDim }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.redBorder; e.currentTarget.style.background = W.redBg; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.border; e.currentTarget.style.background = W.glassDim; }}
+              style={{
+                border: `1px dashed ${W.border}`,
+                background: W.glassDim,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = W.redBorder;
+                e.currentTarget.style.background = W.redBg;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = W.border;
+                e.currentTarget.style.background = W.glassDim;
+              }}
             >
-              <ImagePlus className="w-4 h-4 shrink-0" style={{ color: W.red }} />
+              <ImagePlus
+                className="w-4 h-4 shrink-0"
+                style={{ color: W.red }}
+              />
               <div className="min-w-0">
-                <p className="text-xs font-semibold" style={{ color: W.text }}>Add your product photo</p>
-                <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>Optional — AI places your exact product into the generated scene (premium, 3 credits)</p>
+                <p className="text-xs font-semibold" style={{ color: W.text }}>
+                  Add your product photo
+                </p>
+                <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>
+                  Optional — AI places your exact product into the generated
+                  scene (premium, 3 credits)
+                </p>
               </div>
             </button>
           </div>
         )}
 
         {/* ── Prompt ideas ── */}
-        <div className="rounded-xl p-3.5 space-y-3" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
-          <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: W.dim }}>Prompt ideas</p>
+        <div
+          className="rounded-xl p-3.5 space-y-3"
+          style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
+        >
+          <p
+            className="text-[10px] font-bold uppercase tracking-widest"
+            style={{ color: W.dim }}
+          >
+            Prompt ideas
+          </p>
 
           {refFile ? (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] font-semibold shrink-0" style={{ color: W.muted }}>For your product</span>
+              <span
+                className="text-[10px] font-semibold shrink-0"
+                style={{ color: W.muted }}
+              >
+                For your product
+              </span>
               {PRODUCT_SCENE_PRESETS.map(({ label, icon: Icon, prompt: p }) => (
                 <button
                   key={label}
                   onClick={() => applyUseCase(p, label)}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                  style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.redBorder; e.currentTarget.style.background = W.redBg; e.currentTarget.style.color = W.red; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.border; e.currentTarget.style.background = W.glass; e.currentTarget.style.color = W.muted; }}
+                  style={{
+                    border: `1px solid ${W.border}`,
+                    background: W.glass,
+                    color: W.muted,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = W.redBorder;
+                    e.currentTarget.style.background = W.redBg;
+                    e.currentTarget.style.color = W.red;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = W.border;
+                    e.currentTarget.style.background = W.glass;
+                    e.currentTarget.style.color = W.muted;
+                  }}
                 >
                   <Icon className="w-3 h-3 shrink-0" />
                   {label}
@@ -714,15 +1044,32 @@ function GeneratePageInner() {
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] font-semibold shrink-0" style={{ color: W.muted }}>Try</span>
+              <span
+                className="text-[10px] font-semibold shrink-0"
+                style={{ color: W.muted }}
+              >
+                Try
+              </span>
               {QUICK_EXAMPLES.map(({ label, prompt: p }) => (
                 <button
                   key={label}
                   onClick={() => setPrompt(p)}
                   className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                  style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.redBorder; e.currentTarget.style.background = W.redBg; e.currentTarget.style.color = W.red; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.border; e.currentTarget.style.background = W.glass; e.currentTarget.style.color = W.muted; }}
+                  style={{
+                    border: `1px solid ${W.border}`,
+                    background: W.glass,
+                    color: W.muted,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = W.redBorder;
+                    e.currentTarget.style.background = W.redBg;
+                    e.currentTarget.style.color = W.red;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = W.border;
+                    e.currentTarget.style.background = W.glass;
+                    e.currentTarget.style.color = W.muted;
+                  }}
                 >
                   {label}
                 </button>
@@ -731,15 +1078,32 @@ function GeneratePageInner() {
           )}
 
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-semibold shrink-0" style={{ color: W.muted }}>Use case</span>
+            <span
+              className="text-[10px] font-semibold shrink-0"
+              style={{ color: W.muted }}
+            >
+              Use case
+            </span>
             {USE_CASES.map(({ label, icon: Icon, prompt: p }) => (
               <button
                 key={label}
                 onClick={() => applyUseCase(p, label)}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = W.redBorder; e.currentTarget.style.background = W.redBg; e.currentTarget.style.color = W.red; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = W.border; e.currentTarget.style.background = W.glass; e.currentTarget.style.color = W.muted; }}
+                style={{
+                  border: `1px solid ${W.border}`,
+                  background: W.glass,
+                  color: W.muted,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = W.redBorder;
+                  e.currentTarget.style.background = W.redBg;
+                  e.currentTarget.style.color = W.red;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = W.border;
+                  e.currentTarget.style.background = W.glass;
+                  e.currentTarget.style.color = W.muted;
+                }}
               >
                 <Icon className="w-3 h-3 shrink-0" />
                 {label}
@@ -749,20 +1113,41 @@ function GeneratePageInner() {
         </div>
 
         {/* ── Settings + Generate ── */}
-        <div className="flex items-center gap-2 flex-wrap pt-1 relative" style={{ borderTop: `1px solid ${W.border}` }}>
-
+        <div
+          className="flex items-center gap-2 flex-wrap pt-1 relative"
+          style={{ borderTop: `1px solid ${W.border}` }}
+        >
           {/* Template picker */}
           <div className="relative shrink-0 mt-3">
             <button
-              onClick={(e) => { e.stopPropagation(); setShowTemplatePicker(!showTemplatePicker); setShowAiMenu(false); setShowSizePicker(false); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowTemplatePicker(!showTemplatePicker);
+                setShowAiMenu(false);
+                setShowSizePicker(false);
+              }}
               className="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium transition-all"
-              style={showTemplatePicker || appliedTemplate
-                ? { border: `1px solid ${W.redBorder}`, background: W.redBg, color: W.red }
-                : { border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+              style={
+                showTemplatePicker || appliedTemplate
+                  ? {
+                      border: `1px solid ${W.redBorder}`,
+                      background: W.redBg,
+                      color: W.red,
+                    }
+                  : {
+                      border: `1px solid ${W.border}`,
+                      background: W.glass,
+                      color: W.muted,
+                    }
+              }
             >
               <Layers className="w-3.5 h-3.5 shrink-0" />
-              <span className="max-w-24 truncate">{appliedTemplate ? appliedTemplate.name : "Template"}</span>
-              <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${showTemplatePicker ? "rotate-180" : ""}`} />
+              <span className="max-w-24 truncate">
+                {appliedTemplate ? appliedTemplate.name : "Template"}
+              </span>
+              <ChevronDown
+                className={`w-3 h-3 shrink-0 transition-transform ${showTemplatePicker ? "rotate-180" : ""}`}
+              />
             </button>
 
             <AnimatePresence>
@@ -773,54 +1158,113 @@ function GeneratePageInner() {
                   exit={{ opacity: 0, y: 4, scale: 0.97 }}
                   transition={{ duration: 0.13 }}
                   className="absolute bottom-full mb-2 left-0 z-50 w-72 rounded-2xl overflow-hidden"
-                  style={{ background: "#130505", border: `1px solid ${W.border}`, boxShadow: "0 20px 50px rgba(0,0,0,0.8)" }}
+                  style={{
+                    background: "#130505",
+                    border: `1px solid ${W.border}`,
+                    boxShadow: "0 20px 50px rgba(0,0,0,0.8)",
+                  }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="p-1.5 max-h-80 overflow-y-auto">
-                    {([
-                      { type: "production" as const, label: "Production — for your product photos" },
-                      { type: "universal" as const, label: "Universal — for your own photos" },
-                    ]).map(({ type, label }) => {
-                      const group = templates.filter((t) => t.templateType === type).slice(0, 4);
+                    {[
+                      {
+                        type: "production" as const,
+                        label: "Production — for your product photos",
+                      },
+                      {
+                        type: "universal" as const,
+                        label: "Universal — for your own photos",
+                      },
+                    ].map(({ type, label }) => {
+                      const group = templates
+                        .filter((t) => t.templateType === type)
+                        .slice(0, 4);
                       if (group.length === 0) return null;
                       return (
                         <div key={type}>
-                          <p className="text-[10px] font-bold uppercase tracking-widest px-2 pt-1.5 pb-1.5" style={{ color: W.dim }}>{label}</p>
+                          <p
+                            className="text-[10px] font-bold uppercase tracking-widest px-2 pt-1.5 pb-1.5"
+                            style={{ color: W.dim }}
+                          >
+                            {label}
+                          </p>
                           {group.map((tpl) => (
                             <button
                               key={tpl.id}
                               onClick={() => handleSelectTemplate(tpl.id)}
                               className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all text-left"
-                              style={selectedTemplate === tpl.id ? { background: W.redBg } : {}}
-                              onMouseEnter={(e) => { if (selectedTemplate !== tpl.id) e.currentTarget.style.background = W.glass; }}
-                              onMouseLeave={(e) => { if (selectedTemplate !== tpl.id) e.currentTarget.style.background = "transparent"; }}
+                              style={
+                                selectedTemplate === tpl.id
+                                  ? { background: W.redBg }
+                                  : {}
+                              }
+                              onMouseEnter={(e) => {
+                                if (selectedTemplate !== tpl.id)
+                                  e.currentTarget.style.background = W.glass;
+                              }}
+                              onMouseLeave={(e) => {
+                                if (selectedTemplate !== tpl.id)
+                                  e.currentTarget.style.background =
+                                    "transparent";
+                              }}
                             >
                               {tpl.coverImageUrl ? (
                                 <Image
                                   src={tpl.coverImageUrl}
-                                  alt="" width={48} height={48}
+                                  alt=""
+                                  width={48}
+                                  height={48}
                                   className="w-7 h-7 rounded-md object-cover shrink-0"
                                 />
                               ) : (
                                 <div
                                   className="w-7 h-7 rounded-md shrink-0"
-                                  style={{ background: `linear-gradient(160deg, ${tpl.accentColor}45 0%, #0d0303 85%)` }}
+                                  style={{
+                                    background: `linear-gradient(160deg, ${tpl.accentColor}45 0%, #0d0303 85%)`,
+                                  }}
                                 />
                               )}
                               <div className="flex-1 min-w-0">
-                                <p className="text-[12px] font-semibold leading-none" style={{ color: selectedTemplate === tpl.id ? W.red : W.text }}>
+                                <p
+                                  className="text-[12px] font-semibold leading-none"
+                                  style={{
+                                    color:
+                                      selectedTemplate === tpl.id
+                                        ? W.red
+                                        : W.text,
+                                  }}
+                                >
                                   {tpl.name}
-                                  {tpl.isPro && <span className="ml-1.5 text-[9px] bg-amber-400/20 text-amber-400 border border-amber-400/30 rounded-full px-1.5 font-bold">PRO</span>}
+                                  {tpl.isPro && (
+                                    <span className="ml-1.5 text-[9px] bg-amber-400/20 text-amber-400 border border-amber-400/30 rounded-full px-1.5 font-bold">
+                                      PRO
+                                    </span>
+                                  )}
                                 </p>
-                                <p className="text-[10px] mt-0.5 truncate" style={{ color: W.muted }}>{tpl.description}</p>
+                                <p
+                                  className="text-[10px] mt-0.5 truncate"
+                                  style={{ color: W.muted }}
+                                >
+                                  {tpl.description}
+                                </p>
                               </div>
-                              {selectedTemplate === tpl.id && <Check className="w-3 h-3 shrink-0" style={{ color: W.red }} />}
+                              {selectedTemplate === tpl.id && (
+                                <Check
+                                  className="w-3 h-3 shrink-0"
+                                  style={{ color: W.red }}
+                                />
+                              )}
                             </button>
                           ))}
                         </div>
                       );
                     })}
-                    <Link href="/templates" className="flex items-center justify-center text-xs font-semibold py-2 hover:underline" style={{ color: W.red }} onClick={() => setShowTemplatePicker(false)}>
+                    <Link
+                      href="/templates"
+                      className="flex items-center justify-center text-xs font-semibold py-2 hover:underline"
+                      style={{ color: W.red }}
+                      onClick={() => setShowTemplatePicker(false)}
+                    >
                       All templates →
                     </Link>
                   </div>
@@ -832,14 +1276,31 @@ function GeneratePageInner() {
           {/* Size picker */}
           <div className="relative shrink-0 mt-3">
             <button
-              onClick={(e) => { e.stopPropagation(); setShowSizePicker(!showSizePicker); setShowAiMenu(false); setShowTemplatePicker(false); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowSizePicker(!showSizePicker);
+                setShowAiMenu(false);
+                setShowTemplatePicker(false);
+              }}
               className="flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold transition-all font-mono"
-              style={showSizePicker
-                ? { border: `1px solid ${W.redBorder}`, background: W.redBg, color: W.red }
-                : { border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+              style={
+                showSizePicker
+                  ? {
+                      border: `1px solid ${W.redBorder}`,
+                      background: W.redBg,
+                      color: W.red,
+                    }
+                  : {
+                      border: `1px solid ${W.border}`,
+                      background: W.glass,
+                      color: W.muted,
+                    }
+              }
             >
               {selectedSize.ratio}
-              <ChevronDown className={`w-3 h-3 transition-transform ${showSizePicker ? "rotate-180" : ""}`} />
+              <ChevronDown
+                className={`w-3 h-3 transition-transform ${showSizePicker ? "rotate-180" : ""}`}
+              />
             </button>
             <AnimatePresence>
               {showSizePicker && (
@@ -849,34 +1310,82 @@ function GeneratePageInner() {
                   exit={{ opacity: 0, y: 4, scale: 0.97 }}
                   transition={{ duration: 0.13 }}
                   className="absolute bottom-full mb-2 left-0 z-50 w-44 rounded-2xl overflow-hidden"
-                  style={{ background: W.card, border: `1px solid ${W.border}`, boxShadow: "0 20px 50px rgba(0,0,0,0.7)" }}
+                  style={{
+                    background: W.card,
+                    border: `1px solid ${W.border}`,
+                    boxShadow: "0 20px 50px rgba(0,0,0,0.7)",
+                  }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="p-1.5">
-                    <p className="text-[10px] font-bold uppercase tracking-widest px-2 pt-1.5 pb-1" style={{ color: W.dim }}>Size</p>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-widest px-2 pt-1.5 pb-1"
+                      style={{ color: W.dim }}
+                    >
+                      Size
+                    </p>
                     {SIZE_PRESETS.map((size) => (
                       <button
                         key={size.id}
-                        onClick={() => { setSelectedSize(size); setShowSizePicker(false); }}
+                        onClick={() => {
+                          setSelectedSize(size);
+                          setShowSizePicker(false);
+                        }}
                         className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all"
-                        style={selectedSize.id === size.id ? { background: W.redBg } : {}}
-                        onMouseEnter={(e) => { if (selectedSize.id !== size.id) e.currentTarget.style.background = W.glass; }}
-                        onMouseLeave={(e) => { if (selectedSize.id !== size.id) e.currentTarget.style.background = "transparent"; }}
+                        style={
+                          selectedSize.id === size.id
+                            ? { background: W.redBg }
+                            : {}
+                        }
+                        onMouseEnter={(e) => {
+                          if (selectedSize.id !== size.id)
+                            e.currentTarget.style.background = W.glass;
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedSize.id !== size.id)
+                            e.currentTarget.style.background = "transparent";
+                        }}
                       >
                         <div
                           className="rounded shrink-0"
                           style={{
-                            width:  Math.round(18 * (size.w / Math.max(size.w, size.h))),
-                            height: Math.round(18 * (size.h / Math.max(size.w, size.h))),
-                            background: selectedSize.id === size.id ? W.red : "rgba(255,255,255,0.2)",
-                            minWidth: 10, minHeight: 10,
+                            width: Math.round(
+                              18 * (size.w / Math.max(size.w, size.h)),
+                            ),
+                            height: Math.round(
+                              18 * (size.h / Math.max(size.w, size.h)),
+                            ),
+                            background:
+                              selectedSize.id === size.id
+                                ? W.red
+                                : "rgba(255,255,255,0.2)",
+                            minWidth: 10,
+                            minHeight: 10,
                           }}
                         />
                         <div>
-                          <p className="text-[12px] font-medium leading-none" style={{ color: selectedSize.id === size.id ? W.red : W.text }}>{size.label}</p>
-                          <p className="text-[10px] font-mono mt-0.5" style={{ color: W.dim }}>{size.ratio}</p>
+                          <p
+                            className="text-[12px] font-medium leading-none"
+                            style={{
+                              color:
+                                selectedSize.id === size.id ? W.red : W.text,
+                            }}
+                          >
+                            {size.label}
+                          </p>
+                          <p
+                            className="text-[10px] font-mono mt-0.5"
+                            style={{ color: W.dim }}
+                          >
+                            {size.ratio}
+                          </p>
                         </div>
-                        {selectedSize.id === size.id && <Check className="w-3 h-3 ml-auto" style={{ color: W.red }} />}
+                        {selectedSize.id === size.id && (
+                          <Check
+                            className="w-3 h-3 ml-auto"
+                            style={{ color: W.red }}
+                          />
+                        )}
                       </button>
                     ))}
                   </div>
@@ -922,22 +1431,45 @@ function GeneratePageInner() {
               className="space-y-3"
             >
               {/* Status bar */}
-              <div className="flex items-center gap-2" style={{ borderTop: `1px solid ${W.border}`, paddingTop: "1.25rem" }}>
+              <div
+                className="flex items-center gap-2"
+                style={{
+                  borderTop: `1px solid ${W.border}`,
+                  paddingTop: "1.25rem",
+                }}
+              >
                 {genStatus === "processing" ? (
                   <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
                 ) : (
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" style={{ boxShadow: "0 0 5px #4ade8066" }} />
+                  <div
+                    className="w-1.5 h-1.5 rounded-full bg-emerald-400"
+                    style={{ boxShadow: "0 0 5px #4ade8066" }}
+                  />
                 )}
-                <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: W.muted }}>
-                  {genStatus === "processing" ? "Generating image…" : "Image ready"}
+                <p
+                  className="text-[11px] font-semibold uppercase tracking-widest"
+                  style={{ color: W.muted }}
+                >
+                  {genStatus === "processing"
+                    ? "Generating image…"
+                    : "Image ready"}
                 </p>
                 {genStatus === "done" && (
                   <button
-                    onClick={() => { setGenStatus("idle"); setGeneratedImage(null); }}
+                    onClick={() => {
+                      setGenStatus("idle");
+                      setGeneratedImage(null);
+                    }}
                     className="ml-auto text-[11px] px-2.5 py-1 rounded-md transition-all"
                     style={{ color: W.dim }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = W.text; e.currentTarget.style.background = W.glass; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = W.dim; e.currentTarget.style.background = "transparent"; }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = W.text;
+                      e.currentTarget.style.background = W.glass;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = W.dim;
+                      e.currentTarget.style.background = "transparent";
+                    }}
                   >
                     Clear
                   </button>
@@ -955,41 +1487,52 @@ function GeneratePageInner() {
                     border: `1px solid ${W.border}`,
                   }}
                 />
-              ) : generatedImage && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.93 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 22 }}
-                  className="relative group w-full max-w-sm mx-auto rounded-2xl overflow-hidden cursor-pointer"
-                  style={{ border: `1px solid ${W.border}` }}
-                  onClick={() => setFullViewSrc(generatedImage)}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={generatedImage}
-                    alt="Generated"
-                    className="w-full object-cover"
-                  />
-                  {/* Hover overlay */}
-                  <div
-                    className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end justify-between p-3"
-                    style={{ background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)" }}
+              ) : (
+                generatedImage && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.93 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                    className="relative group w-full max-w-sm mx-auto rounded-2xl overflow-hidden cursor-pointer"
+                    style={{ border: `1px solid ${W.border}` }}
+                    onClick={() => setFullViewSrc(generatedImage)}
                   >
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setFullViewSrc(generatedImage); }}
-                      className="text-[10px] font-bold text-white/90 bg-black/50 px-2 py-1 rounded-lg hover:bg-black/70 transition-colors"
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={generatedImage}
+                      alt="Generated"
+                      className="w-full object-cover"
+                    />
+                    {/* Hover overlay */}
+                    <div
+                      className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end justify-between p-3"
+                      style={{
+                        background:
+                          "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%)",
+                      }}
                     >
-                      View full size
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDownload(generatedImage); }}
-                      className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-semibold text-white transition-all"
-                      style={{ background: "#dc2626" }}
-                    >
-                      <Download className="w-3 h-3" /> Download
-                    </button>
-                  </div>
-                </motion.div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFullViewSrc(generatedImage);
+                        }}
+                        className="text-[10px] font-bold text-white/90 bg-black/50 px-2 py-1 rounded-lg hover:bg-black/70 transition-colors"
+                      >
+                        View full size
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload(generatedImage);
+                        }}
+                        className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs font-semibold text-white transition-all"
+                        style={{ background: "#dc2626" }}
+                      >
+                        <Download className="w-3 h-3" /> Download
+                      </button>
+                    </div>
+                  </motion.div>
+                )
               )}
 
               {/* ── Next steps card ── */}
@@ -999,9 +1542,15 @@ function GeneratePageInner() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.15, duration: 0.22 }}
                   className="rounded-2xl p-4"
-                  style={{ border: `1px solid ${W.border}`, background: W.card }}
+                  style={{
+                    border: `1px solid ${W.border}`,
+                    background: W.card,
+                  }}
                 >
-                  <p className="text-[10px] font-bold uppercase tracking-widest mb-3" style={{ color: W.dim }}>
+                  <p
+                    className="text-[10px] font-bold uppercase tracking-widest mb-3"
+                    style={{ color: W.dim }}
+                  >
                     What&apos;s next?
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2.5">
@@ -1009,17 +1558,42 @@ function GeneratePageInner() {
                     <button
                       onClick={() => handleDownload(generatedImage!)}
                       className="flex-1 flex items-center gap-3 p-3 rounded-xl transition-all text-left group"
-                      style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = W.glass; e.currentTarget.style.borderColor = "rgba(255,255,255,0.14)"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = W.glassDim; e.currentTarget.style.borderColor = W.border; }}
+                      style={{
+                        border: `1px solid ${W.border}`,
+                        background: W.glassDim,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = W.glass;
+                        e.currentTarget.style.borderColor =
+                          "rgba(255,255,255,0.14)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = W.glassDim;
+                        e.currentTarget.style.borderColor = W.border;
+                      }}
                     >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
-                        style={{ background: W.glass }}>
-                        <Download className="w-3.5 h-3.5" style={{ color: W.muted }} />
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
+                        style={{ background: W.glass }}
+                      >
+                        <Download
+                          className="w-3.5 h-3.5"
+                          style={{ color: W.muted }}
+                        />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold" style={{ color: W.text }}>Download image</p>
-                        <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>Save PNG to your device</p>
+                        <p
+                          className="text-xs font-semibold"
+                          style={{ color: W.text }}
+                        >
+                          Download image
+                        </p>
+                        <p
+                          className="text-[10px] mt-0.5"
+                          style={{ color: W.dim }}
+                        >
+                          Save PNG to your device
+                        </p>
                       </div>
                     </button>
 
@@ -1027,25 +1601,58 @@ function GeneratePageInner() {
                     <Link href="/studio" className="flex-1">
                       <div
                         className="flex items-center gap-3 p-3 rounded-xl transition-all h-full group cursor-pointer"
-                        style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(220,38,38,0.18)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = W.redBg; }}
+                        style={{
+                          border: `1px solid ${W.redBorder}`,
+                          background: W.redBg,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background =
+                            "rgba(220,38,38,0.18)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = W.redBg;
+                        }}
                       >
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ background: "rgba(220,38,38,0.2)", border: `1px solid ${W.redBorder}` }}>
-                          <Sparkles className="w-3.5 h-3.5" style={{ color: W.red }} />
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                          style={{
+                            background: "rgba(220,38,38,0.2)",
+                            border: `1px solid ${W.redBorder}`,
+                          }}
+                        >
+                          <Sparkles
+                            className="w-3.5 h-3.5"
+                            style={{ color: W.red }}
+                          />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold" style={{ color: W.text }}>Content Studio</p>
-                          <p className="text-[10px] mt-0.5" style={{ color: W.muted }}>Generate captions & hashtags</p>
+                          <p
+                            className="text-xs font-semibold"
+                            style={{ color: W.text }}
+                          >
+                            Content Studio
+                          </p>
+                          <p
+                            className="text-[10px] mt-0.5"
+                            style={{ color: W.muted }}
+                          >
+                            Generate captions & hashtags
+                          </p>
                         </div>
-                        <ExternalLink className="w-3 h-3 shrink-0" style={{ color: W.red }} />
+                        <ExternalLink
+                          className="w-3 h-3 shrink-0"
+                          style={{ color: W.red }}
+                        />
                       </div>
                     </Link>
                   </div>
 
-                  <p className="text-[10px] mt-3 text-center" style={{ color: W.dim }}>
-                    Download your image, then upload it to Content Studio to generate platform-ready captions.
+                  <p
+                    className="text-[10px] mt-3 text-center"
+                    style={{ color: W.dim }}
+                  >
+                    Download your image, then upload it to Content Studio to
+                    generate platform-ready captions.
                   </p>
                 </motion.div>
               )}
@@ -1088,7 +1695,12 @@ function GeneratePageInner() {
               onClick={(e) => e.stopPropagation()}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={fullViewSrc} alt="Full view" className="w-full rounded-2xl" style={{ border: `1px solid ${W.border}` }} />
+              <img
+                src={fullViewSrc}
+                alt="Full view"
+                className="w-full rounded-2xl"
+                style={{ border: `1px solid ${W.border}` }}
+              />
               <div className="absolute top-3 right-3 flex gap-2">
                 <button
                   onClick={() => handleDownload(fullViewSrc)}
@@ -1100,7 +1712,10 @@ function GeneratePageInner() {
                 <button
                   onClick={() => setFullViewSrc(null)}
                   className="w-8 h-8 rounded-xl flex items-center justify-center text-white transition-all"
-                  style={{ background: "rgba(0,0,0,0.6)", border: `1px solid ${W.border}` }}
+                  style={{
+                    background: "rgba(0,0,0,0.6)",
+                    border: `1px solid ${W.border}`,
+                  }}
                 >
                   <X className="w-4 h-4" />
                 </button>

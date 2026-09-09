@@ -4,17 +4,33 @@ import { useState, useEffect, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { createClient } from "@/lib/supabase/client";
 import {
-  Bell, Check, Clock, CreditCard, Crown, History,
-  KeyRound, LogOut, Shield, ShieldCheck, Sparkles, User, X as XIcon,
+  Bell,
+  Check,
+  Clock,
+  CreditCard,
+  Crown,
+  History,
+  KeyRound,
+  LogOut,
+  Shield,
+  ShieldCheck,
+  Sparkles,
+  User,
+  X as XIcon,
+  Zap,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PLANS } from "@/lib/mock-data";
 import { type Plan as PlanId } from "@/lib/plans";
-import { DEFAULT_NOTIFICATION_PREFS, type NotificationPrefs } from "@/lib/notification-prefs";
+import {
+  DEFAULT_NOTIFICATION_PREFS,
+  type NotificationPrefs,
+} from "@/lib/notification-prefs";
 import { planLabel } from "@/lib/utils";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useMe } from "@/lib/hooks/use-me";
+import { triggerUpgradeModal } from "@/components/dashboard/UpgradeModal";
 
 const W = {
   bg: "#0f0404",
@@ -31,29 +47,50 @@ const W = {
 };
 
 const SECTIONS = [
-  { id: "profile",       label: "Profile",       icon: User },
-  { id: "plan",          label: "Plan",          icon: Crown },
-  { id: "billing",       label: "Billing",       icon: CreditCard },
-  { id: "security",      label: "Security",      icon: Shield },
-  { id: "notifications", label: "Alerts",        icon: Bell },
+  { id: "profile", label: "Profile", icon: User },
+  { id: "plan", label: "Plan", icon: Crown },
+  { id: "billing", label: "Billing", icon: CreditCard },
+  { id: "security", label: "Security", icon: Shield },
+  { id: "notifications", label: "Alerts", icon: Bell },
 ] as const;
 type SectionId = (typeof SECTIONS)[number]["id"];
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: W.dim }}>
+    <p
+      className="text-[10px] font-bold uppercase tracking-widest mb-1.5"
+      style={{ color: W.dim }}
+    >
       {children}
     </p>
   );
 }
 
-function FieldInput({ value, onChange, type = "text", placeholder, icon: Icon, autoComplete, readOnly }: {
-  value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  type?: string; placeholder?: string; icon?: React.ElementType; autoComplete?: string; readOnly?: boolean;
+function FieldInput({
+  value,
+  onChange,
+  type = "text",
+  placeholder,
+  icon: Icon,
+  autoComplete,
+  readOnly,
+}: {
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: string;
+  placeholder?: string;
+  icon?: React.ElementType;
+  autoComplete?: string;
+  readOnly?: boolean;
 }) {
   return (
     <div className="relative">
-      {Icon && <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5" style={{ color: W.dim }} />}
+      {Icon && (
+        <Icon
+          className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5"
+          style={{ color: W.dim }}
+        />
+      )}
       <input
         type={type}
         value={value}
@@ -70,8 +107,12 @@ function FieldInput({ value, onChange, type = "text", placeholder, icon: Icon, a
           paddingRight: "0.75rem",
           cursor: readOnly ? "default" : "text",
         }}
-        onFocus={(e) => { if (!readOnly) e.currentTarget.style.borderColor = W.redBorder; }}
-        onBlur={(e) => { e.currentTarget.style.borderColor = W.border; }}
+        onFocus={(e) => {
+          if (!readOnly) e.currentTarget.style.borderColor = W.redBorder;
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.borderColor = W.border;
+        }}
       />
     </div>
   );
@@ -82,12 +123,17 @@ export default function AccountPage() {
   const supabase = createClient();
 
   const [activeSection, setActiveSection] = useState<SectionId>("profile");
-  const [authUser, setAuthUser] = useState<{ email: string; id: string } | null>(null);
+  const [authUser, setAuthUser] = useState<{
+    email: string;
+    id: string;
+  } | null>(null);
   const [name, setName] = useState("");
   const [credits, setCredits] = useState(10);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [totalGenerations, setTotalGenerations] = useState(0);
-  const [notifications, setNotifications] = useState<NotificationPrefs>(DEFAULT_NOTIFICATION_PREFS);
+  const [notifications, setNotifications] = useState<NotificationPrefs>(
+    DEFAULT_NOTIFICATION_PREFS,
+  );
   const [savingProfile, setSavingProfile] = useState(false);
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
@@ -95,11 +141,54 @@ export default function AccountPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userPlan, setUserPlan] = useState<PlanId>("free");
   const [switchingPlan, setSwitchingPlan] = useState<PlanId | null>(null);
+  const [loadingPortal, setLoadingPortal] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("checkout") === "success") {
+        toast.success("Payment successful! Your subscription is active.");
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+      const planToCheckout = params.get("checkout_plan");
+      if (planToCheckout === "basic" || planToCheckout === "pro") {
+        setActiveSection("billing");
+        triggerUpgradeModal(planToCheckout);
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
+  }, []);
+
+  async function openCustomerPortal() {
+    if (loadingPortal) return;
+    setLoadingPortal(true);
+    try {
+      const res = await fetch("/api/customer-portal", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "Could not open billing portal.");
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error("Portal URL not received.");
+      }
+    } catch {
+      toast.error("Network error. Could not connect to billing portal.");
+    } finally {
+      setLoadingPortal(false);
+    }
+  }
 
   // 2FA (Supabase TOTP)
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [mfaLoading, setMfaLoading] = useState(false);
-  const [enrollData, setEnrollData] = useState<{ factorId: string; qrCode: string; secret: string } | null>(null);
+  const [enrollData, setEnrollData] = useState<{
+    factorId: string;
+    qrCode: string;
+    secret: string;
+  } | null>(null);
   const [verifyCode, setVerifyCode] = useState("");
 
   // Shared cache (see lib/hooks/use-me.ts) — renders instantly from whatever
@@ -135,7 +224,10 @@ export default function AccountPage() {
     }
     if (!notifSeededRef.current && me.notificationPrefs) {
       notifSeededRef.current = true;
-      setNotifications((prev) => ({ ...prev, ...(me.notificationPrefs as Partial<typeof notifications>) }));
+      setNotifications((prev) => ({
+        ...prev,
+        ...(me.notificationPrefs as Partial<typeof notifications>),
+      }));
     }
   }, [me]);
 
@@ -144,7 +236,9 @@ export default function AccountPage() {
     // Security tab, so it loads independently rather than blocking the rest
     // of the page on it.
     supabase.auth.mfa.listFactors().then(({ data: factors }) => {
-      setMfaFactorId(factors?.totp.find((f) => f.status === "verified")?.id ?? null);
+      setMfaFactorId(
+        factors?.totp.find((f) => f.status === "verified")?.id ?? null,
+      );
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -155,9 +249,14 @@ export default function AccountPage() {
       if (authUser) {
         supabase
           .from("profiles")
-          .update({ notification_prefs: next, updated_at: new Date().toISOString() })
+          .update({
+            notification_prefs: next,
+            updated_at: new Date().toISOString(),
+          })
           .eq("id", authUser.id)
-          .then(({ error }) => { if (error) toast.error("Couldn't save that preference."); });
+          .then(({ error }) => {
+            if (error) toast.error("Couldn't save that preference.");
+          });
       }
       return next;
     });
@@ -167,17 +266,32 @@ export default function AccountPage() {
     setMfaLoading(true);
     // Clean up a stale unverified factor from any abandoned previous attempt.
     const { data: existing } = await supabase.auth.mfa.listFactors();
-    const stale = existing?.all.find((f) => f.factor_type === "totp" && f.status === "unverified");
+    const stale = existing?.all.find(
+      (f) => f.factor_type === "totp" && f.status === "unverified",
+    );
     if (stale) await supabase.auth.mfa.unenroll({ factorId: stale.id });
 
-    const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", friendlyName: "Authenticator app" });
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: "totp",
+      friendlyName: "Authenticator app",
+    });
     setMfaLoading(false);
-    if (error || !data) { toast.error(error?.message || "Couldn't start 2FA setup."); return; }
-    setEnrollData({ factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret });
+    if (error || !data) {
+      toast.error(error?.message || "Couldn't start 2FA setup.");
+      return;
+    }
+    setEnrollData({
+      factorId: data.id,
+      qrCode: data.totp.qr_code,
+      secret: data.totp.secret,
+    });
   }
 
   function cancelMfaEnroll() {
-    if (enrollData) supabase.auth.mfa.unenroll({ factorId: enrollData.factorId }).catch(() => {});
+    if (enrollData)
+      supabase.auth.mfa
+        .unenroll({ factorId: enrollData.factorId })
+        .catch(() => {});
     setEnrollData(null);
     setVerifyCode("");
   }
@@ -186,9 +300,15 @@ export default function AccountPage() {
     e.preventDefault();
     if (!enrollData || verifyCode.length !== 6) return;
     setMfaLoading(true);
-    const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: enrollData.factorId, code: verifyCode });
+    const { error } = await supabase.auth.mfa.challengeAndVerify({
+      factorId: enrollData.factorId,
+      code: verifyCode,
+    });
     setMfaLoading(false);
-    if (error) { toast.error(error.message || "Invalid code. Try again."); return; }
+    if (error) {
+      toast.error(error.message || "Invalid code. Try again.");
+      return;
+    }
     toast.success("Two-factor authentication enabled.");
     setMfaFactorId(enrollData.factorId);
     setEnrollData(null);
@@ -198,17 +318,30 @@ export default function AccountPage() {
   async function disableMfa() {
     if (!mfaFactorId) return;
     setMfaLoading(true);
-    const { error } = await supabase.auth.mfa.unenroll({ factorId: mfaFactorId });
+    const { error } = await supabase.auth.mfa.unenroll({
+      factorId: mfaFactorId,
+    });
     setMfaLoading(false);
-    if (error) { toast.error(error.message || "Couldn't disable 2FA."); return; }
+    if (error) {
+      toast.error(error.message || "Couldn't disable 2FA.");
+      return;
+    }
     toast.success("Two-factor authentication disabled.");
     setMfaFactorId(null);
   }
 
   const currentPlan = PLANS.find((p) => p.id === userPlan) ?? PLANS[0];
-  const creditsPercent = Math.min(100, Math.round((credits / (currentPlan?.credits ?? 10)) * 100));
+  const creditsPercent = Math.min(
+    100,
+    Math.round((credits / (currentPlan?.credits ?? 10)) * 100),
+  );
   const displayName = name || authUser?.email?.split("@")[0] || "User";
-  const initials = displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2);
+  const initials = displayName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 
   // Admin-only self-service switch, using the same route the admin panel's
   // Users tab calls — real checkout doesn't exist yet, so this is how an
@@ -240,7 +373,10 @@ export default function AccountPage() {
       .update({ full_name: name, updated_at: new Date().toISOString() })
       .eq("id", authUser.id);
     setSavingProfile(false);
-    if (error) { toast.error("Failed to save profile."); return; }
+    if (error) {
+      toast.error("Failed to save profile.");
+      return;
+    }
     toast.success("Profile saved!");
   }
 
@@ -252,37 +388,60 @@ export default function AccountPage() {
 
   async function handlePasswordChange(e: React.FormEvent) {
     e.preventDefault();
-    if (!newPwd || newPwd.length < 8) { toast.error("New password must be at least 8 characters."); return; }
+    if (!newPwd || newPwd.length < 8) {
+      toast.error("New password must be at least 8 characters.");
+      return;
+    }
     setSavingPwd(true);
     const { error } = await supabase.auth.updateUser({ password: newPwd });
     setSavingPwd(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success("Password updated.");
-    setCurrentPwd(""); setNewPwd("");
+    setCurrentPwd("");
+    setNewPwd("");
   }
 
   return (
     <div className="h-full overflow-y-auto" style={{ background: W.bg }}>
       <div className="max-w-3xl mx-auto px-5 py-6 flex flex-col gap-5">
-
         {/* ── User card ── */}
         <div
           className="flex items-center gap-3 p-3 rounded-xl"
           style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
         >
-          <Avatar className="w-9 h-9 shrink-0" style={{ outline: `2px solid ${W.border}`, outlineOffset: "1px" }}>
+          <Avatar
+            className="w-9 h-9 shrink-0"
+            style={{ outline: `2px solid ${W.border}`, outlineOffset: "1px" }}
+          >
             {avatarUrl && <AvatarImage src={avatarUrl} />}
-            <AvatarFallback className="text-xs font-bold" style={{ background: W.redBg, color: W.red }}>
+            <AvatarFallback
+              className="text-xs font-bold"
+              style={{ background: W.redBg, color: W.red }}
+            >
               {initials}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold leading-none truncate" style={{ color: W.text }}>{displayName}</p>
-            <p className="text-[11px] mt-0.5 truncate" style={{ color: W.dim }}>{authUser?.email ?? "—"}</p>
+            <p
+              className="text-sm font-semibold leading-none truncate"
+              style={{ color: W.text }}
+            >
+              {displayName}
+            </p>
+            <p className="text-[11px] mt-0.5 truncate" style={{ color: W.dim }}>
+              {authUser?.email ?? "—"}
+            </p>
           </div>
           <span
             className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-            style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.muted }}
+            style={{
+              background: W.glass,
+              border: `1px solid ${W.border}`,
+              color: W.muted,
+            }}
           >
             {isAdmin ? "Unlimited" : planLabel(userPlan)}
           </span>
@@ -290,9 +449,17 @@ export default function AccountPage() {
             <a
               href="/adminopusgenai"
               className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 transition-all"
-              style={{ background: W.redBg, border: `1px solid ${W.redBorder}`, color: W.red }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(220,38,38,0.2)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = W.redBg; }}
+              style={{
+                background: W.redBg,
+                border: `1px solid ${W.redBorder}`,
+                color: W.red,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(220,38,38,0.2)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = W.redBg;
+              }}
             >
               <Shield className="w-2.5 h-2.5" />
               Admin
@@ -303,8 +470,14 @@ export default function AccountPage() {
             className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all"
             style={{ color: W.dim }}
             title="Sign out"
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#f87171"; e.currentTarget.style.background = W.redBg; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = W.dim; e.currentTarget.style.background = "transparent"; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#f87171";
+              e.currentTarget.style.background = W.redBg;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = W.dim;
+              e.currentTarget.style.background = "transparent";
+            }}
           >
             <LogOut className="w-3.5 h-3.5" />
           </button>
@@ -317,14 +490,36 @@ export default function AccountPage() {
               key={id}
               onClick={() => setActiveSection(id)}
               className="h-8 w-full rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 truncate px-2"
-              style={activeSection === id
-                ? { background: "#dc2626", color: "#fff", border: "1px solid transparent" }
-                : { border: `1px solid ${W.border}`, background: W.glassDim, color: W.muted }}
-              onMouseEnter={(e) => { if (activeSection !== id) { e.currentTarget.style.background = W.glass; e.currentTarget.style.color = W.text; } }}
-              onMouseLeave={(e) => { if (activeSection !== id) { e.currentTarget.style.background = W.glassDim; e.currentTarget.style.color = W.muted; } }}
+              style={
+                activeSection === id
+                  ? {
+                      background: "#dc2626",
+                      color: "#fff",
+                      border: "1px solid transparent",
+                    }
+                  : {
+                      border: `1px solid ${W.border}`,
+                      background: W.glassDim,
+                      color: W.muted,
+                    }
+              }
+              onMouseEnter={(e) => {
+                if (activeSection !== id) {
+                  e.currentTarget.style.background = W.glass;
+                  e.currentTarget.style.color = W.text;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeSection !== id) {
+                  e.currentTarget.style.background = W.glassDim;
+                  e.currentTarget.style.color = W.muted;
+                }
+              }}
             >
               <Icon className="w-3 h-3 shrink-0" />
-              <span className="truncate hidden xs:inline sm:inline">{label}</span>
+              <span className="truncate hidden xs:inline sm:inline">
+                {label}
+              </span>
             </button>
           ))}
         </div>
@@ -338,7 +533,6 @@ export default function AccountPage() {
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.18 }}
           >
-
             {/* ── Profile ── */}
             {activeSection === "profile" && (
               <div className="flex flex-col gap-4">
@@ -346,22 +540,52 @@ export default function AccountPage() {
                   {/* Avatar card */}
                   <div
                     className="flex items-center gap-3 p-3.5 rounded-xl sm:w-64 shrink-0"
-                    style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
+                    style={{
+                      border: `1px solid ${W.border}`,
+                      background: W.glassDim,
+                    }}
                   >
-                    <Avatar className="w-12 h-12 shrink-0" style={{ outline: `2px solid ${W.border}`, outlineOffset: "2px" }}>
+                    <Avatar
+                      className="w-12 h-12 shrink-0"
+                      style={{
+                        outline: `2px solid ${W.border}`,
+                        outlineOffset: "2px",
+                      }}
+                    >
                       {avatarUrl && <AvatarImage src={avatarUrl} />}
-                      <AvatarFallback className="text-base font-bold" style={{ background: W.redBg, color: W.red }}>
+                      <AvatarFallback
+                        className="text-base font-bold"
+                        style={{ background: W.redBg, color: W.red }}
+                      >
                         {initials}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold truncate" style={{ color: W.text }}>{displayName}</p>
-                      <p className="text-[10px] truncate mb-2" style={{ color: W.dim }}>{authUser?.email ?? "—"}</p>
+                      <p
+                        className="text-xs font-semibold truncate"
+                        style={{ color: W.text }}
+                      >
+                        {displayName}
+                      </p>
+                      <p
+                        className="text-[10px] truncate mb-2"
+                        style={{ color: W.dim }}
+                      >
+                        {authUser?.email ?? "—"}
+                      </p>
                       <button
                         className="h-6 px-2.5 rounded-md text-[11px] font-medium transition-all"
-                        style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = W.text; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.color = W.muted; }}
+                        style={{
+                          border: `1px solid ${W.border}`,
+                          background: W.glass,
+                          color: W.muted,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = W.text;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = W.muted;
+                        }}
                         onClick={() => toast.info("Avatar upload coming soon.")}
                       >
                         Change photo
@@ -379,10 +603,23 @@ export default function AccountPage() {
                       <div
                         key={label}
                         className="flex flex-col items-center justify-center p-3 rounded-xl text-center"
-                        style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
+                        style={{
+                          border: `1px solid ${W.border}`,
+                          background: W.glassDim,
+                        }}
                       >
-                        <p className="text-xl font-black tabular-nums" style={{ color: W.text }}>{value}</p>
-                        <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>{label}</p>
+                        <p
+                          className="text-xl font-black tabular-nums"
+                          style={{ color: W.text }}
+                        >
+                          {value}
+                        </p>
+                        <p
+                          className="text-[10px] mt-0.5"
+                          style={{ color: W.dim }}
+                        >
+                          {label}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -391,15 +628,25 @@ export default function AccountPage() {
                 {/* Form */}
                 <div
                   className="flex flex-col gap-3.5 p-4 rounded-xl"
-                  style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
+                  style={{
+                    border: `1px solid ${W.border}`,
+                    background: W.glassDim,
+                  }}
                 >
                   <div>
                     <SectionLabel>Full name</SectionLabel>
-                    <FieldInput value={name} onChange={(e) => setName(e.target.value)} />
+                    <FieldInput
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
                   </div>
                   <div>
                     <SectionLabel>Email address</SectionLabel>
-                    <FieldInput type="email" value={authUser?.email ?? ""} readOnly />
+                    <FieldInput
+                      type="email"
+                      value={authUser?.email ?? ""}
+                      readOnly
+                    />
                   </div>
                   <motion.button
                     whileHover={{ scale: 1.015 }}
@@ -409,9 +656,17 @@ export default function AccountPage() {
                     disabled={savingProfile}
                     onClick={saveProfile}
                   >
-                    {savingProfile
-                      ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Saving…</>
-                      : <><Check className="w-3.5 h-3.5" />Save changes</>}
+                    {savingProfile ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Saving…
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        Save changes
+                      </>
+                    )}
                   </motion.button>
                 </div>
               </div>
@@ -422,31 +677,84 @@ export default function AccountPage() {
               <div className="flex flex-col gap-4">
                 <div
                   className="relative p-4 rounded-xl overflow-hidden"
-                  style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}
+                  style={{
+                    border: `1px solid ${W.redBorder}`,
+                    background: W.redBg,
+                  }}
                 >
-                  <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 80% 50%, rgba(220,38,38,0.10) 0%, transparent 60%)" }} />
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background:
+                        "radial-gradient(ellipse at 80% 50%, rgba(220,38,38,0.10) 0%, transparent 60%)",
+                    }}
+                  />
                   <div className="relative flex items-center justify-between gap-4 flex-wrap">
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: W.red }} />
-                        <p className="text-xs font-semibold" style={{ color: W.text }}>{isAdmin ? "Unlimited" : planLabel(userPlan)} Plan</p>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: W.glass, color: W.muted }}>Current</span>
+                        <Sparkles
+                          className="w-3.5 h-3.5 shrink-0"
+                          style={{ color: W.red }}
+                        />
+                        <p
+                          className="text-xs font-semibold"
+                          style={{ color: W.text }}
+                        >
+                          {isAdmin ? "Unlimited" : planLabel(userPlan)} Plan
+                        </p>
+                        <span
+                          className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                          style={{ background: W.glass, color: W.muted }}
+                        >
+                          Current
+                        </span>
                       </div>
-                      <p className="text-xl font-black" style={{ color: W.text }}>
-                        {isAdmin ? "∞" : credits} <span className="text-sm font-normal" style={{ color: W.muted }}>{isAdmin ? "unlimited for testing" : "credits remaining"}</span>
+                      <p
+                        className="text-xl font-black"
+                        style={{ color: W.text }}
+                      >
+                        {isAdmin ? "∞" : credits}{" "}
+                        <span
+                          className="text-sm font-normal"
+                          style={{ color: W.muted }}
+                        >
+                          {isAdmin
+                            ? "unlimited for testing"
+                            : "credits remaining"}
+                        </span>
                       </p>
-                      <p className="text-[11px] mt-0.5" style={{ color: W.dim }}>
-                        {isAdmin ? "Admin account · never charged" : "Resets monthly · Free forever"}
+                      <p
+                        className="text-[11px] mt-0.5"
+                        style={{ color: W.dim }}
+                      >
+                        {isAdmin
+                          ? "Admin account · never charged"
+                          : "Resets monthly · Free forever"}
                       </p>
                     </div>
                     <div className="shrink-0">
-                      <p className="text-[10px] mb-1 text-right" style={{ color: W.dim }}>{isAdmin ? "Unlimited" : `${credits} / ${currentPlan.credits}`}</p>
-                      <div className="w-32 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+                      <p
+                        className="text-[10px] mb-1 text-right"
+                        style={{ color: W.dim }}
+                      >
+                        {isAdmin
+                          ? "Unlimited"
+                          : `${credits} / ${currentPlan.credits}`}
+                      </p>
+                      <div
+                        className="w-32 h-1.5 rounded-full overflow-hidden"
+                        style={{ background: "rgba(255,255,255,0.08)" }}
+                      >
                         <motion.div
                           className="h-full rounded-full"
-                          style={{ background: "linear-gradient(to right, #dc2626, #f97316)" }}
+                          style={{
+                            background:
+                              "linear-gradient(to right, #dc2626, #f97316)",
+                          }}
                           initial={{ width: 0 }}
-                          animate={{ width: isAdmin ? "100%" : `${creditsPercent}%` }}
+                          animate={{
+                            width: isAdmin ? "100%" : `${creditsPercent}%`,
+                          }}
                           transition={{ duration: 0.8, ease: "easeOut" }}
                         />
                       </div>
@@ -460,13 +768,19 @@ export default function AccountPage() {
                     to try each tier's gating before checkout exists. */}
                 <div
                   className="flex items-center gap-2.5 p-3 rounded-xl"
-                  style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
+                  style={{
+                    border: `1px solid ${W.border}`,
+                    background: W.glassDim,
+                  }}
                 >
-                  <Clock className="w-3.5 h-3.5 shrink-0" style={{ color: W.muted }} />
+                  <Clock
+                    className="w-3.5 h-3.5 shrink-0"
+                    style={{ color: W.muted }}
+                  />
                   <p className="text-[11px]" style={{ color: W.muted }}>
                     {isAdmin
-                      ? "Checkout isn't live yet — as admin you can switch plans below to test each tier's gating. You stay unlimited regardless."
-                      : "Paid plans are coming soon — checkout isn't live yet. Everyone stays on Free for now."}
+                      ? "As admin you can switch plans below to test each tier's gating. You stay unlimited regardless."
+                      : "Upgrade your plan to unlock higher resolution models, AI video generations, and recurring monthly credits."}
                   </p>
                 </div>
 
@@ -477,34 +791,76 @@ export default function AccountPage() {
                       <div
                         key={plan.id}
                         className="relative p-4 rounded-xl transition-all"
-                        style={plan.highlight
-                          ? { border: `1px solid ${W.redBorder}`, background: W.redBg }
-                          : isCurrent
-                          ? { border: `1px solid ${W.border}`, background: W.glass }
-                          : { border: `1px solid ${W.border}`, background: W.glassDim }}
+                        style={
+                          plan.highlight
+                            ? {
+                                border: `1px solid ${W.redBorder}`,
+                                background: W.redBg,
+                              }
+                            : isCurrent
+                              ? {
+                                  border: `1px solid ${W.border}`,
+                                  background: W.glass,
+                                }
+                              : {
+                                  border: `1px solid ${W.border}`,
+                                  background: W.glassDim,
+                                }
+                        }
                       >
                         {plan.highlight && (
-                          <span className="absolute -top-2 left-3.5 text-[10px] font-black px-2 py-0.5 rounded-full text-white"
-                            style={{ background: "#dc2626" }}>
+                          <span
+                            className="absolute -top-2 left-3.5 text-[10px] font-black px-2 py-0.5 rounded-full text-white"
+                            style={{ background: "#dc2626" }}
+                          >
                             Popular
                           </span>
                         )}
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-0.5">
-                              <p className="text-xs font-bold" style={{ color: W.text }}>{plan.name}</p>
+                              <p
+                                className="text-xs font-bold"
+                                style={{ color: W.text }}
+                              >
+                                {plan.name}
+                              </p>
                               {isCurrent && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: W.glass, color: W.muted }}>Current</span>
+                                <span
+                                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                                  style={{
+                                    background: W.glass,
+                                    color: W.muted,
+                                  }}
+                                >
+                                  Current
+                                </span>
                               )}
                             </div>
-                            <p className="text-lg font-black" style={{ color: W.text }}>
+                            <p
+                              className="text-lg font-black"
+                              style={{ color: W.text }}
+                            >
                               {plan.price === 0 ? "Free" : `$${plan.price}`}
-                              <span className="text-xs font-normal ml-0.5" style={{ color: W.muted }}>{plan.price > 0 ? "/mo" : ""}</span>
+                              <span
+                                className="text-xs font-normal ml-0.5"
+                                style={{ color: W.muted }}
+                              >
+                                {plan.price > 0 ? "/mo" : ""}
+                              </span>
                             </p>
                             <ul className="mt-1.5 space-y-0.5">
                               {plan.features.slice(0, 3).map((f) => (
-                                <li key={f} className="flex items-center gap-1.5 text-[11px]" style={{ color: W.muted }}>
-                                  <Check className="w-2.5 h-2.5 shrink-0" style={{ color: W.red }} />{f}
+                                <li
+                                  key={f}
+                                  className="flex items-center gap-1.5 text-[11px]"
+                                  style={{ color: W.muted }}
+                                >
+                                  <Check
+                                    className="w-2.5 h-2.5 shrink-0"
+                                    style={{ color: W.red }}
+                                  />
+                                  {f}
                                 </li>
                               ))}
                             </ul>
@@ -513,18 +869,36 @@ export default function AccountPage() {
                             <button
                               onClick={() => switchPlan(plan.id)}
                               disabled={switchingPlan !== null}
-                              className="mt-1 shrink-0 h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-white disabled:opacity-60"
+                              className="mt-1 shrink-0 h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-white disabled:opacity-60 cursor-pointer"
                               style={{ background: "#dc2626" }}
                             >
-                              {switchingPlan === plan.id ? "Switching…" : "Switch (test)"}
+                              {switchingPlan === plan.id
+                                ? "Switching…"
+                                : "Switch (test)"}
+                            </button>
+                          ) : isCurrent ? (
+                            <button
+                              className="mt-1 shrink-0 h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
+                              style={{
+                                border: `1px solid ${W.border}`,
+                                background: W.glass,
+                                color: W.dim,
+                                cursor: "default",
+                              }}
+                              disabled
+                            >
+                              Current
                             </button>
                           ) : (
                             <button
-                              className="mt-1 shrink-0 h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5"
-                              style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.dim, cursor: "default" }}
-                              disabled
+                              onClick={() =>
+                                triggerUpgradeModal(plan.id as PlanId)
+                              }
+                              className="mt-1 shrink-0 h-8 px-3.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-white transition-colors cursor-pointer hover:opacity-90"
+                              style={{ background: "#dc2626" }}
                             >
-                              {isCurrent ? "Current" : <><Clock className="w-3 h-3" />Coming soon</>}
+                              <Zap className="w-3 h-3" />
+                              Upgrade
                             </button>
                           )}
                         </div>
@@ -538,42 +912,116 @@ export default function AccountPage() {
             {/* ── Billing ── */}
             {activeSection === "billing" && (
               <div
-                className="flex flex-col items-center text-center py-12 rounded-xl"
-                style={{ border: `1px solid ${W.border}`, background: W.glassDim }}
+                className="flex flex-col items-center text-center py-12 px-6 rounded-xl"
+                style={{
+                  border: `1px solid ${W.border}`,
+                  background: W.glassDim,
+                }}
               >
-                <CreditCard className="w-9 h-9 mb-3" style={{ color: W.dim }} />
-                <p className="text-sm font-semibold mb-1" style={{ color: W.muted }}>No payment method on file</p>
-                <p className="text-xs mb-4" style={{ color: W.dim }}>You&apos;re on the Free plan — no card needed</p>
-                <div
-                  className="h-8 px-4 rounded-lg text-xs font-semibold flex items-center gap-1.5"
-                  style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.dim }}
+                <CreditCard
+                  className="w-9 h-9 mb-3"
+                  style={{ color: userPlan !== "free" ? W.red : W.dim }}
+                />
+                <p
+                  className="text-sm font-semibold mb-1"
+                  style={{ color: W.text }}
                 >
-                  <Clock className="w-3.5 h-3.5" />Billing coming soon
-                </div>
+                  {userPlan !== "free"
+                    ? `${planLabel(userPlan)} Subscription Active`
+                    : "No payment method on file"}
+                </p>
+                <p className="text-xs mb-5 max-w-sm" style={{ color: W.muted }}>
+                  {userPlan !== "free"
+                    ? "Manage your payment methods, view past invoices, or update your plan through your secure customer billing portal."
+                    : "You are currently on the Free plan. Upgrade to unlock higher resolution models, AI video generations, and recurring monthly credits."}
+                </p>
+                {userPlan !== "free" ? (
+                  <button
+                    onClick={openCustomerPortal}
+                    disabled={loadingPortal}
+                    className="h-9 px-5 rounded-lg text-xs font-semibold flex items-center gap-2 text-white transition-opacity disabled:opacity-50 cursor-pointer"
+                    style={{ background: "#dc2626" }}
+                  >
+                    {loadingPortal ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Opening portal…
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-3.5 h-3.5" />
+                        Manage Subscription & Billing
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => triggerUpgradeModal("basic")}
+                    className="h-9 px-5 rounded-lg text-xs font-semibold flex items-center gap-1.5 text-white transition-opacity cursor-pointer hover:opacity-90"
+                    style={{ background: "#dc2626" }}
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    Upgrade Plan
+                  </button>
+                )}
               </div>
             )}
 
             {/* ── Security ── */}
             {activeSection === "security" && (
               <div className="flex flex-col gap-3">
-                <div className="p-4 rounded-xl" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
+                <div
+                  className="p-4 rounded-xl"
+                  style={{
+                    border: `1px solid ${W.border}`,
+                    background: W.glassDim,
+                  }}
+                >
                   <div className="flex items-center gap-3 mb-3.5">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: W.glass }}>
-                      <KeyRound className="w-3.5 h-3.5" style={{ color: W.muted }} />
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                      style={{ background: W.glass }}
+                    >
+                      <KeyRound
+                        className="w-3.5 h-3.5"
+                        style={{ color: W.muted }}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold" style={{ color: W.text }}>Password</p>
-                      <p className="text-[10px]" style={{ color: W.dim }}>Update your account password</p>
+                      <p
+                        className="text-xs font-semibold"
+                        style={{ color: W.text }}
+                      >
+                        Password
+                      </p>
+                      <p className="text-[10px]" style={{ color: W.dim }}>
+                        Update your account password
+                      </p>
                     </div>
                   </div>
-                  <form onSubmit={handlePasswordChange} className="flex flex-col gap-3">
+                  <form
+                    onSubmit={handlePasswordChange}
+                    className="flex flex-col gap-3"
+                  >
                     <div>
                       <SectionLabel>Current password</SectionLabel>
-                      <FieldInput type="password" autoComplete="current-password" placeholder="••••••••" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} />
+                      <FieldInput
+                        type="password"
+                        autoComplete="current-password"
+                        placeholder="••••••••"
+                        value={currentPwd}
+                        onChange={(e) => setCurrentPwd(e.target.value)}
+                      />
                     </div>
                     <div>
                       <SectionLabel>New password</SectionLabel>
-                      <FieldInput type="password" autoComplete="new-password" placeholder="Min. 8 characters" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
+                      <FieldInput
+                        type="password"
+                        autoComplete="new-password"
+                        placeholder="Min. 8 characters"
+                        value={newPwd}
+                        onChange={(e) => setNewPwd(e.target.value)}
+                      />
                     </div>
                     <button
                       type="submit"
@@ -587,28 +1035,62 @@ export default function AccountPage() {
                 </div>
 
                 {/* Two-factor auth */}
-                <div className="p-4 rounded-xl" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
+                <div
+                  className="p-4 rounded-xl"
+                  style={{
+                    border: `1px solid ${W.border}`,
+                    background: W.glassDim,
+                  }}
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: mfaFactorId ? "rgba(34,197,94,0.12)" : W.glass }}>
-                        {mfaFactorId ? <ShieldCheck className="w-3.5 h-3.5 text-green-400" /> : <Shield className="w-3.5 h-3.5" style={{ color: W.muted }} />}
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                        style={{
+                          background: mfaFactorId
+                            ? "rgba(34,197,94,0.12)"
+                            : W.glass,
+                        }}
+                      >
+                        {mfaFactorId ? (
+                          <ShieldCheck className="w-3.5 h-3.5 text-green-400" />
+                        ) : (
+                          <Shield
+                            className="w-3.5 h-3.5"
+                            style={{ color: W.muted }}
+                          />
+                        )}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold" style={{ color: W.text }}>Two-factor auth</p>
+                        <p
+                          className="text-xs font-semibold"
+                          style={{ color: W.text }}
+                        >
+                          Two-factor auth
+                        </p>
                         <p className="text-[10px]" style={{ color: W.dim }}>
-                          {mfaFactorId ? "Enabled — an authenticator code is required at sign-in" : "Add an extra layer of security"}
+                          {mfaFactorId
+                            ? "Enabled — an authenticator code is required at sign-in"
+                            : "Add an extra layer of security"}
                         </p>
                       </div>
                     </div>
-                    {!enrollData && (
-                      mfaFactorId ? (
+                    {!enrollData &&
+                      (mfaFactorId ? (
                         <button
                           disabled={mfaLoading}
                           onClick={disableMfa}
                           className="h-7 px-3 rounded-lg text-xs font-medium transition-all shrink-0 disabled:opacity-50"
                           style={{ color: "#f87171" }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(220,38,38,0.1)"; e.currentTarget.style.color = "#fca5a5"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#f87171"; }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background =
+                              "rgba(220,38,38,0.1)";
+                            e.currentTarget.style.color = "#fca5a5";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "transparent";
+                            e.currentTarget.style.color = "#f87171";
+                          }}
                         >
                           {mfaLoading ? "Disabling…" : "Disable"}
                         </button>
@@ -617,44 +1099,80 @@ export default function AccountPage() {
                           disabled={mfaLoading}
                           onClick={startMfaEnroll}
                           className="h-7 px-3 rounded-lg text-xs font-medium transition-all shrink-0 disabled:opacity-50"
-                          style={{ border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = W.text)}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = W.muted)}
+                          style={{
+                            border: `1px solid ${W.border}`,
+                            background: W.glass,
+                            color: W.muted,
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.color = W.text)
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.color = W.muted)
+                          }
                         >
                           {mfaLoading ? "Starting…" : "Enable"}
                         </button>
-                      )
-                    )}
+                      ))}
                   </div>
 
                   {enrollData && (
-                    <div className="mt-4 pt-4 flex flex-col sm:flex-row gap-4" style={{ borderTop: `1px solid ${W.border}` }}>
+                    <div
+                      className="mt-4 pt-4 flex flex-col sm:flex-row gap-4"
+                      style={{ borderTop: `1px solid ${W.border}` }}
+                    >
                       <div className="shrink-0 self-center">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={enrollData.qrCode} alt="Scan with your authenticator app" className="w-32 h-32 rounded-lg bg-white p-1.5" />
+                        <img
+                          src={enrollData.qrCode}
+                          alt="Scan with your authenticator app"
+                          className="w-32 h-32 rounded-lg bg-white p-1.5"
+                        />
                       </div>
-                      <form onSubmit={verifyMfaEnroll} className="flex-1 min-w-0 flex flex-col gap-2.5">
+                      <form
+                        onSubmit={verifyMfaEnroll}
+                        className="flex-1 min-w-0 flex flex-col gap-2.5"
+                      >
                         <p className="text-[11px]" style={{ color: W.muted }}>
-                          Scan with Google Authenticator, 1Password, or Authy — or enter this key manually:
+                          Scan with Google Authenticator, 1Password, or Authy —
+                          or enter this key manually:
                         </p>
-                        <code className="text-[10px] px-2 py-1.5 rounded-lg break-all select-all" style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.dim }}>
+                        <code
+                          className="text-[10px] px-2 py-1.5 rounded-lg break-all select-all"
+                          style={{
+                            background: W.glass,
+                            border: `1px solid ${W.border}`,
+                            color: W.dim,
+                          }}
+                        >
                           {enrollData.secret}
                         </code>
                         <div className="flex items-center gap-2">
                           <input
                             value={verifyCode}
-                            onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                            onChange={(e) =>
+                              setVerifyCode(
+                                e.target.value.replace(/\D/g, "").slice(0, 6),
+                              )
+                            }
                             inputMode="numeric"
                             autoComplete="one-time-code"
                             placeholder="6-digit code"
                             className="flex-1 h-9 rounded-xl text-sm text-center tracking-[0.3em] outline-none"
-                            style={{ background: W.glass, border: `1px solid ${W.border}`, color: W.text }}
+                            style={{
+                              background: W.glass,
+                              border: `1px solid ${W.border}`,
+                              color: W.text,
+                            }}
                           />
                           <button
                             type="button"
                             onClick={cancelMfaEnroll}
                             className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0"
-                            style={{ border: `1px solid ${W.border}`, color: W.dim }}
+                            style={{
+                              border: `1px solid ${W.border}`,
+                              color: W.dim,
+                            }}
                             aria-label="Cancel"
                           >
                             <XIcon className="w-3.5 h-3.5" />
@@ -674,28 +1192,71 @@ export default function AccountPage() {
                 </div>
 
                 {[
-                  { icon: History, title: "Active sessions",  sub: "Sign out all other sessions",         cta: "Revoke all",  danger: true,  action: async () => { await supabase.auth.signOut({ scope: "others" }); toast.success("Other sessions signed out."); } },
+                  {
+                    icon: History,
+                    title: "Active sessions",
+                    sub: "Sign out all other sessions",
+                    cta: "Revoke all",
+                    danger: true,
+                    action: async () => {
+                      await supabase.auth.signOut({ scope: "others" });
+                      toast.success("Other sessions signed out.");
+                    },
+                  },
                 ].map(({ icon: Icon, title, sub, action, cta, danger }) => (
-                  <div key={title} className="flex items-center justify-between p-3.5 rounded-xl" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
+                  <div
+                    key={title}
+                    className="flex items-center justify-between p-3.5 rounded-xl"
+                    style={{
+                      border: `1px solid ${W.border}`,
+                      background: W.glassDim,
+                    }}
+                  >
                     <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: W.glass }}>
-                        <Icon className="w-3.5 h-3.5" style={{ color: W.muted }} />
+                      <div
+                        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                        style={{ background: W.glass }}
+                      >
+                        <Icon
+                          className="w-3.5 h-3.5"
+                          style={{ color: W.muted }}
+                        />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold" style={{ color: W.text }}>{title}</p>
-                        <p className="text-[10px]" style={{ color: W.dim }}>{sub}</p>
+                        <p
+                          className="text-xs font-semibold"
+                          style={{ color: W.text }}
+                        >
+                          {title}
+                        </p>
+                        <p className="text-[10px]" style={{ color: W.dim }}>
+                          {sub}
+                        </p>
                       </div>
                     </div>
                     <button
                       className="h-7 px-3 rounded-lg text-xs font-medium transition-all shrink-0"
-                      style={danger ? { color: "#f87171" } : { border: `1px solid ${W.border}`, background: W.glass, color: W.muted }}
+                      style={
+                        danger
+                          ? { color: "#f87171" }
+                          : {
+                              border: `1px solid ${W.border}`,
+                              background: W.glass,
+                              color: W.muted,
+                            }
+                      }
                       onMouseEnter={(e) => {
-                        if (danger) { e.currentTarget.style.background = "rgba(220,38,38,0.1)"; e.currentTarget.style.color = "#fca5a5"; }
-                        else e.currentTarget.style.color = W.text;
+                        if (danger) {
+                          e.currentTarget.style.background =
+                            "rgba(220,38,38,0.1)";
+                          e.currentTarget.style.color = "#fca5a5";
+                        } else e.currentTarget.style.color = W.text;
                       }}
                       onMouseLeave={(e) => {
-                        if (danger) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#f87171"; }
-                        else e.currentTarget.style.color = W.muted;
+                        if (danger) {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.color = "#f87171";
+                        } else e.currentTarget.style.color = W.muted;
                       }}
                       onClick={action}
                     >
@@ -709,37 +1270,79 @@ export default function AccountPage() {
             {/* ── Notifications ── */}
             {activeSection === "notifications" && (
               <div className="flex flex-col gap-2.5">
-                {([
-                  { key: "generationDone" as const, label: "Generation complete", desc: "Notify when images are ready" },
-                  { key: "billing"        as const, label: "Billing & credits",   desc: "Receipts, low credit warnings" },
-                  { key: "tips"           as const, label: "Tips & tutorials",     desc: "Improve your results" },
-                  { key: "newsletter"     as const, label: "Newsletter",           desc: "New features and updates" },
-                ]).map(({ key, label, desc }) => (
-                  <div key={key} className="flex items-center justify-between p-3.5 rounded-xl" style={{ border: `1px solid ${W.border}`, background: W.glassDim }}>
+                {[
+                  {
+                    key: "generationDone" as const,
+                    label: "Generation complete",
+                    desc: "Notify when images are ready",
+                  },
+                  {
+                    key: "billing" as const,
+                    label: "Billing & credits",
+                    desc: "Receipts, low credit warnings",
+                  },
+                  {
+                    key: "tips" as const,
+                    label: "Tips & tutorials",
+                    desc: "Improve your results",
+                  },
+                  {
+                    key: "newsletter" as const,
+                    label: "Newsletter",
+                    desc: "New features and updates",
+                  },
+                ].map(({ key, label, desc }) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between p-3.5 rounded-xl"
+                    style={{
+                      border: `1px solid ${W.border}`,
+                      background: W.glassDim,
+                    }}
+                  >
                     <div>
-                      <p className="text-xs font-semibold" style={{ color: W.text }}>{label}</p>
-                      <p className="text-[11px] mt-0.5" style={{ color: W.dim }}>{desc}</p>
+                      <p
+                        className="text-xs font-semibold"
+                        style={{ color: W.text }}
+                      >
+                        {label}
+                      </p>
+                      <p
+                        className="text-[11px] mt-0.5"
+                        style={{ color: W.dim }}
+                      >
+                        {desc}
+                      </p>
                     </div>
                     <button
                       onClick={() => toggleNotification(key)}
                       className="relative w-10 h-5 rounded-full transition-colors shrink-0 ml-4"
                       style={{
-                        background: notifications[key] ? "#dc2626" : "rgba(255,255,255,0.08)",
+                        background: notifications[key]
+                          ? "#dc2626"
+                          : "rgba(255,255,255,0.08)",
                         border: `1px solid ${notifications[key] ? "rgba(220,38,38,0.4)" : W.border}`,
                       }}
                     >
                       <motion.span
                         layout
                         className="absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow-sm"
-                        style={{ left: notifications[key] ? "calc(100% - 1rem)" : "0.125rem" }}
-                        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                        style={{
+                          left: notifications[key]
+                            ? "calc(100% - 1rem)"
+                            : "0.125rem",
+                        }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 400,
+                          damping: 25,
+                        }}
                       />
                     </button>
                   </div>
                 ))}
               </div>
             )}
-
           </motion.div>
         </AnimatePresence>
 

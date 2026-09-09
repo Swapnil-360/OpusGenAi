@@ -13,6 +13,7 @@ import { ADMIN_EMAILS } from "@/lib/admin-config";
 const MAINTENANCE_ALLOWED_PREFIXES = [
   "/adminopusgenai",
   "/api/admin",
+  "/api/webhooks", // payment webhooks must survive maintenance mode
   "/login",
   "/auth/callback",
   "/mfa-challenge", // admin recovery must survive 2FA step-up too
@@ -27,7 +28,9 @@ const MAINTENANCE_ALLOWED_PREFIXES = [
 // since every path starts with "/", so it can't just join the prefix list
 // above without accidentally allowing everything through.
 function isAllowedDuringMaintenance(path: string): boolean {
-  return path === "/" || MAINTENANCE_ALLOWED_PREFIXES.some((p) => path.startsWith(p));
+  return (
+    path === "/" || MAINTENANCE_ALLOWED_PREFIXES.some((p) => path.startsWith(p))
+  );
 }
 
 const MAINTENANCE_HTML = `<!DOCTYPE html>
@@ -65,6 +68,7 @@ const PROTECTED_PATHS = [
   "/history",
   "/account",
   "/templates",
+  "/tools",
 ];
 
 const ADMIN_PATHS = ["/adminopusgenai", "/api/admin"];
@@ -98,15 +102,15 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
+            request.cookies.set(name, value),
           );
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options),
           );
         },
       },
-    }
+    },
   );
 
   const {
@@ -117,7 +121,9 @@ export async function middleware(request: NextRequest) {
   // refreshed session cookies that getUser() just wrote onto supabaseResponse.
   function redirect(url: URL) {
     const res = NextResponse.redirect(url);
-    supabaseResponse.cookies.getAll().forEach((cookie) => res.cookies.set(cookie));
+    supabaseResponse.cookies
+      .getAll()
+      .forEach((cookie) => res.cookies.set(cookie));
     return res;
   }
 
@@ -133,7 +139,8 @@ export async function middleware(request: NextRequest) {
   // email (not a client-supplied one) to be on the server-only allowlist.
   if (isAdminPath) {
     const email = user?.email?.toLowerCase();
-    const isAdmin = !!email && (ADMIN_EMAILS as readonly string[]).includes(email);
+    const isAdmin =
+      !!email && (ADMIN_EMAILS as readonly string[]).includes(email);
     if (!isAdmin) {
       if (pathname.startsWith("/api/")) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -164,8 +171,10 @@ export async function middleware(request: NextRequest) {
   // completed the challenge yet sits at aal1 while a verified factor demands
   // aal2 (nextLevel). Gate protected routes behind /mfa-challenge until they do.
   if (user && !isDev) {
-    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const needsStepUp = !!aal && aal.nextLevel === "aal2" && aal.currentLevel !== aal.nextLevel;
+    const { data: aal } =
+      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const needsStepUp =
+      !!aal && aal.nextLevel === "aal2" && aal.currentLevel !== aal.nextLevel;
 
     if (needsStepUp && isProtected && pathname !== MFA_CHALLENGE_PATH) {
       const url = request.nextUrl.clone();
@@ -176,7 +185,8 @@ export async function middleware(request: NextRequest) {
 
     if (!needsStepUp && pathname === MFA_CHALLENGE_PATH) {
       const url = request.nextUrl.clone();
-      url.pathname = request.nextUrl.searchParams.get("redirectTo") || "/generate";
+      url.pathname =
+        request.nextUrl.searchParams.get("redirectTo") || "/generate";
       url.searchParams.delete("redirectTo");
       return redirect(url);
     }
@@ -192,5 +202,6 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|tools/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

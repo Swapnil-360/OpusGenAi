@@ -6,13 +6,34 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Aperture, Zap, Clock, User, LogOut,
-  Menu, Layers, PenSquare, Scissors, Replace, Eraser, Maximize2, Frame,
-  PanelLeftClose, PanelLeftOpen, Lightbulb, Clapperboard,
+  Aperture,
+  Zap,
+  Clock,
+  User,
+  LogOut,
+  Menu,
+  Layers,
+  PenSquare,
+  Scissors,
+  Replace,
+  Eraser,
+  Maximize2,
+  Frame,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Lightbulb,
+  Clapperboard,
 } from "lucide-react";
 import { LogoBrand } from "@/components/shared/LogoBrand";
-import { WelcomeGuide, shouldAutoOpenGuide } from "@/components/onboarding/WelcomeGuide";
+import {
+  WelcomeGuide,
+  shouldAutoOpenGuide,
+} from "@/components/onboarding/WelcomeGuide";
 import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
+import {
+  UpgradeModal,
+  triggerUpgradeModal,
+} from "@/components/dashboard/UpgradeModal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FeedbackButton } from "@/components/shared/FeedbackModal";
 import { createClient } from "@/lib/supabase/client";
@@ -36,7 +57,11 @@ const S = {
 
 const NAV_ITEMS = [
   { href: "/generate", label: "Image Generator", icon: Aperture },
-  { href: "/tools/image-to-video", label: "Video Generator", icon: Clapperboard },
+  {
+    href: "/tools/image-to-video",
+    label: "Video Generator",
+    icon: Clapperboard,
+  },
   { href: "/templates", label: "Templates", icon: Layers },
   { href: "/studio", label: "Content Studio", icon: PenSquare },
   { href: "/history", label: "History", icon: Clock },
@@ -44,10 +69,25 @@ const NAV_ITEMS = [
 ];
 
 const TOOL_ITEMS = [
-  { href: "/tools/remove-bg", label: "Remove BG", icon: Scissors, color: "#60a5fa" },
-  { href: "/tools/replace-bg", label: "Replace BG", icon: Replace, color: "#34d399" },
+  {
+    href: "/tools/remove-bg",
+    label: "Remove BG",
+    icon: Scissors,
+    color: "#60a5fa",
+  },
+  {
+    href: "/tools/replace-bg",
+    label: "Replace BG",
+    icon: Replace,
+    color: "#34d399",
+  },
   { href: "/tools/cleanup", label: "Cleanup", icon: Eraser, color: "#fbbf24" },
-  { href: "/tools/upscale", label: "Upscale 4×", icon: Maximize2, color: "#f87171" },
+  {
+    href: "/tools/upscale",
+    label: "Upscale 4×",
+    icon: Maximize2,
+    color: "#f87171",
+  },
   { href: "/tools/uncrop", label: "Uncrop", icon: Frame, color: "#f472b6" },
 ];
 
@@ -78,19 +118,37 @@ function getInitials(name: string): string {
     .toUpperCase();
 }
 
-function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, onOpenGuide }: SidebarProps) {
+function SidebarContent({
+  pathname,
+  collapsed,
+  setMobileOpen,
+  user,
+  onSignOut,
+  onOpenGuide,
+}: SidebarProps) {
   return (
     <div className="flex flex-col h-full" style={{ color: S.textPrimary }}>
-
       {/* Logo */}
       <div
-        className={cn("flex items-center h-16 shrink-0 overflow-hidden px-4", collapsed && "justify-center px-0")}
+        className={cn(
+          "flex items-center h-16 shrink-0 overflow-hidden px-4",
+          collapsed && "justify-center px-0",
+        )}
         style={{ borderBottom: `1px solid ${S.border}` }}
       >
         {collapsed && (
           <Link href="/" onClick={() => setMobileOpen(false)}>
-            <motion.div whileHover={{ scale: 1.06 }} transition={{ duration: 0.15 }}>
-              <Image src="/logo/OpusGen Ai(Orange).png" alt="OpusGen AI" height={28} width={120} className="h-7 w-auto object-contain" />
+            <motion.div
+              whileHover={{ scale: 1.06 }}
+              transition={{ duration: 0.15 }}
+            >
+              <Image
+                src="/logo/OpusGen Ai(Orange).png"
+                alt="OpusGen AI"
+                height={28}
+                width={120}
+                className="h-7 w-auto object-contain"
+              />
             </motion.div>
           </Link>
         )}
@@ -114,7 +172,9 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
       {/* Nav */}
       <nav className="flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || (href !== "/generate" && pathname.startsWith(href));
+          const active =
+            pathname === href ||
+            (href !== "/generate" && pathname.startsWith(href));
           return (
             <Link
               key={href}
@@ -123,14 +183,18 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
               title={collapsed ? label : undefined}
               className={cn(
                 "flex items-center gap-2.5 px-2.5 py-1.75 rounded-md text-[13px] font-medium transition-all duration-150 relative group",
-                collapsed && "justify-center px-0 w-9 h-9 mx-auto"
+                collapsed && "justify-center px-0 w-9 h-9 mx-auto",
               )}
               style={{
                 background: active ? S.activeBg : "transparent",
                 color: active ? S.activeText : S.textMuted,
               }}
-              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = S.hoverBg; }}
-              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = "transparent"; }}
+              onMouseEnter={(e) => {
+                if (!active) e.currentTarget.style.background = S.hoverBg;
+              }}
+              onMouseLeave={(e) => {
+                if (!active) e.currentTarget.style.background = "transparent";
+              }}
             >
               {active && !collapsed && (
                 <motion.span
@@ -140,7 +204,10 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
-              <Icon className="w-4 h-4 shrink-0 relative z-10" strokeWidth={1.75} />
+              <Icon
+                className="w-4 h-4 shrink-0 relative z-10"
+                strokeWidth={1.75}
+              />
               <AnimatePresence initial={false}>
                 {!collapsed && (
                   <motion.span
@@ -187,14 +254,28 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
                     onClick={() => setMobileOpen(false)}
                     className="flex items-center gap-2.5 px-2.5 py-1.75 rounded-md text-[13px] font-medium transition-all duration-150"
                     style={{ color: active ? S.activeText : S.textMuted }}
-                    onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = S.hoverBg; e.currentTarget.style.color = S.textPrimary; } }}
-                    onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = S.textMuted; } }}
+                    onMouseEnter={(e) => {
+                      if (!active) {
+                        e.currentTarget.style.background = S.hoverBg;
+                        e.currentTarget.style.color = S.textPrimary;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active) {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = S.textMuted;
+                      }
+                    }}
                   >
                     <div
                       className="w-5 h-5 rounded-[6px] flex items-center justify-center shrink-0"
                       style={{ backgroundColor: `${color}22` }}
                     >
-                      <Icon className="w-3 h-3" style={{ color }} strokeWidth={1.75} />
+                      <Icon
+                        className="w-3 h-3"
+                        style={{ color }}
+                        strokeWidth={1.75}
+                      />
                     </div>
                     <span className="tracking-wide">{label}</span>
                   </Link>
@@ -212,7 +293,9 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
       >
         {/* Replay the welcome guide — lives here so it's reachable from both
             the desktop sidebar and the mobile drawer, which share this tree. */}
-        <div className={cn("px-2 mb-1.5", collapsed && "px-0 flex justify-center")}>
+        <div
+          className={cn("px-2 mb-1.5", collapsed && "px-0 flex justify-center")}
+        >
           <button
             onClick={onOpenGuide}
             title="How it works"
@@ -221,9 +304,19 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
               "flex items-center rounded-xl transition-all text-xs font-medium",
               collapsed ? "w-9 h-9 justify-center" : "w-full gap-2 px-3 h-9",
             )}
-            style={{ border: `1px solid ${S.border}`, background: "transparent", color: S.textMuted }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = S.hoverBg; e.currentTarget.style.color = S.textPrimary; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = S.textMuted; }}
+            style={{
+              border: `1px solid ${S.border}`,
+              background: "transparent",
+              color: S.textMuted,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = S.hoverBg;
+              e.currentTarget.style.color = S.textPrimary;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = S.textMuted;
+            }}
           >
             <Lightbulb className="w-4 h-4 shrink-0" />
             {!collapsed && <span>How it works</span>}
@@ -260,13 +353,22 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
               <div className="px-2.5 mb-2">
                 <div
                   className="rounded-lg p-3"
-                  style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.18)" }}
+                  style={{
+                    background: "rgba(220,38,38,0.08)",
+                    border: "1px solid rgba(220,38,38,0.18)",
+                  }}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: S.textDim }}>
+                    <span
+                      className="text-[11px] font-semibold uppercase tracking-wider"
+                      style={{ color: S.textDim }}
+                    >
                       Credits
                     </span>
-                    <div className="flex items-center gap-1 text-xs font-bold" style={{ color: S.activeText }}>
+                    <div
+                      className="flex items-center gap-1 text-xs font-bold"
+                      style={{ color: S.activeText }}
+                    >
                       <Zap className="w-3 h-3" />
                       {user.isAdmin ? "Unlimited" : user.credits}
                     </div>
@@ -277,23 +379,39 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
                   >
                     <motion.div
                       className="h-full rounded-full"
-                      style={{ background: "linear-gradient(to right, #dc2626, #f97316)" }}
+                      style={{
+                        background:
+                          "linear-gradient(to right, #dc2626, #f97316)",
+                      }}
                       initial={{ width: 0 }}
-                      animate={{ width: user.isAdmin ? "100%" : `${Math.min((user.credits / 10) * 100, 100)}%` }}
-                      transition={{ duration: 0.8, ease: "easeOut", delay: 0.1 }}
+                      animate={{
+                        width: user.isAdmin
+                          ? "100%"
+                          : `${Math.min((user.credits / 10) * 100, 100)}%`,
+                      }}
+                      transition={{
+                        duration: 0.8,
+                        ease: "easeOut",
+                        delay: 0.1,
+                      }}
                     />
                   </div>
                   {user.plan === "free" && !user.isAdmin && (
-                    <Link href="/account">
-                      <motion.button
-                        whileHover={{ scale: 1.02, boxShadow: "0 0 20px rgba(220,38,38,0.3)" }}
-                        whileTap={{ scale: 0.97 }}
-                        className="w-full mt-2.5 h-7 rounded-md text-[11px] font-semibold text-white flex items-center justify-center gap-1.5 transition-all"
-                        style={{ background: S.red, boxShadow: "0 0 12px rgba(220,38,38,0.2)" }}
-                      >
-                        <Zap className="w-2.5 h-2.5" /> Upgrade plan
-                      </motion.button>
-                    </Link>
+                    <motion.button
+                      onClick={() => triggerUpgradeModal()}
+                      whileHover={{
+                        scale: 1.02,
+                        boxShadow: "0 0 20px rgba(220,38,38,0.3)",
+                      }}
+                      whileTap={{ scale: 0.97 }}
+                      className="w-full mt-2.5 h-7 rounded-md text-[11px] font-semibold text-white flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      style={{
+                        background: S.red,
+                        boxShadow: "0 0 12px rgba(220,38,38,0.2)",
+                      }}
+                    >
+                      <Zap className="w-2.5 h-2.5" /> Upgrade plan
+                    </motion.button>
                   )}
                 </div>
               </div>
@@ -307,11 +425,13 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
           onClick={() => setMobileOpen(false)}
           className={cn(
             "flex items-center gap-2.5 px-2.5 py-2 rounded-md cursor-pointer group transition-all",
-            collapsed && "justify-center px-0"
+            collapsed && "justify-center px-0",
           )}
           title={collapsed ? user.name : undefined}
           onMouseEnter={(e) => (e.currentTarget.style.background = S.hoverBg)}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.background = "transparent")
+          }
         >
           <Avatar className="w-7 h-7 shrink-0">
             {user.avatarUrl && (
@@ -339,21 +459,37 @@ function SidebarContent({ pathname, collapsed, setMobileOpen, user, onSignOut, o
                 className="flex-1 min-w-0 flex items-center gap-2"
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold truncate leading-none mb-0.5" style={{ color: S.textPrimary }}>
+                  <p
+                    className="text-[13px] font-semibold truncate leading-none mb-0.5"
+                    style={{ color: S.textPrimary }}
+                  >
                     {user.name}
                   </p>
-                  <p className="text-[10px] truncate" style={{ color: S.textDim }}>
+                  <p
+                    className="text-[10px] truncate"
+                    style={{ color: S.textDim }}
+                  >
                     {user.email}
                   </p>
                 </div>
                 <button
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onSignOut(); }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSignOut();
+                  }}
                   className="shrink-0 opacity-60 hover:opacity-100 transition-opacity p-1.5 rounded-lg"
                   style={{ color: S.textMuted }}
                   title="Sign out"
                   aria-label="Sign out"
-                  onMouseEnter={(e) => { e.currentTarget.style.color = S.textPrimary; e.currentTarget.style.background = S.hoverBg; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = S.textMuted; e.currentTarget.style.background = "transparent"; }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = S.textPrimary;
+                    e.currentTarget.style.background = S.hoverBg;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = S.textMuted;
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
@@ -375,7 +511,11 @@ const DEFAULT_USER: SidebarUser = {
   isAdmin: false,
 };
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
@@ -388,7 +528,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // between pages), while still revalidating credits/plan in the background.
   const { me, unauthorized } = useMe();
   const sidebarUser: SidebarUser = me
-    ? { name: me.name, email: me.email, avatarUrl: me.avatarUrl, credits: me.credits, plan: me.plan, isAdmin: me.isAdmin }
+    ? {
+        name: me.name,
+        email: me.email,
+        avatarUrl: me.avatarUrl,
+        credits: me.credits,
+        plan: me.plan,
+        isAdmin: me.isAdmin,
+      }
     : DEFAULT_USER;
 
   // Checked after mount, never during render — localStorage isn't available on
@@ -409,8 +556,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "#0f0404" }}>
-
+    <div
+      className="flex h-screen overflow-hidden"
+      style={{ background: "#0f0404" }}
+    >
       {/* Desktop sidebar */}
       <motion.aside
         className="hidden md:flex flex-col relative shrink-0"
@@ -424,7 +573,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           setMobileOpen={setMobileOpen}
           user={sidebarUser}
           onSignOut={handleSignOut}
-                onOpenGuide={() => { setGuideOpen(true); setMobileOpen(false); }}
+          onOpenGuide={() => {
+            setGuideOpen(true);
+            setMobileOpen(false);
+          }}
         />
 
         {/* Collapse toggle */}
@@ -442,9 +594,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           whileTap={{ scale: 0.9 }}
           transition={{ duration: 0.15 }}
         >
-          {collapsed
-            ? <PanelLeftOpen className="w-3.5 h-3.5" strokeWidth={1.75} />
-            : <PanelLeftClose className="w-3.5 h-3.5" strokeWidth={1.75} />}
+          {collapsed ? (
+            <PanelLeftOpen className="w-3.5 h-3.5" strokeWidth={1.75} />
+          ) : (
+            <PanelLeftClose className="w-3.5 h-3.5" strokeWidth={1.75} />
+          )}
         </motion.button>
       </motion.aside>
 
@@ -454,14 +608,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="md:hidden fixed inset-0 z-40">
             <motion.div
               className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               onClick={() => setMobileOpen(false)}
             />
             <motion.aside
               className="absolute left-0 top-0 bottom-0 w-68 z-50 shadow-2xl"
               style={{ background: S.bg, borderRight: `1px solid ${S.border}` }}
-              initial={{ x: -272 }} animate={{ x: 0 }} exit={{ x: -272 }}
+              initial={{ x: -272 }}
+              animate={{ x: 0 }}
+              exit={{ x: -272 }}
               transition={{ type: "spring", stiffness: 320, damping: 32 }}
             >
               <SidebarContent
@@ -470,7 +628,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 setMobileOpen={setMobileOpen}
                 user={sidebarUser}
                 onSignOut={handleSignOut}
-                onOpenGuide={() => { setGuideOpen(true); setMobileOpen(false); }}
+                onOpenGuide={() => {
+                  setGuideOpen(true);
+                  setMobileOpen(false);
+                }}
               />
             </motion.aside>
           </div>
@@ -479,7 +640,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
         {/* Mobile topbar */}
         <div
           className="md:hidden flex items-center justify-between px-4 h-14 shrink-0"
@@ -489,8 +649,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onClick={() => setMobileOpen(true)}
             className="p-1.5 rounded-lg transition-colors"
             style={{ color: S.textMuted }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = S.hoverBg; e.currentTarget.style.color = S.textPrimary; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = S.textMuted; }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = S.hoverBg;
+              e.currentTarget.style.color = S.textPrimary;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = S.textMuted;
+            }}
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -499,7 +665,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </Link>
           <div
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold"
-            style={{ background: "rgba(220,38,38,0.12)", border: "1px solid rgba(220,38,38,0.2)", color: S.activeText }}
+            style={{
+              background: "rgba(220,38,38,0.12)",
+              border: "1px solid rgba(220,38,38,0.2)",
+              color: S.activeText,
+            }}
           >
             <Zap className="w-3 h-3" />
             {sidebarUser.isAdmin ? "Unlimited" : sidebarUser.credits}
@@ -507,7 +677,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <main className="flex-1 overflow-y-auto">
-          {sidebarUser.name !== DEFAULT_USER.name && <WelcomeBanner name={sidebarUser.name} />}
+          {sidebarUser.name !== DEFAULT_USER.name && (
+            <WelcomeBanner name={sidebarUser.name} />
+          )}
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
@@ -524,6 +696,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       <WelcomeGuide open={guideOpen} onClose={() => setGuideOpen(false)} />
+      <UpgradeModal />
     </div>
   );
 }

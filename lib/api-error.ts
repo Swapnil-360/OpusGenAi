@@ -8,12 +8,24 @@
  * Both used to fall through to a flat "Generation failed. Try again.", which
  * is exactly wrong advice — retrying an 8MB phone photo over 4G fails again.
  */
-export async function readApiError(res: Response, fallback = "Something went wrong. Try again."): Promise<string> {
+export async function readApiError(
+  res: Response,
+  fallback = "Something went wrong. Try again.",
+): Promise<string> {
   const body = await res.json().catch(() => null as { error?: string } | null);
+  if (res.status === 402 && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("opusgen:upgrade"));
+  }
+
   if (body?.error) return body.error;
 
-  if (res.status === 413) return "That photo is too large to upload. Try a smaller image.";
-  if (res.status === 504 || res.status === 408) return "The upload timed out. Check your connection and try again.";
-  if (res.status >= 500) return "Our server had a problem. Try again in a moment.";
+  if (res.status === 402)
+    return "You're out of credits. Upgrade your plan to keep generating.";
+  if (res.status === 413)
+    return "That photo is too large to upload. Try a smaller image.";
+  if (res.status === 504 || res.status === 408)
+    return "The upload timed out. Check your connection and try again.";
+  if (res.status >= 500)
+    return "Our server had a problem. Try again in a moment.";
   return fallback;
 }

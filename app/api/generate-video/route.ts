@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pruneUserHistory, MAX_USER_HISTORY } from "@/lib/history-limit";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
-import { getUserCredits, chargeCredits, refundCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
+import {
+  getUserCredits,
+  chargeCredits,
+  refundCredits,
+  hasUnlimitedCredits,
+  UNLIMITED_CREDITS_DISPLAY,
+} from "@/lib/credits";
 import { getUserPlan } from "@/lib/entitlements";
-import { VIDEO_TIERS, canUseVideoQuality, canUseMultiImageVideo, hasReachedBasicVideoLimit, BASIC_STANDARD_VIDEO_LIMIT, MULTI_IMAGE_VIDEO_TIER, type VideoQuality } from "@/lib/plans";
+import {
+  VIDEO_TIERS,
+  canUseVideoQuality,
+  canUseMultiImageVideo,
+  hasReachedBasicVideoLimit,
+  BASIC_STANDARD_VIDEO_LIMIT,
+  MULTI_IMAGE_VIDEO_TIER,
+  type VideoQuality,
+} from "@/lib/plans";
 import { resolveTemplatePrompt } from "@/lib/template-prompt";
 import { rejectIfBot } from "@/lib/bot-protect";
 import { failAndRefundOnce } from "@/lib/video-status";
@@ -15,7 +30,8 @@ import {
   IMAGE_TOO_LARGE_MESSAGE,
 } from "@/lib/request-limits";
 
-const DEFAULT_MOTION_PROMPT = "smooth cinematic camera motion, subtle zoom, natural movement";
+const DEFAULT_MOTION_PROMPT =
+  "smooth cinematic camera motion, subtle zoom, natural movement";
 const DATA_URL_RE = /^data:image\/[a-zA-Z0-9.+-]+;base64,/;
 const FAL_URL_RE = /^https:\/\/[^/]*fal\.(media|ai|run)\//;
 
@@ -25,7 +41,14 @@ const MAX_EXTRA_IMAGES = MULTI_IMAGE_VIDEO_TIER.maxImages - 1;
 
 export async function POST(req: NextRequest) {
   try {
-    const { imageUrl, extraImageUrls: rawExtraImageUrls, prompt: userPrompt, templateId, placeholderValues, quality: rawQuality } = await req.json();
+    const {
+      imageUrl,
+      extraImageUrls: rawExtraImageUrls,
+      prompt: userPrompt,
+      templateId,
+      placeholderValues,
+      quality: rawQuality,
+    } = await req.json();
 
     // Either an image this app already generated (https://*.fal.media/...,
     // unchanged) or a fresh local upload (data:image/...;base64,) — the
@@ -35,11 +58,20 @@ export async function POST(req: NextRequest) {
     // (fal's own servers do for the https case), so this isn't an SSRF
     // control; it's what keeps generated-image credits tied to content
     // actually produced or uploaded through the product.
-    if (typeof imageUrl !== "string" || !(FAL_URL_RE.test(imageUrl) || DATA_URL_RE.test(imageUrl))) {
-      return NextResponse.json({ error: "An image is required." }, { status: 400 });
+    if (
+      typeof imageUrl !== "string" ||
+      !(FAL_URL_RE.test(imageUrl) || DATA_URL_RE.test(imageUrl))
+    ) {
+      return NextResponse.json(
+        { error: "An image is required." },
+        { status: 400 },
+      );
     }
     if (!isWithinImageSizeLimit(imageUrl)) {
-      return NextResponse.json({ error: IMAGE_TOO_LARGE_MESSAGE }, { status: 413 });
+      return NextResponse.json(
+        { error: IMAGE_TOO_LARGE_MESSAGE },
+        { status: 413 },
+      );
     }
 
     // Reference photos beyond the main one — validated the same way, then
@@ -53,16 +85,21 @@ export async function POST(req: NextRequest) {
             (u): u is string =>
               typeof u === "string" &&
               (FAL_URL_RE.test(u) || DATA_URL_RE.test(u)) &&
-              isWithinImageSizeLimit(u)
+              isWithinImageSizeLimit(u),
           )
           .slice(0, MAX_EXTRA_IMAGES)
       : [];
     const isMultiImage = extraImageUrls.length > 0;
 
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: "Sign in to generate videos." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Sign in to generate videos." },
+        { status: 401 },
+      );
     }
 
     const botResponse = await rejectIfBot();
@@ -71,7 +108,8 @@ export async function POST(req: NextRequest) {
     // Multi-image jobs always use MULTI_IMAGE_VIDEO_TIER's fixed model/price —
     // the client's quality field is only meaningful for the single-image path,
     // same "server decides, never the client" rule as everywhere else.
-    const quality: VideoQuality = rawQuality in VIDEO_TIERS ? rawQuality : "standard";
+    const quality: VideoQuality =
+      rawQuality in VIDEO_TIERS ? rawQuality : "standard";
     const tier = isMultiImage ? MULTI_IMAGE_VIDEO_TIER : VIDEO_TIERS[quality];
 
     const isUnlimited = hasUnlimitedCredits(user.email);
@@ -79,26 +117,50 @@ export async function POST(req: NextRequest) {
 
     if (!isUnlimited) {
       const plan = await getUserPlan(user.id);
-      const entitled = isMultiImage ? canUseMultiImageVideo(plan) : canUseVideoQuality(plan, quality);
+      const entitled = isMultiImage
+        ? canUseMultiImageVideo(plan)
+        : canUseVideoQuality(plan, quality);
       if (!entitled) {
-        return NextResponse.json({ error: "Upgrade to Pro to unlock Image-to-Video." }, { status: 403 });
+        return NextResponse.json(
+          { error: "Upgrade to Pro to unlock Image-to-Video." },
+          { status: 403 },
+        );
       }
 
       // Basic's video access is Standard-quality only, capped — HD, Premium,
       // and multi-image all stay Pro-only via the minPlan check above, so
       // this only ever applies to the one tier Basic can actually reach.
+      // Bounded by current billing cycle so renewal resets the count.
       if (!isMultiImage && quality === "standard" && plan === "basic") {
+        const { data: profile } = await admin
+          .from("profiles")
+          .select("current_period_start")
+          .eq("id", user.id)
+          .single();
+
+        let periodStart = profile?.current_period_start;
+        if (!periodStart) {
+          const now = new Date();
+          periodStart = new Date(
+            Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+          ).toISOString();
+        }
+
         const { count } = await admin
           .from("generations")
           .select("id", { count: "exact", head: true })
           .eq("user_id", user.id)
           .eq("tool_id", "image-to-video")
           .in("status", ["completed", "pending"])
-          .eq("metadata->>quality", "standard");
+          .eq("metadata->>quality", "standard")
+          .gte("created_at", periodStart);
+
         if (hasReachedBasicVideoLimit(plan, count ?? 0)) {
           return NextResponse.json(
-            { error: `You've used all ${BASIC_STANDARD_VIDEO_LIMIT} videos included with Basic. Upgrade to Pro for unlimited video.` },
-            { status: 403 }
+            {
+              error: `You've used all ${BASIC_STANDARD_VIDEO_LIMIT} videos included with Basic this cycle. Upgrade to Pro for unlimited video.`,
+            },
+            { status: 403 },
           );
         }
       }
@@ -110,11 +172,16 @@ export async function POST(req: NextRequest) {
     let resolvedImageUrls: string[];
     try {
       resolvedImageUrls = await Promise.all(
-        [imageUrl, ...extraImageUrls].map((u) => (DATA_URL_RE.test(u) ? uploadDataUrlToFal(u) : u))
+        [imageUrl, ...extraImageUrls].map((u) =>
+          DATA_URL_RE.test(u) ? uploadDataUrlToFal(u) : u,
+        ),
       );
     } catch (uploadError) {
       console.error("uploadDataUrlToFal failed:", uploadError);
-      return NextResponse.json({ error: "Failed to process the uploaded image." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Failed to process the uploaded image." },
+        { status: 400 },
+      );
     }
     const resolvedImageUrl = resolvedImageUrls[0];
 
@@ -124,7 +191,10 @@ export async function POST(req: NextRequest) {
     let motionPrompt = sanitizePrompt(userPrompt);
     if (templateId) {
       if (typeof templateId !== "string") {
-        return NextResponse.json({ error: "Invalid template." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Invalid template." },
+          { status: 400 },
+        );
       }
       const { data: tpl } = await admin
         .from("templates")
@@ -132,12 +202,15 @@ export async function POST(req: NextRequest) {
         .eq("id", templateId)
         .single();
       if (!tpl) {
-        return NextResponse.json({ error: "That template no longer exists." }, { status: 400 });
+        return NextResponse.json(
+          { error: "That template no longer exists." },
+          { status: 400 },
+        );
       }
       motionPrompt = resolveTemplatePrompt(
         tpl.prompt,
         sanitizePlaceholderValues(placeholderValues),
-        motionPrompt
+        motionPrompt,
       );
     }
     if (!motionPrompt) motionPrompt = DEFAULT_MOTION_PROMPT;
@@ -149,7 +222,11 @@ export async function POST(req: NextRequest) {
     // net if a template prompt ever forgets it.
     if (isMultiImage && !/@Image\d/.test(motionPrompt)) {
       const mapping = resolvedImageUrls
-        .map((_, i) => (i === 0 ? "@Image1 is the main photo." : `@Image${i + 1} is an additional reference photo the user provided.`))
+        .map((_, i) =>
+          i === 0
+            ? "@Image1 is the main photo."
+            : `@Image${i + 1} is an additional reference photo the user provided.`,
+        )
         .join(" ");
       motionPrompt = `${motionPrompt} Reference images: ${mapping}`;
     }
@@ -158,8 +235,10 @@ export async function POST(req: NextRequest) {
     const credits = await getUserCredits(user.id);
     if (!isUnlimited && credits < cost) {
       return NextResponse.json(
-        { error: "You're out of credits. Upgrade your plan to keep generating." },
-        { status: 402 }
+        {
+          error: "You're out of credits. Upgrade your plan to keep generating.",
+        },
+        { status: 402 },
       );
     }
 
@@ -179,12 +258,17 @@ export async function POST(req: NextRequest) {
       const charged = await chargeCredits(
         user.id,
         cost,
-        isMultiImage ? "Image-to-video (multi-image)" : `Image-to-video (${quality})`
+        isMultiImage
+          ? "Image-to-video (multi-image)"
+          : `Image-to-video (${quality})`,
       );
       if (charged === null) {
         return NextResponse.json(
-          { error: "You're out of credits. Upgrade your plan to keep generating." },
-          { status: 402 }
+          {
+            error:
+              "You're out of credits. Upgrade your plan to keep generating.",
+          },
+          { status: 402 },
         );
       }
       newCredits = charged;
@@ -201,6 +285,8 @@ export async function POST(req: NextRequest) {
       resolution: tier.resolution,
       durationSeconds: tier.durationSeconds,
       imageCount: resolvedImageUrls.length,
+      templateId: templateId || undefined,
+      userPrompt: userPrompt ? sanitizePrompt(userPrompt) : undefined,
     };
 
     const { data: row, error: insertError } = await admin
@@ -221,9 +307,18 @@ export async function POST(req: NextRequest) {
       console.error("generations insert failed:", insertError?.message);
       // No row was created, so there is nothing for the settle path to claim
       // later — this refund can't collide with one.
-      if (!isUnlimited) await refundCredits(user.id, cost, "Image-to-video (failed to start)");
-      return NextResponse.json({ error: "Failed to start generation. Try again." }, { status: 500 });
+      if (!isUnlimited)
+        await refundCredits(user.id, cost, "Image-to-video (failed to start)");
+      return NextResponse.json(
+        { error: "Failed to start generation. Try again." },
+        { status: 500 },
+      );
     }
+
+    // Enforce 20-item retention limit on new video generation
+    pruneUserHistory(admin, user.id, MAX_USER_HISTORY).catch((err) =>
+      console.error("pruneUserHistory error:", err),
+    );
 
     try {
       const { request_id } = await fal.queue.submit(tier.model, {
@@ -256,14 +351,24 @@ export async function POST(req: NextRequest) {
       // double-refund against a settle pass that saw the row first.
       const refunded = await failAndRefundOnce(
         admin,
-        { id: row.id, user_id: user.id, status: "pending", error_message: null, credit_cost: cost, metadata: baseMetadata },
+        {
+          id: row.id,
+          user_id: user.id,
+          status: "pending",
+          error_message: null,
+          credit_cost: cost,
+          metadata: baseMetadata,
+        },
         user.email,
         "Failed to start video generation.",
-        "Image-to-video (submit failed)"
+        "Image-to-video (submit failed)",
       );
       return NextResponse.json(
-        { error: "Failed to start video generation.", credits: refunded ?? newCredits },
-        { status: 502 }
+        {
+          error: "Failed to start video generation.",
+          credits: refunded ?? newCredits,
+        },
+        { status: 502 },
       );
     }
   } catch (e) {

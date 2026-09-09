@@ -18,13 +18,19 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   }
 
-  const [{ data: profile }, { count }, prefsResult, { count: standardVideoCount }] = await Promise.all([
-    supabase.from("profiles").select("full_name, credits, avatar_url, plan").eq("id", user.id).single(),
+  const [{ data: profile }, { count }, prefsResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, credits, avatar_url, plan, current_period_start")
+      .eq("id", user.id)
+      .single(),
     supabase
       .from("generations")
       .select("id", { count: "exact", head: true })
@@ -32,19 +38,32 @@ export async function GET() {
       .eq("status", "completed"),
     // Kept as its own query: an older schema without this column shouldn't
     // take the rest of the profile down with it.
-    supabase.from("profiles").select("notification_prefs").eq("id", user.id).single(),
-    // Same condition /api/generate-video enforces the Basic cap against —
-    // only meaningful when plan is "basic", but cheap enough (one indexed
-    // count) to just always fetch rather than branch on plan first and lose
-    // the parallelism above.
     supabase
-      .from("generations")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("tool_id", "image-to-video")
-      .in("status", ["completed", "pending"])
-      .eq("metadata->>quality", "standard"),
+      .from("profiles")
+      .select("notification_prefs")
+      .eq("id", user.id)
+      .single(),
   ]);
+
+  let periodStart = (profile as { current_period_start?: string | null })
+    ?.current_period_start;
+  if (!periodStart) {
+    const now = new Date();
+    periodStart = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+    ).toISOString();
+  }
+
+  // Same condition /api/generate-video enforces the Basic cap against —
+  // bounded by the user's billing cycle so the allowance resets on renewal.
+  const { count: standardVideoCount } = await supabase
+    .from("generations")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("tool_id", "image-to-video")
+    .in("status", ["completed", "pending"])
+    .eq("metadata->>quality", "standard")
+    .gte("created_at", periodStart);
 
   const meta = (user.user_metadata ?? {}) as Record<string, string | undefined>;
 
@@ -62,7 +81,9 @@ export async function GET() {
     plan: profile?.plan ?? "free",
     totalGenerations: count ?? 0,
     standardVideosUsed: standardVideoCount ?? 0,
-    isAdmin: !!user.email && (ADMIN_EMAILS as readonly string[]).includes(user.email.toLowerCase()),
+    isAdmin:
+      !!user.email &&
+      (ADMIN_EMAILS as readonly string[]).includes(user.email.toLowerCase()),
     notificationPrefs: prefsResult.data?.notification_prefs ?? null,
   });
 }

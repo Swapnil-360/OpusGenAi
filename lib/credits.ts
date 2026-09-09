@@ -4,7 +4,9 @@ import { ADMIN_EMAILS } from "@/lib/admin-config";
 /** Admins get unlimited use across every credit-gated tool, for testing —
  *  never blocked by balance, never actually charged. */
 export function hasUnlimitedCredits(email: string | null | undefined): boolean {
-  return !!email && (ADMIN_EMAILS as readonly string[]).includes(email.toLowerCase());
+  return (
+    !!email && (ADMIN_EMAILS as readonly string[]).includes(email.toLowerCase())
+  );
 }
 
 /** Sent to the client instead of the real (low, never-charged) stored balance
@@ -48,14 +50,17 @@ export async function getUserCredits(userId: string): Promise<number> {
 export async function chargeCredits(
   userId: string,
   cost: number,
-  description: string
+  description: string,
 ): Promise<number | null> {
   const admin = createAdminClient();
 
-  const { data: newBalance, error: rpcError } = await admin.rpc("charge_credits", {
-    uid: userId,
-    amount: cost,
-  });
+  const { data: newBalance, error: rpcError } = await admin.rpc(
+    "charge_credits",
+    {
+      uid: userId,
+      amount: cost,
+    },
+  );
   if (rpcError) {
     console.error("charge_credits failed:", rpcError.message);
     return null;
@@ -70,7 +75,8 @@ export async function chargeCredits(
     type: "generation",
     description,
   });
-  if (txError) console.error("credit_transactions insert failed:", txError.message);
+  if (txError)
+    console.error("credit_transactions insert failed:", txError.message);
 
   return newBalance as number;
 }
@@ -91,14 +97,17 @@ export async function chargeCredits(
 export async function refundCredits(
   userId: string,
   amount: number,
-  description: string
+  description: string,
 ): Promise<number | null> {
   const admin = createAdminClient();
 
-  const { data: newBalance, error: rpcError } = await admin.rpc("refund_credits", {
-    uid: userId,
-    amount,
-  });
+  const { data: newBalance, error: rpcError } = await admin.rpc(
+    "refund_credits",
+    {
+      uid: userId,
+      amount,
+    },
+  );
   if (rpcError) {
     console.error("refund_credits failed:", rpcError.message);
     return null;
@@ -110,7 +119,50 @@ export async function refundCredits(
     type: "refund",
     description,
   });
-  if (txError) console.error("credit_transactions insert failed:", txError.message);
+  if (txError)
+    console.error("credit_transactions insert failed:", txError.message);
+
+  return (newBalance ?? null) as number | null;
+}
+
+/**
+ * Atomically adds credits to a user's account and logs a transaction.
+ * Used for payment gateway checkout purchases, recurring subscription refills,
+ * signup bonuses, or manual admin credit adjustments.
+ */
+export async function grantCredits(
+  userId: string,
+  amount: number,
+  type:
+    | "purchase"
+    | "subscription_renewal"
+    | "signup_bonus"
+    | "admin_adjustment",
+  description: string,
+): Promise<number | null> {
+  if (amount <= 0) return null;
+  const admin = createAdminClient();
+
+  const { data: newBalance, error: rpcError } = await admin.rpc(
+    "refund_credits",
+    {
+      uid: userId,
+      amount,
+    },
+  );
+  if (rpcError) {
+    console.error("grantCredits rpc failed:", rpcError.message);
+    return null;
+  }
+
+  const { error: txError } = await admin.from("credit_transactions").insert({
+    user_id: userId,
+    amount,
+    type,
+    description,
+  });
+  if (txError)
+    console.error("credit_transactions insert failed:", txError.message);
 
   return (newBalance ?? null) as number | null;
 }

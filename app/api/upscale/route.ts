@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pruneUserHistory, MAX_USER_HISTORY } from "@/lib/history-limit";
 import { fal } from "@/lib/fal";
-import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
+import {
+  getUserCredits,
+  chargeCredits,
+  hasUnlimitedCredits,
+  UNLIMITED_CREDITS_DISPLAY,
+} from "@/lib/credits";
 import { rejectIfBot } from "@/lib/bot-protect";
 
 // Was Hugging Face's caidas/swin2SR-realworld-sr-x4-large via router.huggingface.co
@@ -17,9 +23,14 @@ const CREDIT_COST = 2;
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
-      return NextResponse.json({ error: "Sign in to use this tool." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Sign in to use this tool." },
+        { status: 401 },
+      );
     }
 
     const botResponse = await rejectIfBot();
@@ -32,18 +43,26 @@ export async function POST(req: NextRequest) {
     const credits = await getUserCredits(user.id);
     if (!isUnlimited && credits < CREDIT_COST) {
       return NextResponse.json(
-        { error: "You're out of credits. Upgrade your plan to keep generating." },
-        { status: 402 }
+        {
+          error: "You're out of credits. Upgrade your plan to keep generating.",
+        },
+        { status: 402 },
       );
     }
 
     const formData = await req.formData();
     const file = formData.get("image") as File | null;
     if (!file) {
-      return NextResponse.json({ error: "No image provided." }, { status: 400 });
+      return NextResponse.json(
+        { error: "No image provided." },
+        { status: 400 },
+      );
     }
     if (file.size > MAX_FILE_BYTES) {
-      return NextResponse.json({ error: "Image too large (max 10MB)." }, { status: 413 });
+      return NextResponse.json(
+        { error: "Image too large (max 10MB)." },
+        { status: 413 },
+      );
     }
 
     // Scale and face-enhancement map onto real UI controls (previously never
@@ -59,22 +78,31 @@ export async function POST(req: NextRequest) {
       imageUrl = await fal.storage.upload(file);
     } catch (uploadError) {
       console.error("fal.storage.upload failed (upscale):", uploadError);
-      return NextResponse.json({ error: "Failed to process the uploaded image." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Failed to process the uploaded image." },
+        { status: 400 },
+      );
     }
 
     let upscaledUrl: string | undefined;
     try {
-      const result = await fal.subscribe(MODEL, { input: { image_url: imageUrl, scale, face } });
+      const result = await fal.subscribe(MODEL, {
+        input: { image_url: imageUrl, scale, face },
+      });
       upscaledUrl = (result.data as { image?: { url: string } })?.image?.url;
     } catch (err) {
       console.error("fal esrgan error:", err);
     }
 
     if (!upscaledUrl) {
-      return NextResponse.json({ error: "Upscale failed. Try again." }, { status: 502 });
+      return NextResponse.json(
+        { error: "Upscale failed. Try again." },
+        { status: 502 },
+      );
     }
 
-    const { error: insertError } = await createAdminClient().from("generations").insert({
+    const admin = createAdminClient();
+    const { error: insertError } = await admin.from("generations").insert({
       user_id: user.id,
       tool_id: "upscale",
       status: "completed",
@@ -83,7 +111,11 @@ export async function POST(req: NextRequest) {
       completed_at: new Date().toISOString(),
       metadata: { images: [upscaledUrl] },
     });
-    if (insertError) console.error("generations insert failed:", insertError.message);
+    if (insertError)
+      console.error("generations insert failed:", insertError.message);
+    pruneUserHistory(admin, user.id, MAX_USER_HISTORY).catch((err) =>
+      console.error("pruneUserHistory error:", err),
+    );
 
     // Atomic: deducts only if the balance still covers it, so concurrent
     // requests can't both clear the read-only check above and both go free.
@@ -94,8 +126,11 @@ export async function POST(req: NextRequest) {
       const charged = await chargeCredits(user.id, CREDIT_COST, "Upscale 4×");
       if (charged === null) {
         return NextResponse.json(
-          { error: "You're out of credits. Upgrade your plan to keep generating." },
-          { status: 402 }
+          {
+            error:
+              "You're out of credits. Upgrade your plan to keep generating.",
+          },
+          { status: 402 },
         );
       }
       newCredits = charged;

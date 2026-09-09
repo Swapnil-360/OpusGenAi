@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,7 +13,10 @@ import {
   type MotionValue,
 } from "framer-motion";
 import { ArrowRight, Check } from "lucide-react";
-import { PLANS, MOCK_CURRENT_USER, type Plan } from "@/lib/mock-data";
+import { PLANS, type Plan } from "@/lib/mock-data";
+import { type Plan as PlanId } from "@/lib/plans";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 import { useTemplates } from "@/lib/hooks/use-templates";
 import { VIDEO_CATEGORIES } from "@/lib/templates-data";
 import { useHeroImages } from "@/lib/hooks/use-hero-images";
@@ -262,7 +265,17 @@ function OrbitCard({
 
 // ─── Pricing card ─────────────────────────────────────────────────────────────
 
-function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
+function PricingCard({
+  plan,
+  isCurrent,
+  onSelectPlan,
+  loading,
+}: {
+  plan: Plan;
+  isCurrent: boolean;
+  onSelectPlan: (planId: PlanId) => void;
+  loading?: boolean;
+}) {
   const isBasic = plan.id === "basic";
   const isPro = plan.highlight;
 
@@ -382,33 +395,38 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
             <span className="hidden sm:inline">Active plan</span>
           </div>
         ) : (
-          <Link href="/signup">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full h-7 sm:h-11 rounded-lg sm:rounded-xl text-[9px] sm:text-sm font-bold transition-all"
-              style={
-                isPro
-                  ? { background: "#dc2626", color: "#fff", boxShadow: "0 0 20px rgba(220,38,38,0.28)" }
-                  : isBasic
-                  ? { background: "#0ea5e9", color: "#fff", boxShadow: "0 0 20px rgba(56,189,248,0.25)" }
-                  : { border: "1px solid rgba(255,255,255,0.09)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.7)" }
-              }
-            >
-              <span className="sm:hidden">{plan.cta.split(" ")[0]}</span>
-              <span className="hidden sm:inline">{plan.cta}</span>
-            </motion.button>
-          </Link>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={loading}
+            onClick={() => onSelectPlan(plan.id)}
+            className="w-full h-7 sm:h-11 rounded-lg sm:rounded-xl text-[9px] sm:text-sm font-bold transition-all flex items-center justify-center gap-2"
+            style={
+              isPro
+                ? { background: "#dc2626", color: "#fff", boxShadow: "0 0 20px rgba(220,38,38,0.28)" }
+                : isBasic
+                ? { background: "#0ea5e9", color: "#fff", boxShadow: "0 0 20px rgba(56,189,248,0.25)" }
+                : { border: "1px solid rgba(255,255,255,0.09)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.7)" }
+            }
+          >
+            {loading ? (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+            ) : (
+              <>
+                <span className="sm:hidden">{plan.cta.split(" ")[0]}</span>
+                <span className="hidden sm:inline">{plan.cta}</span>
+              </>
+            )}
+          </motion.button>
         )}
 
-        {/* Paid tiers aren't purchasable yet — signing up still works, but don't
-            imply a card can be charged today. */}
+        {/* Reassurance copy for paid tiers */}
         {plan.price > 0 && !isCurrent && (
           <p
             className="mt-1.5 sm:mt-2.5 text-center text-[7px] sm:text-[10px]"
             style={{ color: "rgba(255,255,255,0.40)" }}
           >
-            Paid plans coming soon — start free today
+            Cancel anytime · Instant activation
           </p>
         )}
       </div>
@@ -445,6 +463,54 @@ function PricingCard({ plan, isCurrent }: { plan: Plan; isCurrent: boolean }) {
 
 export default function LandingPage() {
   const router = useRouter();
+
+  // ── Auth + plan state ──────────────────────────────────────────────────
+  const [authUser, setAuthUser] = useState<{ id: string } | null>(null);
+  const [userPlan, setUserPlan] = useState<PlanId | null>(null);
+  const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setAuthUser({ id: data.user.id });
+        supabase
+          .from("profiles")
+          .select("plan")
+          .eq("id", data.user.id)
+          .single()
+          .then(({ data: profile }) => {
+            if (profile?.plan) setUserPlan(profile.plan as PlanId);
+          });
+      }
+    });
+  }, []);
+
+  async function handlePlanSelect(planId: PlanId) {
+    if (planId === "free") {
+      router.push(authUser ? "/generate" : "/signup");
+      return;
+    }
+    if (!authUser) {
+      router.push(`/signup?plan=${planId}&redirectTo=${encodeURIComponent(`/account?checkout_plan=${planId}`)}`);
+      return;
+    }
+    setLoadingPlan(planId);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Checkout failed");
+      window.location.href = data.url;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Something went wrong");
+      setLoadingPlan(null);
+    }
+  }
+
   const { templates: ALL_TEMPLATES, loading: templatesLoading, error: templatesError, refetch: refetchTemplates } = useTemplates();
   // Video templates get their own section (they're motion prompts, and their
   // preview is a clip rather than a still); the image-template carousel below
@@ -557,7 +623,7 @@ export default function LandingPage() {
                 transition={{ delay: 0.32 }}
                 className="flex items-center gap-3 flex-wrap justify-center lg:justify-start"
               >
-                <Link href="/signup">
+                <Link href={authUser ? "/generate" : "/signup"}>
                   <motion.button
                     whileHover={{
                       scale: 1.04,
@@ -567,7 +633,7 @@ export default function LandingPage() {
                     className="group flex items-center gap-3 h-13 pl-6 pr-2 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold transition-all text-[15px]"
                     style={{ boxShadow: "0 0 32px rgba(220,38,38,0.32)" }}
                   >
-                    Get Started
+                    {authUser ? "Open Studio" : "Get Started"}
                     <span className="flex items-center justify-center w-9 h-9 rounded-full transition-colors" style={{ background: "rgba(255,255,255,0.18)" }}>
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                     </span>
@@ -916,7 +982,12 @@ export default function LandingPage() {
                   delay={i * 0.09}
                   className={plan.highlight ? "sm:-my-8" : plan.id === "basic" ? "sm:-my-4" : ""}
                 >
-                  <PricingCard plan={plan} isCurrent={plan.id === MOCK_CURRENT_USER.plan} />
+                  <PricingCard
+                    plan={plan}
+                    isCurrent={userPlan ? plan.id === userPlan : false}
+                    onSelectPlan={handlePlanSelect}
+                    loading={loadingPlan === plan.id}
+                  />
                 </FadeIn>
               ))}
             </div>

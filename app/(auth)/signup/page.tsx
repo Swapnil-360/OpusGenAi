@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Check, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +10,18 @@ import { LogoBrand } from "@/components/shared/LogoBrand";
 import { createClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="w-full max-w-md h-96" />}>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
+function SignupForm() {
+  const searchParams = useSearchParams();
+  const plan = searchParams.get("plan");
+  const redirectTo = searchParams.get("redirectTo") ?? (plan ? `/account?checkout_plan=${plan}` : "/generate");
+
   const [showPassword, setShowPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -30,7 +43,7 @@ export default function SignupPage() {
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
       },
     });
 
@@ -50,7 +63,7 @@ export default function SignupPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTo)}`,
       },
     });
 
@@ -98,7 +111,7 @@ export default function SignupPage() {
         </div>
         <p className="text-center text-sm mt-5" style={{ color: "rgba(255,255,255,0.55)" }}>
           Already confirmed?{" "}
-          <Link href="/login" className="font-semibold hover:opacity-80 transition-opacity" style={{ color: "#f87171" }}>
+          <Link href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`} className="font-semibold hover:opacity-80 transition-opacity" style={{ color: "#f87171" }}>
             Sign in
           </Link>
         </p>
@@ -139,6 +152,15 @@ export default function SignupPage() {
             <p className="text-sm mt-1.5" style={{ color: "rgba(255,255,255,0.55)" }}>
               Join OpusGen AI — free to start
             </p>
+            {plan && (
+              <div
+                className="mt-3 px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5"
+                style={{ background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.3)", color: "#f87171" }}
+              >
+                <span>Selected plan:</span>
+                <span className="text-white font-bold">{plan}</span>
+              </div>
+            )}
           </div>
 
           <motion.button
@@ -294,7 +316,7 @@ export default function SignupPage() {
 
       <p className="text-center text-sm mt-5" style={{ color: "rgba(255,255,255,0.55)" }}>
         Already have an account?{" "}
-        <Link href="/login" className="font-semibold hover:opacity-80 transition-opacity" style={{ color: "#f87171" }}>
+        <Link href={`/login?redirectTo=${encodeURIComponent(redirectTo)}`} className="font-semibold hover:opacity-80 transition-opacity" style={{ color: "#f87171" }}>
           Sign in
         </Link>
       </p>

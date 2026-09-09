@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { pruneUserHistory, MAX_USER_HISTORY } from "@/lib/history-limit";
 import { resolveTemplatePrompt } from "@/lib/template-prompt";
 import { fal, uploadDataUrlToFal } from "@/lib/fal";
-import { getUserCredits, chargeCredits, hasUnlimitedCredits, UNLIMITED_CREDITS_DISPLAY } from "@/lib/credits";
+import {
+  getUserCredits,
+  chargeCredits,
+  hasUnlimitedCredits,
+  UNLIMITED_CREDITS_DISPLAY,
+} from "@/lib/credits";
 import { getUserPlan } from "@/lib/entitlements";
 import { QUALITY_TIERS, canUseQuality, type Quality } from "@/lib/plans";
-import { buildScenePrompt, buildProductEditPrompt, buildPortraitEditPrompt, buildCampaignEditPrompt, HF_SIZE_MAP as SIZE_MAP } from "@/lib/scene-prompt";
+import {
+  buildScenePrompt,
+  buildProductEditPrompt,
+  buildPortraitEditPrompt,
+  buildCampaignEditPrompt,
+  HF_SIZE_MAP as SIZE_MAP,
+} from "@/lib/scene-prompt";
 import { rejectIfBot } from "@/lib/bot-protect";
 import {
   sanitizePrompt,
@@ -35,10 +47,15 @@ export async function POST(req: NextRequest) {
 
     // ── Auth + credit check ──
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Sign in to generate images." }, { status: 401 });
+      return NextResponse.json(
+        { error: "Sign in to generate images." },
+        { status: 401 },
+      );
     }
 
     const botResponse = await rejectIfBot();
@@ -54,7 +71,10 @@ export async function POST(req: NextRequest) {
     let templateType = rawTemplateType;
     if (templateId) {
       if (typeof templateId !== "string") {
-        return NextResponse.json({ error: "Invalid template." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Invalid template." },
+          { status: 400 },
+        );
       }
       const admin = createAdminClient();
       const { data: tpl } = await admin
@@ -63,7 +83,10 @@ export async function POST(req: NextRequest) {
         .eq("id", templateId)
         .single();
       if (!tpl) {
-        return NextResponse.json({ error: "That template no longer exists." }, { status: 400 });
+        return NextResponse.json(
+          { error: "That template no longer exists." },
+          { status: 400 },
+        );
       }
       // Trusted from the row, not the request — a client can't relabel a
       // template to get a different prompt-fidelity suffix applied.
@@ -71,12 +94,15 @@ export async function POST(req: NextRequest) {
       prompt = resolveTemplatePrompt(
         tpl.prompt,
         sanitizePlaceholderValues(placeholderValues),
-        cleanUserPrompt
+        cleanUserPrompt,
       );
     }
 
     if (!prompt.trim()) {
-      return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Prompt is required" },
+        { status: 400 },
+      );
     }
 
     const isPremium = mode === "premium";
@@ -84,7 +110,8 @@ export async function POST(req: NextRequest) {
     // the free flux/schnell path has no quality ladder. Default to
     // "standard" so existing clients that don't send `quality` keep
     // behaving exactly as before.
-    const quality: Quality = isPremium && rawQuality in QUALITY_TIERS ? rawQuality : "standard";
+    const quality: Quality =
+      isPremium && rawQuality in QUALITY_TIERS ? rawQuality : "standard";
     const tier = QUALITY_TIERS[quality];
     const cost = isPremium ? tier.creditCost : CREDIT_COST;
 
@@ -94,8 +121,10 @@ export async function POST(req: NextRequest) {
       const plan = await getUserPlan(user.id);
       if (!canUseQuality(plan, quality)) {
         return NextResponse.json(
-          { error: `Upgrade to ${tier.minPlan === "basic" ? "Basic" : "Pro"} to use ${quality.toUpperCase()} quality.` },
-          { status: 403 }
+          {
+            error: `Upgrade to ${tier.minPlan === "basic" ? "Basic" : "Pro"} to use ${quality.toUpperCase()} quality.`,
+          },
+          { status: 403 },
         );
       }
     }
@@ -103,8 +132,10 @@ export async function POST(req: NextRequest) {
     const credits = await getUserCredits(user.id);
     if (!isUnlimited && credits < cost) {
       return NextResponse.json(
-        { error: "You're out of credits. Upgrade your plan to keep generating." },
-        { status: 402 }
+        {
+          error: "You're out of credits. Upgrade your plan to keep generating.",
+        },
+        { status: 402 },
       );
     }
 
@@ -112,16 +143,24 @@ export async function POST(req: NextRequest) {
 
     if (isPremium) {
       if (!inputImage || typeof inputImage !== "string") {
-        return NextResponse.json({ error: "Product photo is required for this mode." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Product photo is required for this mode." },
+          { status: 400 },
+        );
       }
       if (!isWithinImageSizeLimit(inputImage)) {
-        return NextResponse.json({ error: IMAGE_TOO_LARGE_MESSAGE }, { status: 413 });
+        return NextResponse.json(
+          { error: IMAGE_TOO_LARGE_MESSAGE },
+          { status: 413 },
+        );
       }
       const imageUrl = await uploadDataUrlToFal(inputImage);
       const editPrompt =
-        templateType === "universal" ? buildPortraitEditPrompt(prompt.trim())
-        : templateType === "campaign" ? buildCampaignEditPrompt(prompt.trim())
-        : buildProductEditPrompt(prompt.trim());
+        templateType === "universal"
+          ? buildPortraitEditPrompt(prompt.trim())
+          : templateType === "campaign"
+            ? buildCampaignEditPrompt(prompt.trim())
+            : buildProductEditPrompt(prompt.trim());
       const result = await fal.subscribe(tier.model, {
         input: {
           image_urls: [imageUrl],
@@ -135,13 +174,18 @@ export async function POST(req: NextRequest) {
       image = (result.data as { images?: { url: string }[] })?.images?.[0]?.url;
       if (!image) {
         console.error(`fal ${tier.model} returned no image:`, result);
-        return NextResponse.json({ error: "Generation failed. Try again." }, { status: 502 });
+        return NextResponse.json(
+          { error: "Generation failed. Try again." },
+          { status: 502 },
+        );
       }
     } else {
       // ── Generate (free path) ──
       const dims = SIZE_MAP[ratio] ?? SIZE_MAP["1:1"];
       const isBackgroundOnly = mode === "background";
-      const modelInput = isBackgroundOnly ? buildScenePrompt(prompt.trim()) : prompt.trim();
+      const modelInput = isBackgroundOnly
+        ? buildScenePrompt(prompt.trim())
+        : prompt.trim();
 
       const result = await fal.subscribe("fal-ai/flux/schnell", {
         input: {
@@ -154,7 +198,10 @@ export async function POST(req: NextRequest) {
       image = (result.data as { images?: { url: string }[] })?.images?.[0]?.url;
       if (!image) {
         console.error("fal flux/schnell returned no image:", result);
-        return NextResponse.json({ error: "Generation failed. Try again." }, { status: 502 });
+        return NextResponse.json(
+          { error: "Generation failed. Try again." },
+          { status: 502 },
+        );
       }
     }
 
@@ -170,12 +217,17 @@ export async function POST(req: NextRequest) {
       const charged = await chargeCredits(
         user.id,
         cost,
-        isPremium ? `Premium AI product photo (${quality})` : "Image generation"
+        isPremium
+          ? `Premium AI product photo (${quality})`
+          : "Image generation",
       );
       if (charged === null) {
         return NextResponse.json(
-          { error: "You're out of credits. Upgrade your plan to keep generating." },
-          { status: 402 }
+          {
+            error:
+              "You're out of credits. Upgrade your plan to keep generating.",
+          },
+          { status: 402 },
         );
       }
       newCredits = charged;
@@ -200,6 +252,7 @@ export async function POST(req: NextRequest) {
           aspectRatio: ratio,
           templateId: templateId ?? undefined,
           templateType: templateType ?? undefined,
+          userPrompt: cleanUserPrompt || undefined,
           productPreserved: mode === "background" || undefined,
           engine: isPremium ? tier.model : undefined,
           quality: isPremium ? quality : undefined,
@@ -207,9 +260,19 @@ export async function POST(req: NextRequest) {
       })
       .select("id")
       .single();
-    if (insertError) console.error("generations insert failed:", insertError.message);
+    if (insertError)
+      console.error("generations insert failed:", insertError.message);
 
-    return NextResponse.json({ image, credits: newCredits, generationId: insertedRow?.id ?? null });
+    // Enforce 20-item retention limit on new generation
+    pruneUserHistory(createAdminClient(), user.id, MAX_USER_HISTORY).catch(
+      (err) => console.error("pruneUserHistory error:", err),
+    );
+
+    return NextResponse.json({
+      image,
+      credits: newCredits,
+      generationId: insertedRow?.id ?? null,
+    });
   } catch (e) {
     console.error("Generate route error:", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });

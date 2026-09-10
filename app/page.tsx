@@ -765,7 +765,7 @@ export default function LandingPage() {
                 fade, since the panel itself now reads as a distinct surface
                 floating over the page instead of blending into it. */}
             <div
-              className="relative overflow-hidden rounded-full py-4"
+              className="relative overflow-hidden rounded-full py-5 sm:py-6"
               style={{
                 background: "rgba(255,255,255,0.045)",
                 border: "1px solid rgba(255,255,255,0.10)",
@@ -774,23 +774,37 @@ export default function LandingPage() {
                 boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07), 0 16px 40px rgba(0,0,0,0.35)",
               }}
             >
-              <motion.div
-                className="flex whitespace-nowrap"
-                animate={{ x: "-50%" }}
-                transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
+              {/* Left & right smooth fade mask so text gracefully fades before reaching the rounded border */}
+              <div
+                className="w-full overflow-hidden"
+                style={{
+                  maskImage:
+                    "linear-gradient(to right, transparent 0%, black min(12vw, 96px), black calc(100% - min(12vw, 96px)), transparent 100%)",
+                  WebkitMaskImage:
+                    "linear-gradient(to right, transparent 0%, black min(12vw, 96px), black calc(100% - min(12vw, 96px)), transparent 100%)",
+                }}
               >
-                {[...CAPABILITIES, ...CAPABILITIES].map((cap, i) => (
-                  <div key={i} className="flex items-center gap-2.5 px-4 shrink-0">
-                    <span className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: "#f87171", boxShadow: "0 0 6px rgba(248,113,113,0.8)" }} />
-                    <span
-                      className="text-[13px] sm:text-sm font-semibold tracking-wide uppercase"
-                      style={{ color: "rgba(255,255,255,0.72)", letterSpacing: "0.04em" }}
-                    >
-                      {cap}
-                    </span>
-                  </div>
-                ))}
-              </motion.div>
+                <motion.div
+                  className="flex whitespace-nowrap items-center"
+                  animate={{ x: "-50%" }}
+                  transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
+                >
+                  {[...CAPABILITIES, ...CAPABILITIES].map((cap, i) => (
+                    <div key={i} className="flex items-center gap-3 px-6 sm:px-8 shrink-0">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ backgroundColor: "#f87171", boxShadow: "0 0 8px rgba(248,113,113,0.85)" }}
+                      />
+                      <span
+                        className="text-xs sm:text-[13px] font-semibold tracking-wider uppercase leading-none"
+                        style={{ color: "rgba(255,255,255,0.72)", letterSpacing: "0.07em" }}
+                      >
+                        {cap}
+                      </span>
+                    </div>
+                  ))}
+                </motion.div>
+              </div>
             </div>
           </div>
         </div>

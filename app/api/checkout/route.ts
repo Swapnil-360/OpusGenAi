@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const plan = body.plan;
+    const plan = body.plan ?? body.planId;
 
     if (plan !== "basic" && plan !== "pro") {
       return NextResponse.json(

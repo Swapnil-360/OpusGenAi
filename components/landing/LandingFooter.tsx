@@ -2,12 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import {
-  ExternalLink,
-  Instagram,
-  Mail,
-  Twitter,
-} from "lucide-react";
+import { ExternalLink, Instagram, Mail, Twitter } from "lucide-react";
 import { LogoBrand } from "@/components/shared/LogoBrand";
 import { FeedbackButton } from "@/components/shared/FeedbackModal";
 
@@ -138,6 +133,7 @@ export function LandingFooter() {
             </p>
             <a
               href="mailto:support@opusgenai.com"
+              title="Send email to support@opusgenai.com"
               className="inline-flex items-center gap-2 text-sm font-medium transition-colors"
               style={{ color: W.text }}
               onMouseEnter={(e) => {
@@ -192,28 +188,34 @@ export function LandingFooter() {
               Connect
             </p>
             <ul className="space-y-3">
-              {CONNECT.map(({ icon: Icon, label, href, highlight }) => (
-                <li key={label}>
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm transition-colors"
-                    style={{ color: highlight ? W.red : W.muted }}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLAnchorElement).style.color =
-                        highlight ? "#fca5a5" : W.text;
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLAnchorElement).style.color =
-                        highlight ? W.red : W.muted;
-                    }}
-                  >
-                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                    {label}
-                  </a>
-                </li>
-              ))}
+              {CONNECT.map(({ icon: Icon, label, href, highlight }) => {
+                const isMailto = href.startsWith("mailto:");
+                return (
+                  <li key={label}>
+                    <a
+                      href={href}
+                      {...(!isMailto && {
+                        target: "_blank",
+                        rel: "noopener noreferrer",
+                      })}
+                      title={isMailto ? `Send email to ${label}` : undefined}
+                      className="flex items-center gap-2 text-sm transition-colors"
+                      style={{ color: highlight ? W.red : W.muted }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLAnchorElement).style.color =
+                          highlight ? "#fca5a5" : W.text;
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLAnchorElement).style.color =
+                          highlight ? W.red : W.muted;
+                      }}
+                    >
+                      <Icon className="w-3.5 h-3.5 shrink-0" />
+                      {label}
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 

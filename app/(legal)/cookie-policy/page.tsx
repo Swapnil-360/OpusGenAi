@@ -84,7 +84,7 @@ export default function CookiePolicyPage() {
           Cookie Policy
         </h1>
         <p className="text-sm" style={{ color: S.muted }}>
-          Last updated: August 4, 2026 &nbsp;·&nbsp; Effective: August 4, 2026
+          Last updated: September 10, 2026 &nbsp;·&nbsp; Effective: September 10, 2026
         </p>
       </div>
 
@@ -108,11 +108,11 @@ export default function CookiePolicyPage() {
           { name: "sb-access-token", type: "Essential", purpose: "Supabase authentication — keeps you signed in", duration: "Session / up to 1 hour" },
           { name: "sb-refresh-token", type: "Essential", purpose: "Supabase authentication — silently renews your session", duration: "Up to 30 days" },
         ]} />
-        <P>That is the complete list. If that changes — for example, if we introduce optional analytics or a live chat widget — we will update this table and the &quot;Last updated&quot; date above before doing so.</P>
+        <P>That is the complete list of cookies set by our domain. If that changes — for example, if we introduce optional analytics or a live chat widget — we will update this table and the &quot;Last updated&quot; date above before doing so.</P>
       </Section>
 
-      <Section title="4. Third-Party Cookies">
-        <P>We do not currently embed any third-party service on our pages that sets its own cookies (no ad networks, no chat widgets, no third-party analytics). The only cookies in use are the essential Supabase authentication cookies listed above, which are set by our own domain.</P>
+      <Section title="4. Third-Party &amp; Payment Cookies">
+        <P>We do not embed third-party advertising networks or tracking scripts on our pages. When you initiate a plan upgrade or manage your billing, you are redirected to a secure checkout or billing portal hosted by our Merchant of Record and payment gateway, <strong style={{ color: "rgba(255,255,255,0.88)" }}>Polar Software Inc.</strong> (polar.sh). Polar uses necessary security and session cookies to authenticate your transaction, process payments, and protect against fraudulent card usage. These cookies are governed by Polar&apos;s privacy and security policies.</P>
       </Section>
 
       <Section title="5. How to Manage Cookies">

@@ -62,7 +62,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: checkout.url });
   } catch (error: unknown) {
-    const errMessage = error instanceof Error ? error.message : "Internal error";
+    const errMessage =
+      error instanceof Error ? error.message : "Internal error";
     console.error("Polar checkout session creation error:", error);
     return NextResponse.json(
       { error: `Checkout error: ${errMessage}` },

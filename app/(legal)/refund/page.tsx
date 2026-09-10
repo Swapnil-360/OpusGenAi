@@ -71,26 +71,26 @@ export default function RefundPolicyPage() {
           Refund Policy
         </h1>
         <p className="text-sm" style={{ color: S.muted }}>
-          Last updated: August 4, 2026 &nbsp;·&nbsp; Effective: August 4, 2026
+          Last updated: September 10, 2026 &nbsp;·&nbsp; Effective: September 10, 2026
         </p>
       </div>
 
-      <InfoBox color="green" title="Nothing to refund today">
-        <p>OpusGen AI is currently Free-tier only — we do not collect payment information or charge anyone. Paid plans (Basic and Pro) are announced on our pricing page but are not yet available for purchase. The policy below describes how refunds will work once billing launches, and it will take effect (with advance notice) before any payment is ever collected.</p>
-      </InfoBox>
+      <div className="p-5 rounded-2xl mb-8 text-sm leading-relaxed" style={{ background: S.glass, border: `1px solid ${S.border}`, color: S.muted }}>
+        At <strong style={{ color: "rgba(255,255,255,0.85)" }}>OpusGen AI</strong>, we want you to be completely satisfied with our service. All payments, subscriptions, and refunds are processed securely through our Merchant of Record partner, <strong style={{ color: "rgba(255,255,255,0.85)" }}>Polar Software Inc.</strong> This policy explains your options regarding subscriptions, renewals, cancellations, and credit refunds.
+      </div>
 
       {/* Quick summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-12 mt-3">
-        <InfoBox color="green" title="✓ Will be eligible for refund">
-          <p>Billing errors · Duplicate charges · Technical failures preventing service use · First-time subscribers within 7 days</p>
+        <InfoBox color="green" title="✓ Eligible for refund">
+          <p>First-time subscribers within 7 days · Billing errors · Duplicate charges · Sustained technical outages</p>
         </InfoBox>
-        <InfoBox color="red" title="✗ Will not be eligible for refund">
-          <p>Used credits · Partially used subscription periods · Change of mind after use · Violating our Terms of Service</p>
+        <InfoBox color="red" title="✗ Non-refundable">
+          <p>Used credits · Mid-cycle cancellations after 7 days · Change of mind on renewals · Account terminations for Terms violations</p>
         </InfoBox>
       </div>
 
       <Section title="1. Subscription Refunds">
-        <P>Once paid plans launch, OpusGen AI intends to offer monthly subscription plans (Basic and Pro, priced as shown on our pricing page at that time). The following will apply from that point on:</P>
+        <P>OpusGen AI offers monthly subscription plans (Basic at $9.99/mo and Pro at $29/mo). The following terms apply to all active subscriptions:</P>
 
         <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>7-day satisfaction guarantee (first-time subscribers):</strong> If you are a first-time subscriber to a paid plan and are not satisfied with the Service, you may request a full refund within 7 days of your initial payment. This applies to your first subscription charge only.</P>
 
@@ -137,7 +137,7 @@ export default function RefundPolicyPage() {
           "Step 3: Our team will review your request and respond within 3 business days.",
           "Step 4: Approved refunds are processed back to your original payment method within 5–10 business days.",
         ]} />
-        <P>Once billing is live, approved refunds will be processed through our payment processor and will appear on your statement as a reversal of the original charge. Processing times may vary depending on your bank or card issuer.</P>
+        <P>Approved refunds are processed through Polar back to your original payment method and will appear on your statement as a reversal of the original charge. Processing times typically range from 5–10 business days depending on your bank or card issuer.</P>
       </Section>
 
       <Section title="6. Chargebacks">

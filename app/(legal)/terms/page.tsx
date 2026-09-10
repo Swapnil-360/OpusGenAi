@@ -58,7 +58,7 @@ export default function TermsPage() {
           Terms of Service
         </h1>
         <p className="text-sm" style={{ color: S.muted }}>
-          Last updated: August 4, 2026 &nbsp;·&nbsp; Effective: August 4, 2026
+          Last updated: September 10, 2026 &nbsp;·&nbsp; Effective: September 10, 2026
         </p>
       </div>
 
@@ -95,10 +95,12 @@ export default function TermsPage() {
         <P>Optional two-factor authentication (TOTP, via an authenticator app) is available from Account → Security. We strongly recommend enabling it.</P>
       </Section>
 
-      <Section title="4. Credits and Plans">
+      <Section title="4. Credits, Subscriptions, and Billing">
         <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Credits system:</strong> The Service operates on a credit-based system. Each generation or tool usage consumes a defined number of credits based on the operation performed. Credits are non-transferable between accounts.</P>
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Current plan:</strong> The Service is currently available on a Free tier only (10 credits upon registration, standard quality, JPG download). Paid plans (Basic and Pro) are announced on our pricing page but are <strong style={{ color: "rgba(255,255,255,0.88)" }}>not yet available for purchase</strong> — no payment is collected or processed at this time.</P>
-        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>When billing launches:</strong> Once paid plans go live, they will be billed monthly in advance through a PCI-compliant payment processor, and we will update these Terms (and our <a href="/refund" style={{ color: S.red }}>Refund Policy</a>) with the applicable billing, refund, and cancellation terms before any charges begin. Unused monthly credits will not roll over between billing cycles; one-time credit packs, if introduced, will not expire.</P>
+        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Plans and tiers:</strong> We offer a Free tier (with initial trial credits) as well as paid monthly subscription tiers (Basic and Pro), each with specified monthly credit allowances and feature access as described on our pricing page.</P>
+        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Merchant of Record &amp; Payment Processing:</strong> Payments, subscriptions, sales taxes, and VAT are handled securely by our Merchant of Record and payment gateway partner, <strong style={{ color: "rgba(255,255,255,0.88)" }}>Polar Software Inc.</strong> By purchasing a subscription, you also agree to Polar&apos;s Terms of Service. OpusGen AI does not collect or store sensitive payment card details.</P>
+        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Recurring billing &amp; Renewal:</strong> Paid subscriptions are billed automatically in advance on a recurring monthly basis. Each successful renewal automatically refreshes your monthly plan credits. You are responsible for maintaining valid payment information.</P>
+        <P><strong style={{ color: "rgba(255,255,255,0.88)" }}>Cancellation:</strong> You may cancel your subscription at any time through the customer billing portal accessible in your Account Settings. Upon cancellation, your subscription remains active until the end of your current paid billing period, and no further renewal charges will occur. For refund conditions, please review our <a href="/refund" style={{ color: S.red }}>Refund Policy</a>.</P>
       </Section>
 
       <Section title="5. Acceptable Use Policy">

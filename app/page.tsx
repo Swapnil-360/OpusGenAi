@@ -151,10 +151,14 @@ function SpinBorder({
 }) {
   return (
     <motion.div
-      className={cn("relative rounded-2xl overflow-hidden group/spin", className)}
+      className={cn(
+        "relative rounded-2xl overflow-hidden group/spin",
+        className,
+      )}
       style={{ padding: "1.5px" }}
       whileHover={{
-        boxShadow: "0 0 28px rgba(220,38,38,0.35), 0 0 60px rgba(220,38,38,0.12)",
+        boxShadow:
+          "0 0 28px rgba(220,38,38,0.35), 0 0 60px rgba(220,38,38,0.12)",
       }}
       transition={{ duration: 0.3 }}
     >
@@ -241,7 +245,12 @@ function OrbitCard({
       transition={{ type: "spring", stiffness: 340, damping: 22 }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} loading="lazy" className="w-full h-full object-cover" />
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        className="w-full h-full object-cover"
+      />
       <div
         className="absolute inset-0"
         style={{
@@ -281,19 +290,39 @@ function PricingCard({
 
   // per-tier accent colors
   const A = isPro
-    ? { bg: "rgba(220,38,38,0.15)", border: "rgba(220,38,38,0.3)", text: "#f87171", line: "rgba(220,38,38,0.5)" }
+    ? {
+        bg: "rgba(220,38,38,0.15)",
+        border: "rgba(220,38,38,0.3)",
+        text: "#f87171",
+        line: "rgba(220,38,38,0.5)",
+      }
     : isBasic
-    ? { bg: "rgba(56,189,248,0.1)", border: "rgba(56,189,248,0.3)", text: "#38bdf8", line: "rgba(56,189,248,0.5)" }
-    : { bg: "transparent", border: "rgba(255,255,255,0.07)", text: "rgba(255,255,255,0.35)", line: "transparent" };
+      ? {
+          bg: "rgba(56,189,248,0.1)",
+          border: "rgba(56,189,248,0.3)",
+          text: "#38bdf8",
+          line: "rgba(56,189,248,0.5)",
+        }
+      : {
+          bg: "transparent",
+          border: "rgba(255,255,255,0.07)",
+          text: "rgba(255,255,255,0.35)",
+          line: "transparent",
+        };
 
   const cardBg = isPro
     ? "linear-gradient(160deg, rgba(180,15,15,0.16) 0%, rgba(8,2,2,0.98) 55%)"
     : isBasic
-    ? "linear-gradient(160deg, rgba(56,189,248,0.1) 0%, rgba(8,2,2,0.98) 55%)"
-    : "rgba(255,255,255,0.02)";
+      ? "linear-gradient(160deg, rgba(56,189,248,0.1) 0%, rgba(8,2,2,0.98) 55%)"
+      : "rgba(255,255,255,0.02)";
 
   const savings = plan.originalPrice ? plan.originalPrice - plan.price : 0;
-  const G = { bg: "rgba(34,197,94,0.14)", border: "rgba(34,197,94,0.35)", text: "#4ade80", line: "rgba(34,197,94,0.5)" };
+  const G = {
+    bg: "rgba(34,197,94,0.14)",
+    border: "rgba(34,197,94,0.35)",
+    text: "#4ade80",
+    line: "rgba(34,197,94,0.5)",
+  };
 
   const inner = (
     <div className="relative overflow-hidden" style={{ background: cardBg }}>
@@ -301,7 +330,9 @@ function PricingCard({
       {(isPro || isBasic || isCurrent) && (
         <div
           className="absolute top-0 left-0 right-0 h-px pointer-events-none"
-          style={{ background: `linear-gradient(to right, transparent, ${isCurrent ? G.line : A.line}, transparent)` }}
+          style={{
+            background: `linear-gradient(to right, transparent, ${isCurrent ? G.line : A.line}, transparent)`,
+          }}
         />
       )}
 
@@ -310,7 +341,11 @@ function PricingCard({
         {isCurrent ? (
           <span
             className="self-start mb-2 sm:mb-5 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1 flex items-center gap-1 sm:gap-1.5"
-            style={{ background: G.bg, border: `1px solid ${G.border}`, color: G.text }}
+            style={{
+              background: G.bg,
+              border: `1px solid ${G.border}`,
+              color: G.text,
+            }}
           >
             <Check className="w-2 h-2 sm:w-3 sm:h-3" />
             <span className="hidden sm:inline">Current plan</span>
@@ -319,7 +354,11 @@ function PricingCard({
         ) : isPro ? (
           <span
             className="self-start mb-2 sm:mb-5 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1"
-            style={{ background: A.bg, border: `1px solid ${A.border}`, color: A.text }}
+            style={{
+              background: A.bg,
+              border: `1px solid ${A.border}`,
+              color: A.text,
+            }}
           >
             <span className="hidden sm:inline">Most popular</span>
             <span className="sm:hidden">Popular</span>
@@ -327,7 +366,11 @@ function PricingCard({
         ) : isBasic ? (
           <span
             className="self-start mb-2 sm:mb-5 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1"
-            style={{ background: A.bg, border: `1px solid ${A.border}`, color: A.text }}
+            style={{
+              background: A.bg,
+              border: `1px solid ${A.border}`,
+              color: A.text,
+            }}
           >
             <span className="hidden sm:inline">Best value</span>
             <span className="sm:hidden">Value</span>
@@ -336,19 +379,29 @@ function PricingCard({
 
         {/* Price */}
         <div className="mb-2 sm:mb-6">
-          <p className="text-[8px] sm:text-xs font-semibold uppercase tracking-wider mb-1 sm:mb-2" style={{ color: "rgba(255,255,255,0.52)" }}>
+          <p
+            className="text-[8px] sm:text-xs font-semibold uppercase tracking-wider mb-1 sm:mb-2"
+            style={{ color: "rgba(255,255,255,0.52)" }}
+          >
             {plan.name}
           </p>
 
           {/* Original price — hidden on mobile */}
           {plan.originalPrice && (
             <div className="hidden sm:flex items-center gap-2 mb-1.5">
-              <span className="text-sm line-through" style={{ color: "rgba(255,255,255,0.40)" }}>
+              <span
+                className="text-sm line-through"
+                style={{ color: "rgba(255,255,255,0.40)" }}
+              >
                 ${plan.originalPrice}/mo
               </span>
               <span
                 className="text-[10px] font-black px-2 py-0.5 rounded-full"
-                style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80", border: "1px solid rgba(34,197,94,0.25)" }}
+                style={{
+                  background: "rgba(34,197,94,0.15)",
+                  color: "#4ade80",
+                  border: "1px solid rgba(34,197,94,0.25)",
+                }}
               >
                 Save ${savings}
               </span>
@@ -360,19 +413,33 @@ function PricingCard({
               {plan.price === 0 ? "Free" : `$${plan.price}`}
             </p>
             {plan.price > 0 && (
-              <span className="text-[9px] sm:text-sm mb-0.5 sm:mb-1" style={{ color: "rgba(255,255,255,0.52)" }}>/mo</span>
+              <span
+                className="text-[9px] sm:text-sm mb-0.5 sm:mb-1"
+                style={{ color: "rgba(255,255,255,0.52)" }}
+              >
+                /mo
+              </span>
             )}
           </div>
-          <p className="text-[9px] sm:text-xs font-medium mt-1 sm:mt-2" style={{ color: `${A.text}88` }}>
+          <p
+            className="text-[9px] sm:text-xs font-medium mt-1 sm:mt-2"
+            style={{ color: `${A.text}88` }}
+          >
             <span className="sm:hidden">{plan.credits} cr.</span>
-            <span className="hidden sm:inline">{plan.credits} credits included</span>
+            <span className="hidden sm:inline">
+              {plan.credits} credits included
+            </span>
           </p>
         </div>
 
         {/* Features — hidden on mobile */}
         <ul className="hidden sm:block space-y-2.5 mb-7 flex-1">
           {plan.features.slice(0, isPro ? 5 : 4).map((f) => (
-            <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: "rgba(255,255,255,0.48)" }}>
+            <li
+              key={f}
+              className="flex items-center gap-2.5 text-sm"
+              style={{ color: "rgba(255,255,255,0.48)" }}
+            >
               <div
                 className="w-4 h-4 rounded-full flex items-center justify-center shrink-0"
                 style={{ background: A.bg, border: `1px solid ${A.border}` }}
@@ -388,7 +455,11 @@ function PricingCard({
         {isCurrent ? (
           <div
             className="w-full h-7 sm:h-11 rounded-lg sm:rounded-xl text-[9px] sm:text-sm font-bold flex items-center justify-center gap-1 sm:gap-2 cursor-default"
-            style={{ border: `1px solid ${G.border}`, background: G.bg, color: G.text }}
+            style={{
+              border: `1px solid ${G.border}`,
+              background: G.bg,
+              color: G.text,
+            }}
           >
             <Check className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="sm:hidden">Active</span>
@@ -403,14 +474,44 @@ function PricingCard({
             className="w-full h-7 sm:h-11 rounded-lg sm:rounded-xl text-[9px] sm:text-sm font-bold transition-all flex items-center justify-center gap-2"
             style={
               isPro
-                ? { background: "#dc2626", color: "#fff", boxShadow: "0 0 20px rgba(220,38,38,0.28)" }
+                ? {
+                    background: "#dc2626",
+                    color: "#fff",
+                    boxShadow: "0 0 20px rgba(220,38,38,0.28)",
+                  }
                 : isBasic
-                ? { background: "#0ea5e9", color: "#fff", boxShadow: "0 0 20px rgba(56,189,248,0.25)" }
-                : { border: "1px solid rgba(255,255,255,0.09)", background: "rgba(255,255,255,0.04)", color: "rgba(255,255,255,0.7)" }
+                  ? {
+                      background: "#0ea5e9",
+                      color: "#fff",
+                      boxShadow: "0 0 20px rgba(56,189,248,0.25)",
+                    }
+                  : {
+                      border: "1px solid rgba(255,255,255,0.09)",
+                      background: "rgba(255,255,255,0.04)",
+                      color: "rgba(255,255,255,0.7)",
+                    }
             }
           >
             {loading ? (
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+              <svg
+                className="animate-spin h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
             ) : (
               <>
                 <span className="sm:hidden">{plan.cta.split(" ")[0]}</span>
@@ -447,10 +548,19 @@ function PricingCard({
         className="relative rounded-2xl overflow-hidden"
         style={
           isCurrent
-            ? { border: `1px solid ${G.border}`, boxShadow: "0 0 28px rgba(34,197,94,0.12)" }
+            ? {
+                border: `1px solid ${G.border}`,
+                boxShadow: "0 0 28px rgba(34,197,94,0.12)",
+              }
             : isBasic
-            ? { border: `1px solid ${A.border}`, boxShadow: "0 0 28px rgba(56,189,248,0.1)" }
-            : { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)" }
+              ? {
+                  border: `1px solid ${A.border}`,
+                  boxShadow: "0 0 28px rgba(56,189,248,0.1)",
+                }
+              : {
+                  background: "rgba(255,255,255,0.025)",
+                  border: "1px solid rgba(255,255,255,0.07)",
+                }
         }
       >
         {inner}
@@ -492,7 +602,9 @@ export default function LandingPage() {
       return;
     }
     if (!authUser) {
-      router.push(`/signup?plan=${planId}&redirectTo=${encodeURIComponent(`/account?checkout_plan=${planId}`)}`);
+      router.push(
+        `/signup?plan=${planId}&redirectTo=${encodeURIComponent(`/account?checkout_plan=${planId}`)}`,
+      );
       return;
     }
     setLoadingPlan(planId);
@@ -511,17 +623,27 @@ export default function LandingPage() {
     }
   }
 
-  const { templates: ALL_TEMPLATES, loading: templatesLoading, error: templatesError, refetch: refetchTemplates } = useTemplates();
+  const {
+    templates: ALL_TEMPLATES,
+    loading: templatesLoading,
+    error: templatesError,
+    refetch: refetchTemplates,
+  } = useTemplates();
   // Video templates get their own section (they're motion prompts, and their
   // preview is a clip rather than a still); the image-template carousel below
   // covers everything else.
-  const VIDEO_TEMPLATES = ALL_TEMPLATES.filter((t) => t.templateType === "video");
-  const IMAGE_TEMPLATES = ALL_TEMPLATES.filter((t) => t.templateType !== "video");
+  const VIDEO_TEMPLATES = ALL_TEMPLATES.filter(
+    (t) => t.templateType === "video",
+  );
+  const IMAGE_TEMPLATES = ALL_TEMPLATES.filter(
+    (t) => t.templateType !== "video",
+  );
   // Video templates are now one per product category (cosmetics, skincare,
   // sneakers, ...) rather than a style axis, so the category itself is worth
   // surfacing on the card — this is what turns the raw "sneakers" id into
   // the "Sneakers" label shown below.
-  const videoCategoryLabel = (id: string) => VIDEO_CATEGORIES.find((c) => c.id === id)?.label ?? id;
+  const videoCategoryLabel = (id: string) =>
+    VIDEO_CATEGORIES.find((c) => c.id === id)?.label ?? id;
   const { images: heroImages } = useHeroImages(8);
   const orbitAngle = useMotionValue(0);
   useAnimationFrame((t) => {
@@ -634,14 +756,20 @@ export default function LandingPage() {
                     style={{ boxShadow: "0 0 32px rgba(220,38,38,0.32)" }}
                   >
                     {authUser ? "Open Studio" : "Get Started"}
-                    <span className="flex items-center justify-center w-9 h-9 rounded-full transition-colors" style={{ background: "rgba(255,255,255,0.18)" }}>
+                    <span
+                      className="flex items-center justify-center w-9 h-9 rounded-full transition-colors"
+                      style={{ background: "rgba(255,255,255,0.18)" }}
+                    >
                       <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                     </span>
                   </motion.button>
                 </Link>
                 <Link href="#templates">
                   <motion.button
-                    whileHover={{ scale: 1.02, borderColor: "rgba(255,255,255,0.22)" }}
+                    whileHover={{
+                      scale: 1.02,
+                      borderColor: "rgba(255,255,255,0.22)",
+                    }}
                     whileTap={{ scale: 0.97 }}
                     className="flex items-center gap-2.5 h-13 px-6 rounded-full font-medium transition-all text-[15px]"
                     style={{
@@ -680,70 +808,78 @@ export default function LandingPage() {
             >
               {/* Responsive container — clips/scales the 480×480 orbital */}
               <div className="relative w-64 h-64 sm:w-80 sm:h-80 lg:w-[480px] lg:h-[480px]">
-              <div
-                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 scale-[0.53] sm:scale-[0.67] lg:scale-100 origin-center"
-                style={{ width: 480, height: 480 }}
-              >
-                {/* Radial ambient glow */}
                 <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    background:
-                      "radial-gradient(ellipse at center, rgba(210,22,22,0.42) 0%, rgba(160,8,8,0.14) 40%, transparent 70%)",
-                    filter: "blur(55px)",
-                  }}
-                />
+                  className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 scale-[0.53] sm:scale-[0.67] lg:scale-100 origin-center"
+                  style={{ width: 480, height: 480 }}
+                >
+                  {/* Radial ambient glow */}
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background:
+                        "radial-gradient(ellipse at center, rgba(210,22,22,0.42) 0%, rgba(160,8,8,0.14) 40%, transparent 70%)",
+                      filter: "blur(55px)",
+                    }}
+                  />
 
-                {/* Subtle orbit ring */}
-                <div
-                  className="absolute rounded-full pointer-events-none"
-                  style={{
-                    width: 356,
-                    height: 356,
-                    left: "50%",
-                    top: "50%",
-                    marginLeft: -178,
-                    marginTop: -178,
-                    border: "1px solid rgba(220,38,38,0.09)",
-                  }}
-                />
+                  {/* Subtle orbit ring */}
+                  <div
+                    className="absolute rounded-full pointer-events-none"
+                    style={{
+                      width: 356,
+                      height: 356,
+                      left: "50%",
+                      top: "50%",
+                      marginLeft: -178,
+                      marginTop: -178,
+                      border: "1px solid rgba(220,38,38,0.09)",
+                    }}
+                  />
 
-                {/* Orbiting cards — real template photos (admin-configurable:
+                  {/* Orbiting cards — real template photos (admin-configurable:
                     random from templates, specific templates, or uploaded
                     custom photos — see useHeroImages). */}
-                {heroImages.map((img, i) => (
-                  <OrbitCard
-                    key={img.src}
-                    src={img.src}
-                    alt={img.alt}
-                    rotation={HERO_ROTATIONS[i % HERO_ROTATIONS.length]}
-                    orbitAngle={orbitAngle}
-                    offset={(i * 360) / heroImages.length}
-                  />
-                ))}
+                  {heroImages.map((img, i) => (
+                    <OrbitCard
+                      key={img.src}
+                      src={img.src}
+                      alt={img.alt}
+                      rotation={HERO_ROTATIONS[i % HERO_ROTATIONS.length]}
+                      orbitAngle={orbitAngle}
+                      offset={(i * 360) / heroImages.length}
+                    />
+                  ))}
 
-                {/* Center branding */}
-                <motion.div
-                  className="absolute z-20 flex items-center justify-center rounded-full cursor-pointer"
-                  style={{
-                    width: 96,
-                    height: 96,
-                    left: "50%",
-                    top: "50%",
-                    marginLeft: -48,
-                    marginTop: -48,
-                    filter: "drop-shadow(0 0 0px transparent)",
-                  }}
-                  whileHover={{
-                    scale: 1.18,
-                    filter: "drop-shadow(0 0 18px rgba(251,146,60,0.7)) drop-shadow(0 0 36px rgba(220,38,38,0.4))",
-                  }}
-                  transition={{ type: "spring", stiffness: 320, damping: 22 }}
-                >
-                  <Image src="/logo/OpusGenAi(white).png" alt="OpusGen AI" width={96} height={96} className="object-contain" />
-                </motion.div>
+                  {/* Center branding */}
+                  <motion.div
+                    className="absolute z-20 flex items-center justify-center rounded-full cursor-pointer"
+                    style={{
+                      width: 96,
+                      height: 96,
+                      left: "50%",
+                      top: "50%",
+                      marginLeft: -48,
+                      marginTop: -48,
+                      filter: "drop-shadow(0 0 0px transparent)",
+                    }}
+                    whileHover={{
+                      scale: 1.18,
+                      filter:
+                        "drop-shadow(0 0 18px rgba(251,146,60,0.7)) drop-shadow(0 0 36px rgba(220,38,38,0.4))",
+                    }}
+                    transition={{ type: "spring", stiffness: 320, damping: 22 }}
+                  >
+                    <Image
+                      src="/logo/OpusGenAi(white).png"
+                      alt="OpusGen AI"
+                      width={96}
+                      height={96}
+                      className="object-contain"
+                    />
+                  </motion.div>
+                </div>
               </div>
-              </div>{/* end responsive container */}
+              {/* end responsive container */}
             </motion.div>
           </div>
         </section>
@@ -752,11 +888,26 @@ export default function LandingPage() {
         <div className="px-4 sm:px-6 py-8 md:py-10">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center gap-4 mb-5">
-              <div className="h-px flex-1" style={{ background: "linear-gradient(to right, transparent, rgba(255,255,255,0.14))" }} />
-              <p className="text-[10px] font-bold uppercase tracking-[0.25em] shrink-0" style={{ color: "rgba(255,255,255,0.38)" }}>
+              <div
+                className="h-px flex-1"
+                style={{
+                  background:
+                    "linear-gradient(to right, transparent, rgba(255,255,255,0.14))",
+                }}
+              />
+              <p
+                className="text-[10px] font-bold uppercase tracking-[0.25em] shrink-0"
+                style={{ color: "rgba(255,255,255,0.38)" }}
+              >
                 Platform Capabilities
               </p>
-              <div className="h-px flex-1" style={{ background: "linear-gradient(to left, transparent, rgba(255,255,255,0.14))" }} />
+              <div
+                className="h-px flex-1"
+                style={{
+                  background:
+                    "linear-gradient(to left, transparent, rgba(255,255,255,0.14))",
+                }}
+              />
             </div>
 
             {/* Single frosted-glass capsule (was a row of individually-boxed
@@ -771,7 +922,8 @@ export default function LandingPage() {
                 border: "1px solid rgba(255,255,255,0.10)",
                 backdropFilter: "blur(20px)",
                 WebkitBackdropFilter: "blur(20px)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07), 0 16px 40px rgba(0,0,0,0.35)",
+                boxShadow:
+                  "inset 0 1px 0 rgba(255,255,255,0.07), 0 16px 40px rgba(0,0,0,0.35)",
               }}
             >
               {/* Left & right smooth fade mask so text gracefully fades before reaching the rounded border */}
@@ -787,17 +939,30 @@ export default function LandingPage() {
                 <motion.div
                   className="flex whitespace-nowrap items-center"
                   animate={{ x: "-50%" }}
-                  transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
+                  transition={{
+                    duration: 26,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
                 >
                   {[...CAPABILITIES, ...CAPABILITIES].map((cap, i) => (
-                    <div key={i} className="flex items-center gap-3 px-6 sm:px-8 shrink-0">
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 px-6 sm:px-8 shrink-0"
+                    >
                       <span
                         className="w-1.5 h-1.5 rounded-full shrink-0"
-                        style={{ backgroundColor: "#f87171", boxShadow: "0 0 8px rgba(248,113,113,0.85)" }}
+                        style={{
+                          backgroundColor: "#f87171",
+                          boxShadow: "0 0 8px rgba(248,113,113,0.85)",
+                        }}
                       />
                       <span
                         className="text-xs sm:text-[13px] font-semibold tracking-wider uppercase leading-none"
-                        style={{ color: "rgba(255,255,255,0.72)", letterSpacing: "0.07em" }}
+                        style={{
+                          color: "rgba(255,255,255,0.72)",
+                          letterSpacing: "0.07em",
+                        }}
                       >
                         {cap}
                       </span>
@@ -810,7 +975,10 @@ export default function LandingPage() {
         </div>
 
         {/* ══ VIDEO TEMPLATES ══════════════════════════════════════════════════ */}
-        <section id="video-templates" className="py-10 md:py-16 lg:py-20 px-4 sm:px-6">
+        <section
+          id="video-templates"
+          className="py-10 md:py-16 lg:py-20 px-4 sm:px-6"
+        >
           <div className="max-w-7xl mx-auto">
             <FadeIn>
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-6 md:mb-10">
@@ -862,9 +1030,17 @@ export default function LandingPage() {
                   <Link
                     href={`/templates?type=video&template=${tpl.id}`}
                     className="group block rounded-2xl overflow-hidden h-full transition-all"
-                    style={{ border: "1px solid rgba(255,255,255,0.08)", background: "#140505" }}
+                    style={{
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      background: "#140505",
+                    }}
                   >
-                    <div className="relative aspect-video overflow-hidden" style={{ background: `linear-gradient(150deg, ${tpl.accentColor}26 0%, #0d0303 85%)` }}>
+                    <div
+                      className="relative aspect-video overflow-hidden"
+                      style={{
+                        background: `linear-gradient(150deg, ${tpl.accentColor}26 0%, #0d0303 85%)`,
+                      }}
+                    >
                       {tpl.previewVideoUrl ? (
                         // Always playing, not hover-to-play — a visitor should see the
                         // actual motion output without having to discover a hover
@@ -873,23 +1049,39 @@ export default function LandingPage() {
                         <video
                           src={tpl.previewVideoUrl}
                           poster={tpl.coverImageUrl ?? undefined}
-                          autoPlay muted loop playsInline preload="auto"
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          preload="auto"
                           className="w-full h-full object-cover"
                         />
                       ) : tpl.coverImageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={tpl.coverImageUrl} alt={tpl.name} className="w-full h-full object-cover" />
+                        <img
+                          src={tpl.coverImageUrl}
+                          alt={tpl.name}
+                          className="w-full h-full object-cover"
+                        />
                       ) : null}
                       <span
                         className="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
-                        style={{ background: "rgba(0,0,0,0.65)", color: "white", border: `1px solid ${tpl.accentColor}66` }}
+                        style={{
+                          background: "rgba(0,0,0,0.65)",
+                          color: "white",
+                          border: `1px solid ${tpl.accentColor}66`,
+                        }}
                       >
                         {videoCategoryLabel(tpl.category)}
                       </span>
                       {tpl.isPro && (
                         <span
                           className="absolute top-2 right-2 text-[9px] font-black px-1.5 py-0.5 rounded-full"
-                          style={{ background: "rgba(0,0,0,0.7)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.4)" }}
+                          style={{
+                            background: "rgba(0,0,0,0.7)",
+                            color: "#fbbf24",
+                            border: "1px solid rgba(251,191,36,0.4)",
+                          }}
                         >
                           PRO
                         </span>
@@ -897,7 +1089,10 @@ export default function LandingPage() {
                     </div>
                     <div className="p-3">
                       <p className="text-sm font-bold mb-0.5">{tpl.name}</p>
-                      <p className="text-[11px] leading-snug" style={{ color: "rgba(255,255,255,0.45)" }}>
+                      <p
+                        className="text-[11px] leading-snug"
+                        style={{ color: "rgba(255,255,255,0.45)" }}
+                      >
                         {tpl.description}
                       </p>
                     </div>
@@ -936,7 +1131,10 @@ export default function LandingPage() {
                 <div className="flex items-center justify-center h-56 sm:h-72 lg:h-80">
                   <div
                     className="w-6 h-6 rounded-full animate-spin"
-                    style={{ border: "2px solid rgba(255,255,255,0.15)", borderTopColor: "#f87171" }}
+                    style={{
+                      border: "2px solid rgba(255,255,255,0.15)",
+                      borderTopColor: "#f87171",
+                    }}
                   />
                 </div>
               ) : IMAGE_TEMPLATES.length > 0 ? (
@@ -954,13 +1152,26 @@ export default function LandingPage() {
                 </>
               ) : templatesError ? (
                 <div className="flex flex-col items-center justify-center gap-3 h-56 sm:h-72 lg:h-80">
-                  <p className="text-sm" style={{ color: "rgba(255,255,255,0.45)" }}>Couldn&apos;t load templates.</p>
+                  <p
+                    className="text-sm"
+                    style={{ color: "rgba(255,255,255,0.45)" }}
+                  >
+                    Couldn&apos;t load templates.
+                  </p>
                   <button
                     onClick={refetchTemplates}
                     className="text-xs font-semibold px-4 py-2 rounded-lg transition-all"
-                    style={{ border: "1px solid rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.75)" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                    style={{
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      color: "rgba(255,255,255,0.75)",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background =
+                        "rgba(255,255,255,0.06)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "transparent";
+                    }}
                   >
                     Try again
                   </button>
@@ -994,7 +1205,13 @@ export default function LandingPage() {
                 <FadeIn
                   key={plan.id}
                   delay={i * 0.09}
-                  className={plan.highlight ? "sm:-my-8" : plan.id === "basic" ? "sm:-my-4" : ""}
+                  className={
+                    plan.highlight
+                      ? "sm:-my-8"
+                      : plan.id === "basic"
+                        ? "sm:-my-4"
+                        : ""
+                  }
                 >
                   <PricingCard
                     plan={plan}

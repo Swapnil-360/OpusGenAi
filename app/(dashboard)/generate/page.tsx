@@ -68,16 +68,6 @@ type SizePreset = (typeof SIZE_PRESETS)[number];
 
 const AI_ACTIONS = [
   {
-    icon: Wand2,
-    label: "Improve Prompt",
-    desc: "Auto-enhance with studio lighting & details",
-  },
-  {
-    icon: Sparkles,
-    label: "Edit With AI",
-    desc: "Quick custom AI edits to your prompt",
-  },
-  {
     icon: ScanText,
     label: "Describe Image",
     desc: "Upload a photo and let AI write the prompt",
@@ -1208,10 +1198,6 @@ function GeneratePageInner() {
                                   ];
                                 setPrompt(pick);
                                 toast.success("Random prompt applied!");
-                              } else if (label === "Improve Prompt") {
-                                improvePrompt();
-                              } else if (label === "Edit With AI") {
-                                setShowAiEditor(true);
                               } else if (label === "Describe Image") {
                                 describeFileInputRef.current?.click();
                               }
@@ -1240,9 +1226,7 @@ function GeneratePageInner() {
                                 className="text-[10px]"
                                 style={{ color: W.muted }}
                               >
-                                {label === "Improve Prompt" && refFile
-                                  ? "Analyzes your photo + prompt"
-                                  : desc}
+                                {desc}
                               </p>
                             </div>
                           </DropdownMenuItem>

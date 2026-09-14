@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     const output = (result.data as { output?: string })?.output?.trim();
     if (!output) {
-      return NextResponse.json({ error: "Couldn't improve the prompt. Try again." }, { status: 502 });
+      return NextResponse.json({ error: "Couldn't generate prompt. Try again." }, { status: 502 });
     }
 
     return NextResponse.json({ prompt: output });

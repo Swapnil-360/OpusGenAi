@@ -12,9 +12,9 @@ const S = {
   border: "rgba(255,255,255,0.09)",
   glass: "rgba(255,255,255,0.05)",
   glassDim: "rgba(255,255,255,0.03)",
-  muted: "rgba(255,255,255,0.45)",
-  dim: "rgba(255,255,255,0.28)",
-  text: "rgba(255,255,255,0.88)",
+  muted: "rgba(255,255,255,0.68)",
+  dim: "rgba(255,255,255,0.55)",
+  text: "rgba(255,255,255,0.92)",
 };
 
 interface ToolPageShellProps {
@@ -149,7 +149,7 @@ export function UploadZone({ label = "Drop image here", preview, onUpload, onRem
           <ImageUp className={compact ? "w-4 h-4" : "w-7 h-7"} style={{ color: isDragging ? accentColor : S.muted }} />
         </div>
         <p className={cn("font-semibold", compact ? "text-xs mb-0.5" : "text-sm mb-1")} style={{ color: S.text }}>{isDragging ? "Drop it here" : label}</p>
-        <p className={compact ? "text-[10px]" : "text-xs"} style={{ color: S.muted }}>
+        <p className="text-xs" style={{ color: S.muted }}>
           {compact ? "or click to browse" : "or click to browse · JPG, PNG, WebP"}
         </p>
       </motion.div>

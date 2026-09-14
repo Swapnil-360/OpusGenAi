@@ -20,9 +20,9 @@ function FacebookIcon({ className }: { className?: string }) {
 }
 
 const W = {
-  text: "rgba(255,255,255,0.88)",
-  muted: "rgba(255,255,255,0.45)",
-  dim: "rgba(255,255,255,0.42)",
+  text: "rgba(255,255,255,0.92)",
+  muted: "rgba(255,255,255,0.72)",
+  dim: "rgba(255,255,255,0.65)",
   border: "rgba(255,255,255,0.07)",
   glass: "rgba(255,255,255,0.04)",
   glassMid: "rgba(255,255,255,0.06)",
@@ -281,6 +281,7 @@ export function LandingFooter() {
                 style={{ color: W.dim }}
                 onMouseEnter={(e) => {
                   (e.currentTarget as HTMLAnchorElement).style.color = W.muted;
+                  (e.currentTarget as HTMLAnchorElement).style.color = W.text;
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLAnchorElement).style.color = W.dim;

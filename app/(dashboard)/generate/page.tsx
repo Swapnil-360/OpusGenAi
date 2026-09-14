@@ -17,6 +17,7 @@ import {
   ScanText,
   Sparkles,
   Wand2,
+  Loader2,
   X,
   Zap,
   Layers,
@@ -67,24 +68,75 @@ type SizePreset = (typeof SIZE_PRESETS)[number];
 
 const AI_ACTIONS = [
   {
-    icon: RefreshCw,
-    label: "Random Prompt",
-    desc: "Fill with a random product prompt",
-  },
-  {
     icon: Wand2,
     label: "Improve Prompt",
-    desc: "Enhance your prompt for better results",
+    desc: "Auto-enhance with studio lighting & details",
   },
   {
     icon: Sparkles,
     label: "Edit With AI",
-    desc: "Quick AI edits to your prompt",
+    desc: "Quick custom AI edits to your prompt",
   },
   {
     icon: ScanText,
     label: "Describe Image",
-    desc: "Upload an image and describe it",
+    desc: "Upload a photo and let AI write the prompt",
+  },
+  {
+    icon: RefreshCw,
+    label: "Random Prompt",
+    desc: "Fill with a random studio prompt",
+  },
+] as const;
+
+const AI_EDIT_STYLES = [
+  {
+    label: "Golden Hour",
+    icon: "🌅",
+    instruction:
+      "Change lighting to warm golden hour sunlight with soft long shadows",
+  },
+  {
+    label: "Moody Studio",
+    icon: "🌑",
+    instruction:
+      "Make lighting moody, high contrast, and cinematic with dark dramatic shadows",
+  },
+  {
+    label: "Clean White",
+    icon: "⚪",
+    instruction:
+      "Place on clean seamless white studio background with soft even lighting",
+  },
+  {
+    label: "Luxury Gold",
+    icon: "✨",
+    instruction:
+      "Add luxury editorial aesthetic with subtle gold foil accents and premium reflective surface",
+  },
+  {
+    label: "Botanical",
+    icon: "🌿",
+    instruction:
+      "Add fresh botanical greenery and natural plant accents in the background with soft bokeh",
+  },
+  {
+    label: "Water Droplets",
+    icon: "💧",
+    instruction:
+      "Add crisp water droplets, subtle condensation, and clean splash elements",
+  },
+  {
+    label: "Cyberpunk",
+    icon: "🏙️",
+    instruction:
+      "Add futuristic cyberpunk aesthetic with blue and magenta neon edge lighting",
+  },
+  {
+    label: "Minimalist",
+    icon: "📐",
+    instruction:
+      "Simplify scene to clean minimalist architectural aesthetic with negative space",
   },
 ] as const;
 
@@ -109,31 +161,31 @@ const ALL_PROMPTS = [
 
 const USE_CASES = [
   {
-    label: "Website / Product Page",
+    label: "Product Page",
     icon: Globe,
     prompt:
       "clean white seamless studio background, soft even lighting, minimal shadow, sharp focus, professional e-commerce product photography, centered composition",
   },
   {
-    label: "Marketplace Listing",
+    label: "Marketplace",
     icon: ShoppingBag,
     prompt:
       "pure white background, bright even studio lighting, no shadows, sharp focus, standard e-commerce marketplace listing style",
   },
   {
-    label: "Social Media Post",
+    label: "Social Post",
     icon: Heart,
     prompt:
       "warm flat surface with soft natural light, blurred simple backdrop, shallow depth of field, trendy minimal social-media aesthetic, inviting mood, no busy interior scene",
   },
   {
-    label: "Poster / Ad Banner",
+    label: "Ad Banner",
     icon: LayoutTemplate,
     prompt:
       "bold dramatic background with strong negative space for text overlay, high contrast studio lighting, cinematic advertising style",
   },
   {
-    label: "Marketing Campaign",
+    label: "Campaign",
     icon: Megaphone,
     prompt:
       "editorial advertising background, moody cinematic lighting, premium brand campaign aesthetic, shallow depth of field",
@@ -382,6 +434,91 @@ function GeneratePageInner() {
     }
   }
 
+  const [showAiEditor, setShowAiEditor] = useState(false);
+  const [aiEditInput, setAiEditInput] = useState("");
+  const describeFileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleAiEdit(customInstruction: string) {
+    const text = customInstruction.trim();
+    if (!text) {
+      toast.error("Enter an edit instruction or choose a style.");
+      return;
+    }
+    setIsEnhancing(true);
+    toast.loading("Applying AI edits…", {
+      id: "edit-progress",
+      duration: 60000,
+    });
+
+    try {
+      const res = await fetch("/api/enhance-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          instruction: text,
+          action: "edit",
+        }),
+      });
+
+      toast.dismiss("edit-progress");
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Couldn't edit the prompt. Try again.");
+        return;
+      }
+
+      const { prompt: updated } = await res.json();
+      setPrompt(updated);
+      setAiEditInput("");
+      setShowAiEditor(false);
+      toast.success("Prompt edited with AI!");
+    } catch {
+      toast.dismiss("edit-progress");
+      toast.error("Network error. Check your connection.");
+    } finally {
+      setIsEnhancing(false);
+    }
+  }
+
+  async function handleDescribeImage(file: File) {
+    setIsEnhancing(true);
+    toast.loading("Analyzing image with AI…", {
+      id: "describe-progress",
+      duration: 60000,
+    });
+
+    try {
+      const dataUrl = await fileToUploadDataUrl(file);
+      const res = await fetch("/api/enhance-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          image: dataUrl,
+          action: "describe",
+        }),
+      });
+
+      toast.dismiss("describe-progress");
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Couldn't analyze the image. Try again.");
+        return;
+      }
+
+      const { prompt: generatedPrompt } = await res.json();
+      setPrompt(generatedPrompt);
+      toast.success("Prompt generated from image!");
+    } catch {
+      toast.dismiss("describe-progress");
+      toast.error("Network error. Check your connection.");
+    } finally {
+      setIsEnhancing(false);
+    }
+  }
+
   async function handleDownload(src: string, extension: string = "png") {
     // data: URLs (product-preserving composite) download directly; remote
     // fal.media URLs (plain text-to-image, video) need fetch+blob or the
@@ -578,21 +715,25 @@ function GeneratePageInner() {
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Page header ── */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
             style={{ background: W.redBg, border: `1px solid ${W.redBorder}` }}
+            aria-hidden="true"
           >
-            <Aperture className="w-3.5 h-3.5" style={{ color: W.red }} />
+            <Aperture className="w-4 h-4" style={{ color: W.red }} />
           </div>
           <div>
             <h1
-              className="text-sm font-semibold leading-none"
+              className="text-xl sm:text-2xl font-bold tracking-tight leading-tight"
               style={{ color: W.text }}
             >
               Generate Images
             </h1>
-            <p className="text-[11px] mt-0.5" style={{ color: W.muted }}>
+            <p
+              className="text-xs sm:text-sm mt-0.5 leading-normal"
+              style={{ color: "rgba(255, 255, 255, 0.65)" }}
+            >
               AI product photography · Upload your product for AI scene
               placement (3 credits · premium)
             </p>
@@ -602,7 +743,7 @@ function GeneratePageInner() {
         {/* ── Prompt box ── */}
         <div className="relative">
           <motion.div
-            className="absolute -inset-3 rounded-3xl pointer-events-none"
+            className="absolute -inset-2 rounded-2xl pointer-events-none"
             animate={{ opacity: promptFocused ? 1 : 0 }}
             transition={{ duration: 0.4 }}
             style={{
@@ -833,111 +974,323 @@ function GeneratePageInner() {
                 maxLength={4000}
               />
 
-              <div className="flex items-center justify-between px-4 pb-3">
-                {/* Rendered via Radix's portal (DropdownMenuContent), not a
-                 * manually-positioned absolute div — this card has
-                 * overflow-hidden for its animated border glow, which was
-                 * clipping the old dropdown's top edge since it opened
-                 * upward from inside that same clipped container. */}
-                <DropdownMenu
-                  open={showAiMenu}
-                  onOpenChange={(open) => {
-                    setShowAiMenu(open);
-                    if (open) {
-                      setShowSizePicker(false);
-                      setShowTemplatePicker(false);
-                    }
-                  }}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      disabled={isEnhancing}
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium transition-all disabled:opacity-60"
-                      style={
-                        showAiMenu
-                          ? {
-                              border: `1px solid ${W.redBorder}`,
-                              background: W.redBg,
-                              color: W.red,
-                            }
-                          : {
-                              border: `1px solid ${W.border}`,
-                              background: W.glass,
-                              color: W.muted,
-                            }
-                      }
-                    >
-                      {isEnhancing ? (
-                        <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Sparkles className="w-3 h-3" />
-                      )}
-                      {isEnhancing ? "Analyzing…" : "Enhance"}
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    side="top"
-                    sideOffset={8}
-                    className="w-60 rounded-2xl p-1.5"
+              {/* ── Inline AI Prompt Editor Drawer ── */}
+              <AnimatePresence>
+                {showAiEditor && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
                     style={{
-                      background: W.card,
-                      border: `1px solid ${W.border}`,
-                      boxShadow: "0 20px 50px rgba(0,0,0,0.7)",
+                      borderTop: `1px solid ${W.border}`,
+                      background: "rgba(255, 255, 255, 0.02)",
                     }}
-                    onClick={(e) => e.stopPropagation()}
                   >
-                    {AI_ACTIONS.map(({ icon: Icon, label, desc }) => (
-                      <DropdownMenuItem
-                        key={label}
-                        disabled={isEnhancing}
-                        onSelect={() => {
-                          if (label === "Random Prompt") {
-                            const pick =
-                              ALL_PROMPTS[
-                                Math.floor(Math.random() * ALL_PROMPTS.length)
-                              ];
-                            setPrompt(pick);
-                            toast.success("Random prompt applied!");
-                          } else if (label === "Improve Prompt") {
-                            improvePrompt();
-                          } else {
-                            toast.info(`${label} — coming soon!`);
-                          }
-                        }}
-                        className="flex items-start gap-3 px-3 py-2.5 rounded-xl cursor-pointer"
-                        style={{ color: W.text }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background = W.glass)
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background = "transparent")
-                        }
-                      >
-                        <Icon
-                          className="w-3.5 h-3.5 mt-0.5 shrink-0"
-                          style={{ color: W.red }}
-                        />
-                        <div>
-                          <p
-                            className="text-[12px] font-semibold"
+                    <div className="p-3.5 space-y-3">
+                      {/* Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-5 h-5 rounded-md flex items-center justify-center"
+                            style={{ background: W.redBg }}
+                          >
+                            <Sparkles
+                              className="w-3 h-3"
+                              style={{ color: W.red }}
+                            />
+                          </div>
+                          <span
+                            className="text-xs font-semibold"
                             style={{ color: W.text }}
                           >
-                            {label}
-                          </p>
-                          <p className="text-[10px]" style={{ color: W.muted }}>
-                            {label === "Improve Prompt" && refFile
-                              ? "Analyzes your photo + prompt"
-                              : desc}
-                          </p>
+                            Edit with AI
+                          </span>
+                          <span
+                            className="text-[10px] hidden sm:inline"
+                            style={{ color: W.dim }}
+                          >
+                            Pick a style modifier or describe custom adjustments
+                          </span>
                         </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                        <button
+                          type="button"
+                          onClick={() => setShowAiEditor(false)}
+                          className="p-1 rounded-md transition-opacity opacity-60 hover:opacity-100"
+                          style={{ color: W.muted }}
+                          aria-label="Close AI editor"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Quick style pills */}
+                      <div className="space-y-1.5">
+                        <p
+                          className="text-[10px] font-bold uppercase tracking-wider"
+                          style={{ color: W.dim }}
+                        >
+                          Quick Styles
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {AI_EDIT_STYLES.map(
+                            ({ label, icon, instruction }) => (
+                              <button
+                                key={label}
+                                type="button"
+                                disabled={isEnhancing}
+                                onClick={() => handleAiEdit(instruction)}
+                                className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-[11px] font-medium transition-all disabled:opacity-50"
+                                style={{
+                                  border: `1px solid ${W.border}`,
+                                  background: W.glass,
+                                  color: W.text,
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.borderColor =
+                                    W.redBorder;
+                                  e.currentTarget.style.background = W.redBg;
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.borderColor = W.border;
+                                  e.currentTarget.style.background = W.glass;
+                                }}
+                              >
+                                <span>{icon}</span>
+                                <span>{label}</span>
+                              </button>
+                            ),
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Custom edit instruction input row */}
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="text"
+                          value={aiEditInput}
+                          onChange={(e) => setAiEditInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleAiEdit(aiEditInput);
+                            }
+                          }}
+                          placeholder="e.g. Change surface to dark marble, add water splashes, make lighting warmer…"
+                          disabled={isEnhancing}
+                          className="flex-1 h-8 px-3 rounded-lg text-xs outline-none transition-colors"
+                          style={{
+                            background: W.surface,
+                            border: `1px solid ${W.border}`,
+                            color: W.text,
+                          }}
+                        />
+                        <button
+                          type="button"
+                          disabled={isEnhancing || !aiEditInput.trim()}
+                          onClick={() => handleAiEdit(aiEditInput)}
+                          className="h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 shrink-0 transition-all disabled:opacity-40"
+                          style={{
+                            background: W.red,
+                            color: "#fff",
+                          }}
+                        >
+                          {isEnhancing ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Wand2 className="w-3 h-3" />
+                          )}
+                          <span>Apply</span>
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap px-4 pb-3">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  {/* Split Enhance Button */}
+                  <div
+                    className="flex items-center rounded-lg overflow-hidden transition-all"
+                    style={{
+                      border: `1px solid ${W.border}`,
+                      background: W.glass,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      disabled={isEnhancing}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        improvePrompt();
+                      }}
+                      className="flex items-center gap-1.5 h-7 px-2.5 text-[11px] font-medium transition-all disabled:opacity-60"
+                      style={{ color: W.muted }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = W.text;
+                        e.currentTarget.style.background = W.glassDim;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = W.muted;
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                      title="Improve prompt with AI"
+                    >
+                      {isEnhancing ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-red-500 shrink-0" />
+                      ) : (
+                        <Sparkles className="w-3 h-3 text-red-500 shrink-0" />
+                      )}
+                      <span>{isEnhancing ? "Analyzing…" : "Enhance"}</span>
+                    </button>
+
+                    <div
+                      className="w-[1px] h-3.5"
+                      style={{ background: W.border }}
+                    />
+
+                    <DropdownMenu
+                      open={showAiMenu}
+                      onOpenChange={(open) => {
+                        setShowAiMenu(open);
+                        if (open) {
+                          setShowSizePicker(false);
+                          setShowTemplatePicker(false);
+                        }
+                      }}
+                    >
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={isEnhancing}
+                          className="h-7 px-1.5 flex items-center justify-center transition-all disabled:opacity-60"
+                          style={{ color: W.dim }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = W.text;
+                            e.currentTarget.style.background = W.glassDim;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = W.dim;
+                            e.currentTarget.style.background = "transparent";
+                          }}
+                          title="More AI prompt tools"
+                          aria-label="More AI prompt tools"
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        side="bottom"
+                        sideOffset={6}
+                        avoidCollisions={true}
+                        collisionPadding={12}
+                        className="w-64 rounded-2xl p-1.5"
+                        style={{
+                          background: W.card,
+                          border: `1px solid ${W.border}`,
+                          boxShadow: "0 20px 50px rgba(0,0,0,0.7)",
+                        }}
+                      >
+                        {AI_ACTIONS.map(({ icon: Icon, label, desc }) => (
+                          <DropdownMenuItem
+                            key={label}
+                            disabled={isEnhancing}
+                            onSelect={() => {
+                              if (label === "Random Prompt") {
+                                const pick =
+                                  ALL_PROMPTS[
+                                    Math.floor(
+                                      Math.random() * ALL_PROMPTS.length,
+                                    )
+                                  ];
+                                setPrompt(pick);
+                                toast.success("Random prompt applied!");
+                              } else if (label === "Improve Prompt") {
+                                improvePrompt();
+                              } else if (label === "Edit With AI") {
+                                setShowAiEditor(true);
+                              } else if (label === "Describe Image") {
+                                describeFileInputRef.current?.click();
+                              }
+                            }}
+                            className="flex items-start gap-3 px-3 py-2.5 rounded-xl cursor-pointer"
+                            style={{ color: W.text }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background = W.glass)
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.background = "transparent")
+                            }
+                          >
+                            <Icon
+                              className="w-3.5 h-3.5 mt-0.5 shrink-0"
+                              style={{ color: W.red }}
+                            />
+                            <div>
+                              <p
+                                className="text-[12px] font-semibold"
+                                style={{ color: W.text }}
+                              >
+                                {label}
+                              </p>
+                              <p
+                                className="text-[10px]"
+                                style={{ color: W.muted }}
+                              >
+                                {label === "Improve Prompt" && refFile
+                                  ? "Analyzes your photo + prompt"
+                                  : desc}
+                              </p>
+                            </div>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  {/* Dedicated Edit With AI Button */}
+                  <button
+                    type="button"
+                    disabled={isEnhancing}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowAiEditor((prev) => !prev);
+                    }}
+                    className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium transition-all disabled:opacity-60"
+                    style={{
+                      border: showAiEditor
+                        ? `1px solid ${W.redBorder}`
+                        : `1px solid ${W.border}`,
+                      background: showAiEditor ? W.redBg : W.glass,
+                      color: showAiEditor ? W.red : W.muted,
+                    }}
+                    title="Edit prompt with AI instructions or styles"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    <span>Edit with AI</span>
+                  </button>
+                </div>
+
+                {/* Hidden input for Describe Image */}
+                <input
+                  ref={describeFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      handleDescribeImage(file);
+                      e.target.value = "";
+                    }
+                  }}
+                />
+
                 <span
-                  className="text-[10px] font-mono"
+                  className="text-[10px] font-mono shrink-0 ml-auto"
                   style={{ color: prompt.length > 3600 ? "#fbbf24" : W.dim }}
                 >
                   {prompt.length}/4000
@@ -1020,56 +1373,23 @@ function GeneratePageInner() {
                 <button
                   key={label}
                   onClick={() => applyUseCase(p, label)}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                  style={{
-                    border: `1px solid ${W.border}`,
-                    background: W.glass,
-                    color: W.muted,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = W.redBorder;
-                    e.currentTarget.style.background = W.redBg;
-                    e.currentTarget.style.color = W.red;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = W.border;
-                    e.currentTarget.style.background = W.glass;
-                    e.currentTarget.style.color = W.muted;
-                  }}
+                  className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-medium border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 hover:text-white text-white/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                 >
-                  <Icon className="w-3 h-3 shrink-0" />
-                  {label}
+                  <Icon className="w-3 h-3 shrink-0" aria-hidden="true" />
+                  <span>{label}</span>
                 </button>
               ))}
             </div>
           ) : (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span
-                className="text-[10px] font-semibold shrink-0"
-                style={{ color: W.muted }}
-              >
+              <span className="text-xs font-semibold shrink-0 text-white/50 mr-0.5">
                 Try
               </span>
               {QUICK_EXAMPLES.map(({ label, prompt: p }) => (
                 <button
                   key={label}
                   onClick={() => setPrompt(p)}
-                  className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                  style={{
-                    border: `1px solid ${W.border}`,
-                    background: W.glass,
-                    color: W.muted,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = W.redBorder;
-                    e.currentTarget.style.background = W.redBg;
-                    e.currentTarget.style.color = W.red;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = W.border;
-                    e.currentTarget.style.background = W.glass;
-                    e.currentTarget.style.color = W.muted;
-                  }}
+                  className="inline-flex items-center h-7 px-3 rounded-full text-xs font-medium border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 hover:text-white text-white/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                 >
                   {label}
                 </button>
@@ -1077,38 +1397,22 @@ function GeneratePageInner() {
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span
-              className="text-[10px] font-semibold shrink-0"
-              style={{ color: W.muted }}
-            >
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold shrink-0 text-white/50 mr-0.5">
               Use case
             </span>
-            {USE_CASES.map(({ label, icon: Icon, prompt: p }) => (
-              <button
-                key={label}
-                onClick={() => applyUseCase(p, label)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                style={{
-                  border: `1px solid ${W.border}`,
-                  background: W.glass,
-                  color: W.muted,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = W.redBorder;
-                  e.currentTarget.style.background = W.redBg;
-                  e.currentTarget.style.color = W.red;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = W.border;
-                  e.currentTarget.style.background = W.glass;
-                  e.currentTarget.style.color = W.muted;
-                }}
-              >
-                <Icon className="w-3 h-3 shrink-0" />
-                {label}
-              </button>
-            ))}
+            <div className="flex flex-wrap items-center gap-1.5 flex-1">
+              {USE_CASES.map(({ label, icon: Icon, prompt: p }) => (
+                <button
+                  key={label}
+                  onClick={() => applyUseCase(p, label)}
+                  className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-xs font-medium border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 hover:text-white text-white/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                >
+                  <Icon className="w-3 h-3 shrink-0" aria-hidden="true" />
+                  <span>{label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

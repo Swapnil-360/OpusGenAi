@@ -57,6 +57,10 @@ function setState(next: MeState) {
   listeners.forEach((l) => l(next));
 }
 
+export function resetMeCache() {
+  setState({ me: null, unauthorized: true });
+}
+
 async function fetchMe(): Promise<MeState> {
   if (inflight) return inflight;
   inflight = (async () => {
@@ -94,17 +98,26 @@ function setCachedCredits(credits: number) {
 
 export function useMe() {
   const [s, setS] = useState<MeState>(state);
-  const [loading, setLoading] = useState(state.me === null && !state.unauthorized);
+  const [loading, setLoading] = useState(
+    state.me === null && !state.unauthorized,
+  );
 
   useEffect(() => {
     let mounted = true;
-    const listener = (next: MeState) => { if (mounted) setS(next); };
+    const listener = (next: MeState) => {
+      if (mounted) setS(next);
+    };
     listeners.add(listener);
     // Always revalidates in the background, even on a cache hit — this is
     // stale-while-revalidate, not a TTL. See file header for why that's
     // still safe for the money-affecting fields.
-    fetchMe().finally(() => { if (mounted) setLoading(false); });
-    return () => { mounted = false; listeners.delete(listener); };
+    fetchMe().finally(() => {
+      if (mounted) setLoading(false);
+    });
+    return () => {
+      mounted = false;
+      listeners.delete(listener);
+    };
   }, []);
 
   useEffect(() => {

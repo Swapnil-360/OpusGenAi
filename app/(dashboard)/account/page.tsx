@@ -11,6 +11,7 @@ import {
   Crown,
   History,
   KeyRound,
+  Loader2,
   LogOut,
   Shield,
   ShieldCheck,
@@ -31,6 +32,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useMe } from "@/lib/hooks/use-me";
 import { triggerUpgradeModal } from "@/components/dashboard/UpgradeModal";
+import { signOutUser } from "@/lib/auth-signout";
 
 const W = {
   bg: "#0f0404",
@@ -190,6 +192,7 @@ export default function AccountPage() {
     secret: string;
   } | null>(null);
   const [verifyCode, setVerifyCode] = useState("");
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Shared cache (see lib/hooks/use-me.ts) — renders instantly from whatever
   // the layout (or another dashboard page) already fetched this session,
@@ -384,6 +387,9 @@ export default function AccountPage() {
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    await signOutUser();
   }
 
   async function handlePasswordChange(e: React.FormEvent) {
@@ -467,19 +473,36 @@ export default function AccountPage() {
           )}
           <button
             onClick={handleSignOut}
-            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all"
-            style={{ color: W.dim }}
+            disabled={isSigningOut}
+            className="h-8 px-2.5 rounded-lg flex items-center gap-1.5 shrink-0 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-60 disabled:cursor-wait"
+            style={{
+              color: W.dim,
+              border: `1px solid ${W.border}`,
+              background: W.glass,
+            }}
             title="Sign out"
+            aria-label="Sign out of your account"
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = "#f87171";
-              e.currentTarget.style.background = W.redBg;
+              if (!isSigningOut) {
+                e.currentTarget.style.color = "#f87171";
+                e.currentTarget.style.background = W.redBg;
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = W.dim;
-              e.currentTarget.style.background = "transparent";
+              if (!isSigningOut) {
+                e.currentTarget.style.color = W.dim;
+                e.currentTarget.style.background = W.glass;
+              }
             }}
           >
-            <LogOut className="w-3.5 h-3.5" />
+            {isSigningOut ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500 shrink-0" />
+            ) : (
+              <LogOut className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span className="text-xs font-medium hidden xs:inline sm:inline">
+              {isSigningOut ? "Signing out…" : "Sign out"}
+            </span>
           </button>
         </div>
 

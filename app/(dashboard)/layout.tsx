@@ -23,6 +23,7 @@ import {
   PanelLeftOpen,
   Lightbulb,
   Clapperboard,
+  Loader2,
 } from "lucide-react";
 import { LogoBrand } from "@/components/shared/LogoBrand";
 import {
@@ -40,14 +41,15 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useMe } from "@/lib/hooks/use-me";
 import type { Plan } from "@/lib/plans";
+import { signOutUser } from "@/lib/auth-signout";
 
 // ── Theme tokens ──────────────────────────────────────────────────────────────
 const S = {
   bg: "#0b0303",
   border: "rgba(255,255,255,0.07)",
-  textPrimary: "rgba(255,255,255,0.9)",
-  textMuted: "rgba(255,255,255,0.45)",
-  textDim: "rgba(255,255,255,0.28)",
+  textPrimary: "rgba(255,255,255,0.92)",
+  textMuted: "rgba(255,255,255,0.65)",
+  textDim: "rgba(255,255,255,0.55)",
   activeText: "#f87171",
   activeBg: "rgba(220,38,38,0.14)",
   activeBorder: "rgba(220,38,38,0.35)",
@@ -65,23 +67,27 @@ const NAV_ITEMS = [
   { href: "/templates", label: "Templates", icon: Layers },
   { href: "/studio", label: "Content Studio", icon: PenSquare },
   { href: "/history", label: "History", icon: Clock },
-  { href: "/account", label: "Account", icon: User },
 ];
 
 const TOOL_ITEMS = [
   {
     href: "/tools/remove-bg",
-    label: "Remove BG",
+    label: "Remove Background",
     icon: Scissors,
     color: "#60a5fa",
   },
   {
     href: "/tools/replace-bg",
-    label: "Replace BG",
+    label: "Replace Background",
     icon: Replace,
     color: "#34d399",
   },
-  { href: "/tools/cleanup", label: "Cleanup", icon: Eraser, color: "#fbbf24" },
+  {
+    href: "/tools/cleanup",
+    label: "Object Remover",
+    icon: Eraser,
+    color: "#fbbf24",
+  },
   {
     href: "/tools/upscale",
     label: "Upscale 4×",
@@ -107,6 +113,7 @@ type SidebarProps = {
   user: SidebarUser;
   onSignOut: () => void;
   onOpenGuide: () => void;
+  isSigningOut?: boolean;
 };
 
 function getInitials(name: string): string {
@@ -125,6 +132,7 @@ function SidebarContent({
   user,
   onSignOut,
   onOpenGuide,
+  isSigningOut,
 }: SidebarProps) {
   return (
     <div className="flex flex-col h-full" style={{ color: S.textPrimary }}>
@@ -182,7 +190,7 @@ function SidebarContent({
               onClick={() => setMobileOpen(false)}
               title={collapsed ? label : undefined}
               className={cn(
-                "flex items-center gap-2.5 px-2.5 py-1.75 rounded-md text-[13px] font-medium transition-all duration-150 relative group",
+                "flex items-center gap-2.5 px-2.5 py-1.75 rounded-lg text-[13px] font-medium transition-all duration-150 relative group",
                 collapsed && "justify-center px-0 w-9 h-9 mx-auto",
               )}
               style={{
@@ -252,7 +260,7 @@ function SidebarContent({
                     key={href}
                     href={href}
                     onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2.5 px-2.5 py-1.75 rounded-md text-[13px] font-medium transition-all duration-150"
+                    className="flex items-center gap-2.5 px-2.5 py-1.75 rounded-lg text-[13px] font-medium transition-all duration-150"
                     style={{ color: active ? S.activeText : S.textMuted }}
                     onMouseEnter={(e) => {
                       if (!active) {
@@ -268,7 +276,7 @@ function SidebarContent({
                     }}
                   >
                     <div
-                      className="w-5 h-5 rounded-[6px] flex items-center justify-center shrink-0"
+                      className="w-5 h-5 rounded-lg flex items-center justify-center shrink-0"
                       style={{ backgroundColor: `${color}22` }}
                     >
                       <Icon
@@ -424,7 +432,7 @@ function SidebarContent({
           href="/account"
           onClick={() => setMobileOpen(false)}
           className={cn(
-            "flex items-center gap-2.5 px-2.5 py-2 rounded-md cursor-pointer group transition-all",
+            "flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer group transition-all",
             collapsed && "justify-center px-0",
           )}
           title={collapsed ? user.name : undefined}
@@ -460,14 +468,14 @@ function SidebarContent({
               >
                 <div className="flex-1 min-w-0">
                   <p
-                    className="text-[13px] font-semibold truncate leading-none mb-0.5"
+                    className="text-[13px] font-semibold truncate leading-none mb-1"
                     style={{ color: S.textPrimary }}
                   >
                     {user.name}
                   </p>
                   <p
-                    className="text-[10px] truncate"
-                    style={{ color: S.textDim }}
+                    className="text-xs truncate"
+                    style={{ color: "rgba(255, 255, 255, 0.52)" }}
                   >
                     {user.email}
                   </p>
@@ -478,20 +486,29 @@ function SidebarContent({
                     e.stopPropagation();
                     onSignOut();
                   }}
-                  className="shrink-0 opacity-60 hover:opacity-100 transition-opacity p-1.5 rounded-lg"
+                  disabled={isSigningOut}
+                  className="shrink-0 opacity-60 hover:opacity-100 transition-opacity p-1.5 rounded-lg disabled:opacity-40 disabled:cursor-wait"
                   style={{ color: S.textMuted }}
                   title="Sign out"
                   aria-label="Sign out"
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = S.textPrimary;
-                    e.currentTarget.style.background = S.hoverBg;
+                    if (!isSigningOut) {
+                      e.currentTarget.style.color = S.textPrimary;
+                      e.currentTarget.style.background = S.hoverBg;
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.color = S.textMuted;
-                    e.currentTarget.style.background = "transparent";
+                    if (!isSigningOut) {
+                      e.currentTarget.style.color = S.textMuted;
+                      e.currentTarget.style.background = "transparent";
+                    }
                   }}
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  {isSigningOut ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-red-500" />
+                  ) : (
+                    <LogOut className="w-3.5 h-3.5" />
+                  )}
                 </button>
               </motion.div>
             )}
@@ -548,11 +565,16 @@ export default function DashboardLayout({
     if (unauthorized) router.push("/login");
   }, [unauthorized, router]);
 
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    await signOutUser();
   }
 
   return (
@@ -573,6 +595,7 @@ export default function DashboardLayout({
           setMobileOpen={setMobileOpen}
           user={sidebarUser}
           onSignOut={handleSignOut}
+          isSigningOut={isSigningOut}
           onOpenGuide={() => {
             setGuideOpen(true);
             setMobileOpen(false);
@@ -583,21 +606,31 @@ export default function DashboardLayout({
         <motion.button
           onClick={() => setCollapsed(!collapsed)}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="absolute -right-3 top-18 w-6 h-6 rounded-md flex items-center justify-center z-10 transition-colors"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+          className="absolute -right-3.5 sm:-right-4 top-16 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center z-20 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
           style={{
-            background: S.bg,
-            border: `1px solid ${S.border}`,
-            color: S.textMuted,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+            background: "#1c0808",
+            border: "1px solid rgba(255, 255, 255, 0.18)",
+            color: S.textPrimary,
+            boxShadow: "0 2px 10px rgba(0,0,0,0.6)",
           }}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
+          whileHover={{ scale: 1.08, borderColor: "rgba(220,38,38,0.6)" }}
+          whileTap={{ scale: 0.92 }}
           transition={{ duration: 0.15 }}
         >
           {collapsed ? (
-            <PanelLeftOpen className="w-3.5 h-3.5" strokeWidth={1.75} />
+            <PanelLeftOpen
+              className="w-4 h-4 text-white/80"
+              strokeWidth={2}
+              aria-hidden="true"
+            />
           ) : (
-            <PanelLeftClose className="w-3.5 h-3.5" strokeWidth={1.75} />
+            <PanelLeftClose
+              className="w-4 h-4 text-white/80"
+              strokeWidth={2}
+              aria-hidden="true"
+            />
           )}
         </motion.button>
       </motion.aside>
@@ -628,6 +661,7 @@ export default function DashboardLayout({
                 setMobileOpen={setMobileOpen}
                 user={sidebarUser}
                 onSignOut={handleSignOut}
+                isSigningOut={isSigningOut}
                 onOpenGuide={() => {
                   setGuideOpen(true);
                   setMobileOpen(false);

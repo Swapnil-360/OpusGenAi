@@ -80,9 +80,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <div
       className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-bold tracking-[0.14em] uppercase mb-6"
       style={{
-        background: "rgba(220,38,38,0.1)",
-        border: "1px solid rgba(220,38,38,0.25)",
-        color: "rgba(248,113,113,1)",
+        background: "rgba(220,38,38,0.18)",
+        border: "1px solid rgba(220,38,38,0.35)",
+        color: "#fca5a5",
       }}
     >
       <span
@@ -135,7 +135,7 @@ function TiltCard({
       onMouseMove={onMove}
       onMouseLeave={onLeave}
       style={{ rotateX, rotateY, transformPerspective: 900, ...style }}
-      className={className}
+      className={cn("h-full flex flex-col", className)}
     >
       {children}
     </motion.div>
@@ -152,7 +152,7 @@ function SpinBorder({
   return (
     <motion.div
       className={cn(
-        "relative rounded-2xl overflow-hidden group/spin",
+        "relative rounded-2xl overflow-hidden group/spin h-full flex flex-col",
         className,
       )}
       style={{ padding: "1.5px" }}
@@ -184,7 +184,7 @@ function SpinBorder({
       />
       {/* Content layer */}
       <div
-        className="relative overflow-hidden"
+        className="relative overflow-hidden h-full flex flex-col"
         style={{
           borderRadius: "calc(1rem - 1.5px)",
           background: "linear-gradient(160deg, #130505 0%, #0a0202 100%)",
@@ -325,7 +325,10 @@ function PricingCard({
   };
 
   const inner = (
-    <div className="relative overflow-hidden" style={{ background: cardBg }}>
+    <div
+      className="relative overflow-hidden h-full flex flex-col"
+      style={{ background: cardBg }}
+    >
       {/* Top accent line — green takes priority when current */}
       {(isPro || isBasic || isCurrent) && (
         <div
@@ -336,46 +339,55 @@ function PricingCard({
         />
       )}
 
-      <div className="p-3 sm:p-7 flex flex-col">
-        {/* Badge */}
-        {isCurrent ? (
-          <span
-            className="self-start mb-2 sm:mb-5 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1 flex items-center gap-1 sm:gap-1.5"
-            style={{
-              background: G.bg,
-              border: `1px solid ${G.border}`,
-              color: G.text,
-            }}
-          >
-            <Check className="w-2 h-2 sm:w-3 sm:h-3" />
-            <span className="hidden sm:inline">Current plan</span>
-            <span className="sm:hidden">Current</span>
-          </span>
-        ) : isPro ? (
-          <span
-            className="self-start mb-2 sm:mb-5 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1"
-            style={{
-              background: A.bg,
-              border: `1px solid ${A.border}`,
-              color: A.text,
-            }}
-          >
-            <span className="hidden sm:inline">Most popular</span>
-            <span className="sm:hidden">Popular</span>
-          </span>
-        ) : isBasic ? (
-          <span
-            className="self-start mb-2 sm:mb-5 text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1"
-            style={{
-              background: A.bg,
-              border: `1px solid ${A.border}`,
-              color: A.text,
-            }}
-          >
-            <span className="hidden sm:inline">Best value</span>
-            <span className="sm:hidden">Value</span>
-          </span>
-        ) : null}
+      <div className="p-3 sm:p-7 flex flex-col flex-1">
+        {/* Badge slot */}
+        <div className="min-h-[26px] sm:min-h-[32px] mb-2 sm:mb-5 flex items-center">
+          {isCurrent ? (
+            <span
+              className="text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1 flex items-center gap-1 sm:gap-1.5"
+              style={{
+                background: G.bg,
+                border: `1px solid ${G.border}`,
+                color: G.text,
+              }}
+            >
+              <Check className="w-2 h-2 sm:w-3 sm:h-3" />
+              <span className="hidden sm:inline">Current plan</span>
+              <span className="sm:hidden">Current</span>
+            </span>
+          ) : isPro ? (
+            <span
+              className="text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1"
+              style={{
+                background: A.bg,
+                border: `1px solid ${A.border}`,
+                color: A.text,
+              }}
+            >
+              <span className="hidden sm:inline">Most popular</span>
+              <span className="sm:hidden">Popular</span>
+            </span>
+          ) : isBasic ? (
+            <span
+              className="text-[8px] sm:text-[10px] font-bold uppercase tracking-widest rounded-full px-1.5 sm:px-3 py-0.5 sm:py-1"
+              style={{
+                background: A.bg,
+                border: `1px solid ${A.border}`,
+                color: A.text,
+              }}
+            >
+              <span className="hidden sm:inline">Best value</span>
+              <span className="sm:hidden">Value</span>
+            </span>
+          ) : (
+            <span
+              className="invisible text-[8px] sm:text-[10px] py-0.5 sm:py-1 select-none"
+              aria-hidden="true"
+            >
+              Starter
+            </span>
+          )}
+        </div>
 
         {/* Price */}
         <div className="mb-2 sm:mb-6">
@@ -386,27 +398,29 @@ function PricingCard({
             {plan.name}
           </p>
 
-          {/* Original price — hidden on mobile */}
-          {plan.originalPrice && (
-            <div className="hidden sm:flex items-center gap-2 mb-1.5">
-              <span
-                className="text-sm line-through"
-                style={{ color: "rgba(255,255,255,0.40)" }}
-              >
-                ${plan.originalPrice}/mo
-              </span>
-              <span
-                className="text-[10px] font-black px-2 py-0.5 rounded-full"
-                style={{
-                  background: "rgba(34,197,94,0.15)",
-                  color: "#4ade80",
-                  border: "1px solid rgba(34,197,94,0.25)",
-                }}
-              >
-                Save ${savings}
-              </span>
-            </div>
-          )}
+          {/* Original price slot */}
+          <div className="hidden sm:flex items-center gap-2 mb-1.5 min-h-[22px]">
+            {plan.originalPrice ? (
+              <>
+                <span
+                  className="text-sm line-through"
+                  style={{ color: "rgba(255,255,255,0.40)" }}
+                >
+                  ${plan.originalPrice}/mo
+                </span>
+                <span
+                  className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                  style={{
+                    background: "rgba(34,197,94,0.15)",
+                    color: "#4ade80",
+                    border: "1px solid rgba(34,197,94,0.25)",
+                  }}
+                >
+                  Save ${savings}
+                </span>
+              </>
+            ) : null}
+          </div>
 
           <div className="flex items-end gap-0.5 sm:gap-1">
             <p className="text-2xl sm:text-5xl font-black leading-none">
@@ -434,7 +448,7 @@ function PricingCard({
 
         {/* Features — hidden on mobile */}
         <ul className="hidden sm:block space-y-2.5 mb-7 flex-1">
-          {plan.features.slice(0, isPro ? 5 : 4).map((f) => (
+          {plan.features.slice(0, 5).map((f) => (
             <li
               key={f}
               className="flex items-center gap-2.5 text-sm"
@@ -451,101 +465,97 @@ function PricingCard({
           ))}
         </ul>
 
-        {/* CTA */}
-        {isCurrent ? (
-          <div
-            className="w-full h-7 sm:h-11 rounded-lg sm:rounded-xl text-[9px] sm:text-sm font-bold flex items-center justify-center gap-1 sm:gap-2 cursor-default"
-            style={{
-              border: `1px solid ${G.border}`,
-              background: G.bg,
-              color: G.text,
-            }}
-          >
-            <Check className="w-3 h-3 sm:w-4 sm:h-4" />
-            <span className="sm:hidden">Active</span>
-            <span className="hidden sm:inline">Active plan</span>
-          </div>
-        ) : (
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            disabled={loading}
-            onClick={() => onSelectPlan(plan.id)}
-            className="w-full h-7 sm:h-11 rounded-lg sm:rounded-xl text-[9px] sm:text-sm font-bold transition-all flex items-center justify-center gap-2"
-            style={
-              isPro
-                ? {
-                    background: "#dc2626",
-                    color: "#fff",
-                    boxShadow: "0 0 20px rgba(220,38,38,0.28)",
-                  }
-                : isBasic
+        {/* CTA pinned to bottom */}
+        <div className="mt-auto pt-1">
+          {isCurrent ? (
+            <div
+              className="w-full h-7 sm:h-11 rounded-lg sm:rounded-xl text-[9px] sm:text-sm font-bold flex items-center justify-center gap-1 sm:gap-2 cursor-default"
+              style={{
+                border: `1px solid ${G.border}`,
+                background: G.bg,
+                color: G.text,
+              }}
+            >
+              <Check className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="sm:hidden">Active</span>
+              <span className="hidden sm:inline">Active plan</span>
+            </div>
+          ) : (
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              disabled={loading}
+              onClick={() => onSelectPlan(plan.id)}
+              className="w-full h-7 sm:h-11 rounded-lg sm:rounded-xl text-[9px] sm:text-sm font-bold transition-all flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+              style={
+                isPro
                   ? {
-                      background: "#0ea5e9",
+                      background: "#dc2626",
                       color: "#fff",
-                      boxShadow: "0 0 20px rgba(56,189,248,0.25)",
+                      boxShadow: "0 0 20px rgba(220,38,38,0.28)",
                     }
                   : {
-                      border: "1px solid rgba(255,255,255,0.09)",
-                      background: "rgba(255,255,255,0.04)",
-                      color: "rgba(255,255,255,0.7)",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgba(255,255,255,0.05)",
+                      color: "rgba(255,255,255,0.9)",
                     }
-            }
-          >
-            {loading ? (
-              <svg
-                className="animate-spin h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
-              </svg>
-            ) : (
-              <>
-                <span className="sm:hidden">{plan.cta.split(" ")[0]}</span>
-                <span className="hidden sm:inline">{plan.cta}</span>
-              </>
-            )}
-          </motion.button>
-        )}
+              }
+            >
+              {loading ? (
+                <svg
+                  className="animate-spin h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                  />
+                </svg>
+              ) : (
+                <>
+                  <span className="sm:hidden">{plan.cta.split(" ")[0]}</span>
+                  <span className="hidden sm:inline">{plan.cta}</span>
+                </>
+              )}
+            </motion.button>
+          )}
 
-        {/* Reassurance copy for paid tiers */}
-        {plan.price > 0 && !isCurrent && (
+          {/* Reassurance copy with uniform height slot */}
           <p
-            className="mt-1.5 sm:mt-2.5 text-center text-[7px] sm:text-[10px]"
+            className="mt-1.5 sm:mt-2.5 text-center text-[7px] sm:text-[10px] min-h-[14px]"
             style={{ color: "rgba(255,255,255,0.40)" }}
           >
-            Cancel anytime · Instant activation
+            {plan.price > 0 && !isCurrent
+              ? "Cancel anytime · Instant activation"
+              : ""}
           </p>
-        )}
+        </div>
       </div>
     </div>
   );
 
   if (isPro) {
     return (
-      <TiltCard intensity={5}>
-        <SpinBorder>{inner}</SpinBorder>
+      <TiltCard intensity={5} className="h-full">
+        <SpinBorder className="h-full">{inner}</SpinBorder>
       </TiltCard>
     );
   }
 
   return (
-    <TiltCard intensity={4}>
+    <TiltCard intensity={4} className="h-full">
       <div
-        className="relative rounded-2xl overflow-hidden"
+        className="relative rounded-2xl overflow-hidden h-full flex flex-col"
         style={
           isCurrent
             ? {
@@ -708,7 +718,7 @@ export default function LandingPage() {
                 initial={{ opacity: 0, y: 32 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, delay: 0.08 }}
-                className="font-black tracking-tight leading-[0.9] mb-3 sm:mb-5 text-center lg:text-left"
+                className="font-black tracking-tight leading-[0.9] mb-3 sm:mb-5 text-center lg:text-left text-white"
                 style={{ fontSize: "clamp(2.6rem,5.5vw,5.8rem)" }}
               >
                 Where Great
@@ -718,7 +728,7 @@ export default function LandingPage() {
                 <span
                   style={{
                     background:
-                      "linear-gradient(130deg, #f87171 0%, #ef4444 35%, #b91c1c 100%)",
+                      "linear-gradient(130deg, #fca5a5 0%, #f87171 40%, #ef4444 100%)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     backgroundClip: "text",
@@ -733,7 +743,7 @@ export default function LandingPage() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.18 }}
                 className="leading-relaxed mb-6 max-w-lg mx-auto lg:mx-0 text-center lg:text-left"
-                style={{ fontSize: "1rem", color: "rgba(255,255,255,0.5)" }}
+                style={{ fontSize: "1rem", color: "rgba(255,255,255,0.78)" }}
               >
                 Turn any product photo into studio-quality marketing visuals —
                 in seconds.
@@ -773,9 +783,9 @@ export default function LandingPage() {
                     whileTap={{ scale: 0.97 }}
                     className="flex items-center gap-2.5 h-13 px-6 rounded-full font-medium transition-all text-[15px]"
                     style={{
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      background: "rgba(255,255,255,0.05)",
-                      color: "rgba(255,255,255,0.75)",
+                      border: "1px solid rgba(255,255,255,0.15)",
+                      background: "rgba(255,255,255,0.08)",
+                      color: "rgba(255,255,255,0.92)",
                       backdropFilter: "blur(8px)",
                     }}
                   >
@@ -789,7 +799,7 @@ export default function LandingPage() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.42 }}
                 className="text-xs mt-4 text-center lg:text-left"
-                style={{ color: "rgba(255,255,255,0.50)" }}
+                style={{ color: "rgba(255,255,255,0.72)" }}
               >
                 10 free credits · No card required
               </motion.p>
@@ -897,7 +907,7 @@ export default function LandingPage() {
               />
               <p
                 className="text-[10px] font-bold uppercase tracking-[0.25em] shrink-0"
-                style={{ color: "rgba(255,255,255,0.38)" }}
+                style={{ color: "rgba(255,255,255,0.72)" }}
               >
                 Platform Capabilities
               </p>
@@ -960,7 +970,7 @@ export default function LandingPage() {
                       <span
                         className="text-xs sm:text-[13px] font-semibold tracking-wider uppercase leading-none"
                         style={{
-                          color: "rgba(255,255,255,0.72)",
+                          color: "rgba(255,255,255,0.88)",
                           letterSpacing: "0.07em",
                         }}
                       >
@@ -992,7 +1002,7 @@ export default function LandingPage() {
                     <br />
                     <span
                       style={{
-                        color: "rgba(255,255,255,0.2)",
+                        color: "rgba(255,255,255,0.70)",
                         fontWeight: 300,
                       }}
                     >
@@ -1054,8 +1064,17 @@ export default function LandingPage() {
                           loop
                           playsInline
                           preload="auto"
-                          className="w-full h-full object-cover"
-                        />
+                          aria-hidden="true"
+                          tabIndex={-1}
+                          className="w-full h-full object-cover pointer-events-none"
+                        >
+                          <track
+                            kind="captions"
+                            src="data:text/vtt,WEBVTT"
+                            label="Captions"
+                            default={false}
+                          />
+                        </video>
                       ) : tpl.coverImageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -1067,7 +1086,8 @@ export default function LandingPage() {
                       <span
                         className="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
                         style={{
-                          background: "rgba(0,0,0,0.65)",
+                          background: "rgba(0,0,0,0.85)",
+                          backdropFilter: "blur(4px)",
                           color: "white",
                           border: `1px solid ${tpl.accentColor}66`,
                         }}
@@ -1078,9 +1098,9 @@ export default function LandingPage() {
                         <span
                           className="absolute top-2 right-2 text-[9px] font-black px-1.5 py-0.5 rounded-full"
                           style={{
-                            background: "rgba(0,0,0,0.7)",
+                            background: "rgba(0,0,0,0.88)",
                             color: "#fbbf24",
-                            border: "1px solid rgba(251,191,36,0.4)",
+                            border: "1px solid rgba(251,191,36,0.6)",
                           }}
                         >
                           PRO
@@ -1091,7 +1111,7 @@ export default function LandingPage() {
                       <p className="text-sm font-bold mb-0.5">{tpl.name}</p>
                       <p
                         className="text-[11px] leading-snug"
-                        style={{ color: "rgba(255,255,255,0.45)" }}
+                        style={{ color: "rgba(255,255,255,0.72)" }}
                       >
                         {tpl.description}
                       </p>
@@ -1160,18 +1180,7 @@ export default function LandingPage() {
                   </p>
                   <button
                     onClick={refetchTemplates}
-                    className="text-xs font-semibold px-4 py-2 rounded-lg transition-all"
-                    style={{
-                      border: "1px solid rgba(255,255,255,0.15)",
-                      color: "rgba(255,255,255,0.75)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background =
-                        "rgba(255,255,255,0.06)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                    }}
+                    className="text-xs font-semibold px-4 py-2 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
                   >
                     Try again
                   </button>
@@ -1200,18 +1209,12 @@ export default function LandingPage() {
               </h2>
             </FadeIn>
 
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 items-center">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 items-stretch">
               {PLANS.map((plan, i) => (
                 <FadeIn
                   key={plan.id}
                   delay={i * 0.09}
-                  className={
-                    plan.highlight
-                      ? "sm:-my-8"
-                      : plan.id === "basic"
-                        ? "sm:-my-4"
-                        : ""
-                  }
+                  className="h-full flex flex-col"
                 >
                   <PricingCard
                     plan={plan}

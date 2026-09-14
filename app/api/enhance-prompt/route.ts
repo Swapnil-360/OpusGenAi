@@ -11,14 +11,21 @@ const SYSTEM_PROMPT =
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt: rawPrompt, image, hasProductPhoto } = await req.json();
+    const {
+      prompt: rawPrompt,
+      image,
+      hasProductPhoto,
+      instruction: rawInstruction,
+      action,
+    } = await req.json();
 
     // Capped before use: this string is interpolated into the instruction
     // below, and this call is billed per token.
     const prompt = sanitizePrompt(rawPrompt, 2000);
+    const userInstruction = sanitizePrompt(rawInstruction, 1000);
 
-    if (!prompt && !image) {
-      return NextResponse.json({ error: "Add a photo or prompt first." }, { status: 400 });
+    if (!prompt && !image && !userInstruction) {
+      return NextResponse.json({ error: "Add a photo, prompt, or instruction first." }, { status: 400 });
     }
     if (typeof image === "string" && !isWithinImageSizeLimit(image)) {
       return NextResponse.json({ error: IMAGE_TOO_LARGE_MESSAGE }, { status: 413 });
@@ -45,7 +52,17 @@ export async function POST(req: NextRequest) {
     }
 
     let instruction: string;
-    if (image && prompt) {
+    if (action === "edit" || userInstruction) {
+      if (prompt && userInstruction) {
+        instruction = `You are a professional product photography art director. Modify this existing product prompt according to this edit request: "${userInstruction}". Keep the core subject/product, but update the lighting, background, surface, environment, mood, and aesthetic as requested. Original prompt: "${prompt}". Return ONLY the updated prompt text under 60 words.`;
+      } else if (userInstruction) {
+        instruction = `You are a professional product photography art director. Write a professional product photography prompt based on this user request: "${userInstruction}". Describe the subject, surface, lighting, composition, and mood. Return ONLY the prompt text under 60 words.`;
+      } else {
+        instruction = `Improve this product photography prompt to be more specific and professional, adding details about lighting, surface, and mood while keeping the original subject: "${prompt}"`;
+      }
+    } else if (action === "describe" && image) {
+      instruction = "Analyze this image and write a detailed, professional product photography prompt describing the subject, background, lighting, surface, and aesthetic mood suitable for generating an e-commerce studio shot. Return ONLY the prompt text under 60 words.";
+    } else if (image && prompt) {
       instruction = `Analyze this product photo. Improve and refine this scene description for professional e-commerce product photography — keep the user's intent but add specific, effective photography details (surface, lighting, mood): "${prompt}"`;
     } else if (image) {
       instruction = hasProductPhoto

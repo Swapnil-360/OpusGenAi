@@ -125,7 +125,7 @@ export function LandingNav() {
         className="fixed inset-x-0 z-50"
         style={{
           top: "var(--site-banner-h, 0px)",
-          background: "rgba(15,4,4,0.85)",
+          background: "rgba(10,2,2,0.95)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           borderBottom: "1px solid rgba(255,255,255,0.08)",
@@ -163,7 +163,7 @@ export function LandingNav() {
                     )}
                     <span
                       className="relative z-10 block px-4 py-1.75 rounded-full text-[13px] font-semibold transition-colors"
-                      style={{ color: isActive ? "#fff" : "rgba(255,255,255,0.42)" }}
+                      style={{ color: isActive ? "#fff" : "rgba(255,255,255,0.72)" }}
                     >
                       {label}
                     </span>
@@ -179,13 +179,13 @@ export function LandingNav() {
               <Link href="/account" className="flex items-center gap-2.5 pl-2 pr-1 py-1 rounded-full transition-colors group" style={{ background: "rgba(255,255,255,0.05)" }}>
                 <span
                   className="text-[13px] font-semibold transition-colors"
-                  style={{ color: "rgba(255,255,255,0.7)" }}
+                  style={{ color: "rgba(255,255,255,0.88)" }}
                 >
                   {authUser.name}
                 </span>
-                <Avatar className="w-8 h-8 shrink-0">
+                <Avatar className="w-8 h-8 shrink-0" aria-hidden="true">
                   {authUser.avatarUrl && (
-                    <AvatarImage src={authUser.avatarUrl} alt={authUser.name} referrerPolicy="no-referrer" />
+                    <AvatarImage src={authUser.avatarUrl} alt="" aria-hidden="true" referrerPolicy="no-referrer" />
                   )}
                   <AvatarFallback className="text-xs font-bold" style={{ background: "rgba(220,38,38,0.2)", color: "#f87171" }}>
                     {getInitials(authUser.name)}
@@ -194,25 +194,17 @@ export function LandingNav() {
               </Link>
             ) : (
               <>
-                <Link href="/login">
-                  <button
-                    className="px-4 py-1.5 text-[13px] font-medium transition-colors"
-                    style={{ color: "rgba(255,255,255,0.55)" }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.9)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.55)")}
-                  >
-                    Sign in
-                  </button>
+                <Link
+                  href="/login"
+                  className="h-9 px-4 inline-flex items-center text-sm font-medium text-white/70 hover:text-white rounded-xl hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                >
+                  Sign in
                 </Link>
-                <Link href="/signup">
-                  <motion.button
-                    whileHover={{ scale: 1.04, boxShadow: "0 0 30px rgba(220,38,38,0.5)" }}
-                    whileTap={{ scale: 0.97 }}
-                    className="flex items-center px-5 py-2 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-[13px] transition-all"
-                    style={{ boxShadow: "0 0 18px rgba(220,38,38,0.25)" }}
-                  >
-                    Start free
-                  </motion.button>
+                <Link
+                  href="/signup"
+                  className="h-9 px-4 inline-flex items-center rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm shadow-md shadow-red-600/20 hover:shadow-red-600/35 transition-all active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                >
+                  Start free
                 </Link>
               </>
             )}
@@ -295,21 +287,19 @@ export function LandingNav() {
                   </Link>
                 ) : (
                   <div className="flex gap-2 p-1">
-                    <Link href="/login" className="flex-1" onClick={() => setMobileOpen(false)}>
-                      <button
-                        className="w-full h-10 rounded-xl text-sm font-medium transition-colors"
-                        style={{
-                          border: "1px solid rgba(255,255,255,0.09)",
-                          color: "rgba(255,255,255,0.6)",
-                        }}
-                      >
-                        Sign in
-                      </button>
+                    <Link
+                      href="/login"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex-1 h-10 inline-flex items-center justify-center rounded-xl text-sm font-medium border border-white/15 bg-white/5 hover:bg-white/10 text-white/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                    >
+                      Sign in
                     </Link>
-                    <Link href="/signup" className="flex-1" onClick={() => setMobileOpen(false)}>
-                      <button className="w-full h-10 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm transition-colors">
-                        Start free
-                      </button>
+                    <Link
+                      href="/signup"
+                      onClick={() => setMobileOpen(false)}
+                      className="flex-1 h-10 inline-flex items-center justify-center rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-sm shadow-md shadow-red-600/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                    >
+                      Start free
                     </Link>
                   </div>
                 )}

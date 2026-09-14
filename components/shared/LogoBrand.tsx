@@ -28,7 +28,7 @@ export function LogoBrand({
         transition={{ duration: 3, repeat: 2, ease: "linear" }}
         style={{ color: "#ef4444" }}
       >
-        Ai
+        AI
       </motion.span>
     </span>
   );

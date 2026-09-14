@@ -42,6 +42,7 @@ import {
   GalleryThumbnails,
   ThumbsDown,
   ThumbsUp,
+  Loader2,
 } from "lucide-react";
 import {
   DEFAULT_BANNER,
@@ -53,6 +54,7 @@ import {
 import { PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, CAMPAIGN_CATEGORIES, VIDEO_CATEGORIES, type Template, type TemplateType } from "@/lib/templates-data";
 import { type Plan } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/client";
+import { signOutUser } from "@/lib/auth-signout";
 import { toast } from "sonner";
 
 type Feedback = {
@@ -499,11 +501,16 @@ export default function AdminPage() {
       .finally(() => setFeedbackLoading(false));
   }, []);
 
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    await signOutUser();
   }
 
   // ── plan assignment ─────────────────────────────────────────────────────────
@@ -878,10 +885,11 @@ export default function AdminPage() {
             style={{ color: T.muted, border: `1px solid ${T.border}` }}>
             <ArrowLeft className="w-3 h-3" /> Exit admin
           </Link>
-          <button onClick={handleSignOut} title="Sign out"
-            className="w-7 h-7 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70"
+          <button onClick={handleSignOut} title="Sign out" disabled={isSigningOut}
+            aria-label="Sign out"
+            className="w-7 h-7 rounded-lg flex items-center justify-center transition-opacity hover:opacity-70 disabled:opacity-40 disabled:cursor-wait"
             style={{ color: T.muted, border: `1px solid ${T.border}` }}>
-            <LogOut className="w-3 h-3" />
+            {isSigningOut ? <Loader2 className="w-3 h-3 animate-spin text-red-500" /> : <LogOut className="w-3 h-3" />}
           </button>
         </div>
       </div>

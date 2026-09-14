@@ -165,7 +165,7 @@ export const VIDEO_TIERS: Record<VideoQuality, VideoTier> = {
     minPlan: "basic",
   },
   hd: {
-    label: "HD 1080p",
+    label: "High Definition",
     blurb: "Sharpest resolution",
     model: "fal-ai/wan-25-preview/image-to-video",
     modelLabel: "Wan 2.5",

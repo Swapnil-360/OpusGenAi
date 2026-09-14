@@ -180,7 +180,7 @@ export default function CleanupPage() {
   }
 
   return (
-    <ToolPageShell title="Cleanup" description="Paint over objects, blemishes and distractions to remove them" creditCost={3} accentColor={TOOL_COLOR}>
+    <ToolPageShell title="Object Remover" description="Paint over objects, blemishes and distractions to remove them" creditCost={3} accentColor={TOOL_COLOR}>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: W.dim }}>Paint over what to remove</p>

@@ -16,9 +16,9 @@ import { toast } from "sonner";
 const W = {
   bg: "#0f0404",
   card: "#110404",
-  text: "rgba(255,255,255,0.88)",
-  muted: "rgba(255,255,255,0.45)",
-  dim: "rgba(255,255,255,0.26)",
+  text: "rgba(255,255,255,0.92)",
+  muted: "rgba(255,255,255,0.68)",
+  dim: "rgba(255,255,255,0.58)",
   border: "rgba(255,255,255,0.08)",
   glass: "rgba(255,255,255,0.05)",
   glassDim: "rgba(255,255,255,0.03)",
@@ -34,7 +34,9 @@ type SourceTab = "upload" | "generate";
 // pattern the generate page uses for its own ?template= deep link.
 export default function ImageToVideoPage() {
   return (
-    <Suspense fallback={<div className="h-full" style={{ background: W.bg }} />}>
+    <Suspense
+      fallback={<div className="h-full" style={{ background: W.bg }} />}
+    >
       <ImageToVideoPageInner />
     </Suspense>
   );
@@ -44,7 +46,9 @@ function ImageToVideoPageInner() {
   const searchParams = useSearchParams();
   const { templates } = useTemplates({ authenticated: true });
   const templateId = searchParams.get("template");
-  const activeTemplate = templateId ? templates.find((t) => t.id === templateId) : undefined;
+  const activeTemplate = templateId
+    ? templates.find((t) => t.id === templateId)
+    : undefined;
 
   const [tab, setTab] = useState<SourceTab>("upload");
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
@@ -67,7 +71,10 @@ function ImageToVideoPageInner() {
 
   useEffect(() => {
     if (!isVideoProcessing) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isVideoProcessing]);
@@ -87,7 +94,10 @@ function ImageToVideoPageInner() {
 
   async function generateSourceImage() {
     if (genStatus === "processing") return;
-    if (!genPrompt.trim()) { toast.error("Describe what you want to generate."); return; }
+    if (!genPrompt.trim()) {
+      toast.error("Describe what you want to generate.");
+      return;
+    }
     setGenStatus("processing");
 
     try {
@@ -105,7 +115,9 @@ function ImageToVideoPageInner() {
       setSourceImageUrl(image);
       setGenStatus("idle");
       if (typeof credits === "number") {
-        window.dispatchEvent(new CustomEvent("opusgen:credits", { detail: credits }));
+        window.dispatchEvent(
+          new CustomEvent("opusgen:credits", { detail: credits }),
+        );
       }
       toast.success("Image generated!");
     } catch {
@@ -116,7 +128,9 @@ function ImageToVideoPageInner() {
 
   function changeImage() {
     if (isVideoProcessing) {
-      toast.error("A video is still generating — cancel it below first, or wait for it to finish.");
+      toast.error(
+        "A video is still generating — cancel it below first, or wait for it to finish.",
+      );
       return;
     }
     setSourceImageUrl(null);
@@ -127,31 +141,49 @@ function ImageToVideoPageInner() {
   return (
     <div className="h-full overflow-y-auto" style={{ background: W.bg }}>
       <div className="max-w-2xl mx-auto px-5 py-6 flex flex-col gap-5">
-
         {/* ── Header ── */}
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: W.redBg, border: `1px solid ${W.redBorder}` }}>
+          <div
+            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: W.redBg, border: `1px solid ${W.redBorder}` }}
+          >
             <Clapperboard className="w-3.5 h-3.5" style={{ color: W.red }} />
           </div>
           <div>
-            <h1 className="text-sm font-semibold leading-none" style={{ color: W.text }}>Video Generator</h1>
-            <p className="text-[11px] mt-0.5" style={{ color: W.muted }}>Bring your product photos to life with AI motion</p>
+            <h1
+              className="text-sm font-semibold leading-none"
+              style={{ color: W.text }}
+            >
+              Video Generator
+            </h1>
+            <p
+              className="text-xs mt-0.5 leading-normal"
+              style={{ color: W.muted }}
+            >
+              Bring your product photos to life with AI motion
+            </p>
           </div>
         </div>
 
         {/* Arrived from a video template — say so, since the motion prompt
             further down is pre-filled and would otherwise look unexplained. */}
         {activeTemplate && (
-          <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
-            style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}>
-            <Sparkles className="w-3.5 h-3.5 shrink-0" style={{ color: W.red }} />
+          <div
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2.5"
+            style={{ border: `1px solid ${W.redBorder}`, background: W.redBg }}
+          >
+            <Sparkles
+              className="w-3.5 h-3.5 shrink-0"
+              style={{ color: W.red }}
+            />
             <div className="min-w-0">
               <p className="text-xs font-semibold" style={{ color: W.text }}>
                 Using template: {activeTemplate.name}
               </p>
-              <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>
-                {sourceImageUrl ? "Motion prompt pre-filled below — edit it freely." : "Add your product photo below to get started."}
+              <p className="text-xs mt-0.5" style={{ color: W.dim }}>
+                {sourceImageUrl
+                  ? "Motion prompt pre-filled below — edit it freely."
+                  : "Add your product photo below to get started."}
               </p>
             </div>
           </div>
@@ -166,12 +198,35 @@ function ImageToVideoPageInner() {
             {QUALITIES.map((q) => {
               const tier = VIDEO_TIERS[q];
               return (
-                <div key={q} className="rounded-xl p-2.5" style={{ border: `1px solid ${W.border}`, background: W.card }}>
-                  <p className="text-[11px] font-bold" style={{ color: W.text }}>{tier.label}</p>
-                  <p className="text-[9px] mt-0.5" style={{ color: W.dim }}>{tier.blurb}</p>
-                  <p className="text-[10px] font-semibold mt-1.5" style={{ color: W.red }}>{tier.resolution} · {tier.creditCost}cr</p>
-                  <p className="text-[9px] mt-0.5" style={{ color: W.dim, opacity: 0.75 }}>
-                    {tier.modelLabel}{tier.includesAudio && " · AI audio"}
+                <div
+                  key={q}
+                  className="rounded-xl p-2.5"
+                  style={{
+                    border: `1px solid ${W.border}`,
+                    background: W.card,
+                  }}
+                >
+                  <p className="text-xs font-bold" style={{ color: W.text }}>
+                    {tier.label}
+                  </p>
+                  <p
+                    className="text-[11px] mt-0.5 leading-snug"
+                    style={{ color: W.dim }}
+                  >
+                    {tier.blurb}
+                  </p>
+                  <p
+                    className="text-xs font-semibold mt-1.5"
+                    style={{ color: W.red }}
+                  >
+                    {tier.resolution} · {tier.creditCost} credits
+                  </p>
+                  <p
+                    className="text-[11px] mt-0.5 leading-snug"
+                    style={{ color: W.dim }}
+                  >
+                    {tier.modelLabel}
+                    {tier.includesAudio && " · AI audio"}
                   </p>
                 </div>
               );
@@ -180,21 +235,41 @@ function ImageToVideoPageInner() {
         )}
 
         {!sourceImageUrl ? (
-          <div className="rounded-2xl p-4"
-            style={{ border: `1px solid ${W.redBorder}`, background: "linear-gradient(180deg, rgba(220,38,38,0.06) 0%, transparent 60%)" }}
+          <div
+            className="rounded-2xl p-4"
+            style={{
+              border: `1px solid ${W.redBorder}`,
+              background: "#150606",
+              backgroundImage:
+                "linear-gradient(180deg, rgba(220,38,38,0.06) 0%, transparent 60%)",
+            }}
           >
-            <div className="flex gap-1.5 mb-4 p-1 rounded-xl" style={{ background: W.glassDim, border: `1px solid ${W.border}` }}>
+            <div
+              className="flex gap-1.5 mb-4 p-1 rounded-xl"
+              style={{
+                background: W.glassDim,
+                border: `1px solid ${W.border}`,
+              }}
+            >
               <button
                 onClick={() => setTab("upload")}
                 className="flex-1 h-9 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 transition-all"
-                style={tab === "upload" ? { background: "#dc2626", color: "white" } : { color: W.muted }}
+                style={
+                  tab === "upload"
+                    ? { background: "#dc2626", color: "white" }
+                    : { color: W.muted }
+                }
               >
                 <ImageUp className="w-3.5 h-3.5" /> Upload photo
               </button>
               <button
                 onClick={() => setTab("generate")}
                 className="flex-1 h-9 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 transition-all"
-                style={tab === "generate" ? { background: "#dc2626", color: "white" } : { color: W.muted }}
+                style={
+                  tab === "generate"
+                    ? { background: "#dc2626", color: "white" }
+                    : { color: W.muted }
+                }
               >
                 <Sparkles className="w-3.5 h-3.5" /> Generate image
               </button>
@@ -217,7 +292,11 @@ function ImageToVideoPageInner() {
                   placeholder="Describe the image to generate — e.g. luxury perfume bottle on black marble…"
                   rows={4}
                   className="w-full rounded-xl text-sm resize-none outline-none px-3 py-2.5"
-                  style={{ background: W.glassDim, border: `1px solid ${W.border}`, color: W.text }}
+                  style={{
+                    background: W.glassDim,
+                    border: `1px solid ${W.border}`,
+                    color: W.text,
+                  }}
                 />
                 <motion.button
                   whileHover={{ scale: 1.01 }}
@@ -225,12 +304,21 @@ function ImageToVideoPageInner() {
                   onClick={generateSourceImage}
                   disabled={genStatus === "processing" || !genPrompt.trim()}
                   className="w-full h-10 rounded-xl font-semibold text-sm text-white flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-                  style={{ background: "#dc2626", boxShadow: "0 0 20px rgba(220,38,38,0.22)" }}
+                  style={{
+                    background: "#dc2626",
+                    boxShadow: "0 0 20px rgba(220,38,38,0.22)",
+                  }}
                 >
                   {genStatus === "processing" ? (
-                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating…</>
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Generating…
+                    </>
                   ) : (
-                    <><Sparkles className="w-4 h-4" />Generate Image · 1 credit</>
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Generate Image · 1 credit
+                    </>
                   )}
                 </motion.button>
               </div>
@@ -250,17 +338,24 @@ function ImageToVideoPageInner() {
             onProcessingChange={setIsVideoProcessing}
             onChangeImage={() => {
               if (isVideoProcessing) {
-                toast.error("A video is still generating — cancel it below first, or wait for it to finish.");
+                toast.error(
+                  "A video is still generating — cancel it below first, or wait for it to finish.",
+                );
                 return;
               }
               changeImage();
             }}
-            template={activeTemplate
-              ? {
-                  id: activeTemplate.id, name: activeTemplate.name, placeholders: activeTemplate.placeholders,
-                  imageSlots: activeTemplate.imageSlots, imageSlotsOptional: activeTemplate.imageSlotsOptional,
-                }
-              : null}
+            template={
+              activeTemplate
+                ? {
+                    id: activeTemplate.id,
+                    name: activeTemplate.name,
+                    placeholders: activeTemplate.placeholders,
+                    imageSlots: activeTemplate.imageSlots,
+                    imageSlotsOptional: activeTemplate.imageSlotsOptional,
+                  }
+                : null
+            }
           />
         )}
       </div>

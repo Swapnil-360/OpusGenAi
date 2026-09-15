@@ -363,6 +363,12 @@ const W = {
   card: "#110404",
 };
 
+interface UploadedRefImage {
+  id: string;
+  file: File;
+  url: string;
+}
+
 /* ─── Page ──────────────────────────────────────────────────────────── */
 export default function GeneratePage() {
   return (
@@ -393,10 +399,44 @@ function GeneratePageInner() {
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   // The "Animate this image" card below is keyed to generatedImage — running
   // a new image generation while a video is in progress would remount it and
-  // silently orphan that paid, still-running job. Guarded in handleGenerate().
   const [isVideoProcessing, setIsVideoProcessing] = useState(false);
-  const [refImage, setRefImage] = useState<string | null>(null);
-  const [refFile, setRefFile] = useState<File | null>(null);
+  const [refImages, setRefImages] = useState<UploadedRefImage[]>([]);
+
+  function addRefFiles(files: FileList | File[]) {
+    const incoming = Array.from(files).filter((f) =>
+      f.type.startsWith("image/"),
+    );
+    if (incoming.length === 0) return;
+    setRefImages((prev) => {
+      const availableSlots = 4 - prev.length;
+      if (availableSlots <= 0) {
+        toast.info("Maximum 4 reference images allowed.");
+        return prev;
+      }
+      const toAdd = incoming.slice(0, availableSlots).map((file, idx) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${idx}`,
+        file,
+        url: URL.createObjectURL(file),
+      }));
+      if (incoming.length > availableSlots) {
+        toast.info("Only up to 4 reference images can be added.");
+      }
+      return [...prev, ...toAdd];
+    });
+  }
+
+  function removeRefImage(id: string) {
+    setRefImages((prev) => {
+      const target = prev.find((item) => item.id === id);
+      if (target) URL.revokeObjectURL(target.url);
+      return prev.filter((item) => item.id !== id);
+    });
+  }
+
+  function clearAllRefImages() {
+    refImages.forEach((img) => URL.revokeObjectURL(img.url));
+    setRefImages([]);
+  }
   const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(
     DEFAULT_NOTIFICATION_PREFS,
   );
@@ -447,7 +487,7 @@ function GeneratePageInner() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function improvePrompt() {
-    if (!prompt.trim() && !refFile) {
+    if (!prompt.trim() && refImages.length === 0) {
       toast.error("Add a photo or type a prompt first.");
       return;
     }
@@ -456,14 +496,16 @@ function GeneratePageInner() {
     toast.loading("Analyzing…", { id: "enhance-progress", duration: 60000 });
 
     try {
-      const image = refFile ? await fileToUploadDataUrl(refFile) : undefined;
+      const image = refImages[0]
+        ? await fileToUploadDataUrl(refImages[0].file)
+        : undefined;
       const res = await fetch("/api/enhance-prompt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: prompt.trim(),
           image,
-          hasProductPhoto: !!refFile,
+          hasProductPhoto: refImages.length > 0,
         }),
       });
 
@@ -599,13 +641,15 @@ function GeneratePageInner() {
   // old bg-removal+composite path, this regenerates the whole image via AI —
   // it does not guarantee pixel-identical product pixels, but in testing it
   // reliably preserved shape/logo/text and correctly followed scene prompts.
-  async function generateWithProduct(productFile: File) {
+  async function generateWithProducts(productFiles: File[]) {
     toast.loading("Generating with premium AI…", {
       id: "gen-progress",
       duration: 60000,
     });
 
-    const imageDataUrl = await fileToUploadDataUrl(productFile);
+    const imageDataUrls = await Promise.all(
+      productFiles.map((file) => fileToUploadDataUrl(file)),
+    );
 
     const res = await fetch("/api/generate", {
       method: "POST",
@@ -617,7 +661,8 @@ function GeneratePageInner() {
         placeholderValues,
         mode: "premium",
         quality,
-        image: imageDataUrl,
+        image: imageDataUrls[0],
+        images: imageDataUrls,
       }),
     });
 
@@ -692,9 +737,10 @@ function GeneratePageInner() {
     setGeneratedImage(null);
 
     try {
-      const { image: finalImage, credits: remaining } = refFile
-        ? await generateWithProduct(refFile)
-        : await generateFromPromptOnly();
+      const { image: finalImage, credits: remaining } =
+        refImages.length > 0
+          ? await generateWithProducts(refImages.map((r) => r.file))
+          : await generateFromPromptOnly();
       setGeneratedImage(finalImage);
       setGenStatus("done");
       if (notifPrefs.generationDone) toast.success("Image generated!");
@@ -793,7 +839,7 @@ function GeneratePageInner() {
         </div>
 
         {/* ── Multi-Platform Production Workflow Banner ── */}
-        <MultiPlatformBanner userProductImage={refImage} />
+        <MultiPlatformBanner userProductImage={refImages[0]?.url ?? null} />
 
         {/* ── Prompt box ── */}
         <div className="relative">
@@ -862,33 +908,107 @@ function GeneratePageInner() {
                 }}
               />
 
-              {refImage && (
-                <div className="flex items-center gap-2 px-4 pt-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={refImage}
-                    alt="Product"
-                    className="w-8 h-8 rounded-lg object-cover shrink-0"
-                    style={{ border: `1px solid ${W.border}` }}
-                  />
-                  <span className="text-[11px]" style={{ color: W.muted }}>
-                    Product photo — AI recreates the scene and automatically
-                    isolates it from any clutter in frame.
-                  </span>
-                  <button
-                    onClick={() => {
-                      setRefImage(null);
-                      setRefFile(null);
-                    }}
-                    className="ml-auto shrink-0"
-                    style={{ color: W.dim }}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+              {refImages.length > 0 && (
+                <div className="px-4 pt-3 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {refImages.map((img, idx) => {
+                      const roleTag =
+                        idx === 0
+                          ? "Product"
+                          : idx === 1
+                            ? "Logo / Detail"
+                            : idx === 2
+                              ? "Angle"
+                              : "Reference";
+                      return (
+                        <div
+                          key={img.id}
+                          className="group relative flex items-center gap-1.5 pl-1.5 pr-2 py-1 rounded-lg border transition-all"
+                          style={{
+                            border: `1px solid ${idx === 0 ? W.redBorder : W.border}`,
+                            background: idx === 0 ? W.redBg : W.glass,
+                          }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={img.url}
+                            alt={roleTag}
+                            className="w-7 h-7 rounded-md object-cover shrink-0"
+                          />
+                          <div className="min-w-0 pr-1">
+                            <span
+                              className="text-[10px] font-bold block leading-none"
+                              style={{ color: idx === 0 ? W.red : W.text }}
+                            >
+                              {roleTag}
+                            </span>
+                            <span
+                              className="text-[9px] block truncate leading-tight mt-0.5"
+                              style={{ color: W.dim }}
+                            >
+                              #{idx + 1}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeRefImage(img.id)}
+                            className="p-0.5 rounded hover:bg-white/10 transition-colors cursor-pointer"
+                            style={{ color: W.muted }}
+                            title={`Remove ${roleTag} image`}
+                            aria-label={`Remove image ${idx + 1}`}
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    {refImages.length < 4 && (
+                      <button
+                        type="button"
+                        onClick={() => fileRef.current?.click()}
+                        className="flex items-center gap-1 h-8 px-2.5 rounded-lg border text-[11px] font-medium transition-all cursor-pointer"
+                        style={{
+                          border: `1px dashed ${W.border}`,
+                          background: W.glassDim,
+                          color: W.muted,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = W.redBorder;
+                          e.currentTarget.style.color = W.text;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = W.border;
+                          e.currentTarget.style.color = W.muted;
+                        }}
+                        title="Add logo, detail shot, or additional angle (up to 4 total)"
+                      >
+                        <ImagePlus className="w-3 h-3 text-red-500" />
+                        <span>+ Add Logo / Angle ({refImages.length}/4)</span>
+                      </button>
+                    )}
+
+                    {refImages.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={clearAllRefImages}
+                        className="text-[10px] underline ml-auto transition-opacity opacity-60 hover:opacity-100 cursor-pointer"
+                        style={{ color: W.dim }}
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="text-[10px] leading-tight" style={{ color: W.muted }}>
+                    {refImages.length === 1
+                      ? "Primary product photo attached. You can add brand logos, detail shots, or angles (up to 4 images) for higher detail generation."
+                      : `Multi-image reference active (${refImages.length}/4). AI fuses your product, logo, and angle references seamlessly into the output.`}
+                  </p>
                 </div>
               )}
 
-              {refImage && (
+              {refImages.length > 0 && (
                 <div className="flex items-center gap-1.5 px-4 pt-2.5">
                   {(Object.keys(QUALITY_TIERS) as Quality[]).map((q) => {
                     const tier = QUALITY_TIERS[q];
@@ -1020,7 +1140,7 @@ function GeneratePageInner() {
                 placeholder={
                   appliedTemplate
                     ? "Anything to add? (optional) — e.g. use a darker background, add soft rim lighting…"
-                    : refFile
+                    : refImages.length > 0
                       ? "Describe the full scene you want — e.g. on white marble surface with soft morning light, e-commerce product photography…"
                       : "Describe your product scene — e.g. luxury perfume bottle on black marble with cinematic side lighting, editorial style…"
                 }
@@ -1349,25 +1469,28 @@ function GeneratePageInner() {
           </div>
         </div>
 
+        {/* Hidden file input for product / reference photos */}
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              addRefFiles(e.target.files);
+              e.target.value = "";
+            }
+          }}
+        />
+
         {/* ── Add product photo ── */}
-        {!refImage && (
+        {refImages.length === 0 && (
           <div className="-mt-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) {
-                  setRefFile(f);
-                  setRefImage(URL.createObjectURL(f));
-                }
-              }}
-            />
             <button
+              type="button"
               onClick={() => fileRef.current?.click()}
-              className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-left transition-all"
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-left transition-all cursor-pointer"
               style={{
                 border: `1px dashed ${W.border}`,
                 background: W.glassDim,
@@ -1386,12 +1509,19 @@ function GeneratePageInner() {
                 style={{ color: W.red }}
               />
               <div className="min-w-0">
-                <p className="text-xs font-semibold" style={{ color: W.text }}>
-                  Add your product photo
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-semibold" style={{ color: W.text }}>
+                    Add product photos, logo or reference
+                  </p>
+                  <span
+                    className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                    style={{ background: W.redBg, color: W.red }}
+                  >
+                    Up to 4 images
+                  </span>
+                </div>
                 <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>
-                  Optional — AI places your exact product into the generated
-                  scene (premium, 3 credits)
+                  Upload product angles, brand logo, or detail shots — AI integrates all references (premium, 3 credits)
                 </p>
               </div>
             </button>
@@ -1410,7 +1540,7 @@ function GeneratePageInner() {
             Prompt ideas
           </p>
 
-          {refFile ? (
+          {refImages.length > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <span
                 className="text-[10px] font-semibold shrink-0"

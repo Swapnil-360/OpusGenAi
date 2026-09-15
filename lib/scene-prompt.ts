@@ -19,7 +19,10 @@ export const HF_SIZE_MAP: Record<string, { width: number; height: number }> = {
 // product via AI (unlike the free paste path), so we bake in explicit
 // fidelity + single-product instructions rather than relying on the user to
 // know to ask for them.
-export function buildProductEditPrompt(userPrompt: string): string {
+export function buildProductEditPrompt(userPrompt: string, imageCount = 1): string {
+  if (imageCount > 1) {
+    return `${userPrompt}. Integrate the subject from the primary product image and faithfully apply all details, brand logos, and angle references provided across the reference images. Preserve the exact product shape, proportions, brand logo, label design, colors, and textures without distortion. Show the product in a clean, professional e-commerce product photograph.`;
+  }
   return `${userPrompt}. Keep the product's exact shape, proportions, label design, logo, and all text completely accurate and unchanged. Remove any other objects, other products, or background clutter — show only this single product as a clean, professional e-commerce product photo.`;
 }
 

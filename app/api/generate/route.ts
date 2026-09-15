@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
       placeholderValues,
       mode,
       image: inputImage,
+      images: inputImages,
       quality: rawQuality,
     } = await req.json();
 
@@ -142,28 +143,50 @@ export async function POST(req: NextRequest) {
     let image: string | undefined;
 
     if (isPremium) {
-      if (!inputImage || typeof inputImage !== "string") {
+      // Support both `images` (array) and `image` (single string)
+      const rawImageList: unknown[] =
+        Array.isArray(inputImages) && inputImages.length > 0
+          ? inputImages
+          : typeof inputImage === "string" && inputImage
+            ? [inputImage]
+            : [];
+
+      if (
+        rawImageList.length === 0 ||
+        !rawImageList.every((img) => typeof img === "string" && img.length > 0)
+      ) {
         return NextResponse.json(
           { error: "Product photo is required for this mode." },
           { status: 400 },
         );
       }
-      if (!isWithinImageSizeLimit(inputImage)) {
-        return NextResponse.json(
-          { error: IMAGE_TOO_LARGE_MESSAGE },
-          { status: 413 },
-        );
+
+      // Allow up to 4 images (primary product, logo, angle details, style reference)
+      const targetImages = (rawImageList as string[]).slice(0, 4);
+
+      for (const img of targetImages) {
+        if (!isWithinImageSizeLimit(img)) {
+          return NextResponse.json(
+            { error: IMAGE_TOO_LARGE_MESSAGE },
+            { status: 413 },
+          );
+        }
       }
-      const imageUrl = await uploadDataUrlToFal(inputImage);
+
+      // Upload all reference images to fal concurrently
+      const imageUrls = await Promise.all(
+        targetImages.map((img) => uploadDataUrlToFal(img)),
+      );
+
       const editPrompt =
         templateType === "universal"
           ? buildPortraitEditPrompt(prompt.trim())
           : templateType === "campaign"
             ? buildCampaignEditPrompt(prompt.trim())
-            : buildProductEditPrompt(prompt.trim());
+            : buildProductEditPrompt(prompt.trim(), imageUrls.length);
       const result = await fal.subscribe(tier.model, {
         input: {
-          image_urls: [imageUrl],
+          image_urls: imageUrls,
           prompt: editPrompt,
           aspect_ratio: ratio,
           num_images: 1,

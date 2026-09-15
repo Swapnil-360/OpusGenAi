@@ -20,6 +20,13 @@ describe("buildProductEditPrompt", () => {
     expect(out).toContain("label design, logo");
     expect(out).toContain("single product");
   });
+
+  it("guides multi-image reference fusion when imageCount > 1", () => {
+    const out = buildProductEditPrompt("on a beach at sunset", 3);
+    expect(out).toContain("reference images");
+    expect(out).toContain("brand logo");
+    expect(out).toContain("proportions");
+  });
 });
 
 describe("buildPortraitEditPrompt", () => {

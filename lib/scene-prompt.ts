@@ -11,6 +11,7 @@ export const HF_SIZE_MAP: Record<string, { width: number; height: number }> = {
   "4:5":  { width: 512, height: 640 },
   "9:16": { width: 576, height: 1024 },
   "16:9": { width: 1024, height: 576 },
+  "3:4":  { width: 576, height: 768 },
   "4:3":  { width: 768, height: 576 },
 };
 

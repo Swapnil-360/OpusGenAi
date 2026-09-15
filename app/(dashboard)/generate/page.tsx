@@ -54,15 +54,77 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { triggerUpgradeModal } from "@/components/dashboard/UpgradeModal";
+import { MultiPlatformBanner } from "@/components/dashboard/MultiPlatformBanner";
 import { toast } from "sonner";
 
 /* ─── Static data ──────────────────────────────────────────────────── */
 const SIZE_PRESETS = [
-  { id: "square", label: "Square", ratio: "1:1", w: 1, h: 1 },
-  { id: "ig-portrait", label: "Portrait", ratio: "4:5", w: 4, h: 5 },
-  { id: "ig-story", label: "Story", ratio: "9:16", w: 9, h: 16 },
-  { id: "fb-post", label: "FB Post", ratio: "16:9", w: 16, h: 9 },
-  { id: "linkedin", label: "LinkedIn", ratio: "4:3", w: 4, h: 3 },
+  {
+    id: "square",
+    label: "1:1 Square",
+    ratio: "1:1",
+    w: 1,
+    h: 1,
+    platform: "Amazon / Shopify",
+    platforms: ["Amazon", "Shopify", "Instagram"],
+    desc: "Marketplace listings & square posts",
+    dimensions: "2048 × 2048",
+  },
+  {
+    id: "story",
+    label: "9:16 Story / Reels",
+    ratio: "9:16",
+    w: 9,
+    h: 16,
+    platform: "TikTok / Stories",
+    platforms: ["TikTok", "IG Stories", "Reels"],
+    desc: "Fullscreen mobile videos & stories",
+    dimensions: "1080 × 1920",
+  },
+  {
+    id: "portrait-feed",
+    label: "4:5 Portrait Feed",
+    ratio: "4:5",
+    w: 4,
+    h: 5,
+    platform: "Instagram / FB",
+    platforms: ["Instagram", "Facebook"],
+    desc: "Feed posts & sponsored social ads",
+    dimensions: "1080 × 1350",
+  },
+  {
+    id: "landscape-banner",
+    label: "16:9 Landscape",
+    ratio: "16:9",
+    w: 16,
+    h: 9,
+    platform: "Shopify Hero / Web",
+    platforms: ["Shopify Hero", "Website", "YouTube"],
+    desc: "E-commerce headers & desktop banners",
+    dimensions: "1920 × 1080",
+  },
+  {
+    id: "catalog-pin",
+    label: "3:4 Catalog Pin",
+    ratio: "3:4",
+    w: 3,
+    h: 4,
+    platform: "Etsy / Pinterest",
+    platforms: ["Etsy", "Pinterest"],
+    desc: "Vertical product cards & discovery pins",
+    dimensions: "1200 × 1600",
+  },
+  {
+    id: "classic",
+    label: "4:3 Classic",
+    ratio: "4:3",
+    w: 4,
+    h: 3,
+    platform: "eBay / Catalog",
+    platforms: ["eBay", "Marketplace"],
+    desc: "Standard e-commerce catalog listings",
+    dimensions: "1200 × 900",
+  },
 ] as const;
 type SizePreset = (typeof SIZE_PRESETS)[number];
 
@@ -729,6 +791,15 @@ function GeneratePageInner() {
             </p>
           </div>
         </div>
+
+        {/* ── Multi-Platform Production Ready Banner ── */}
+        <MultiPlatformBanner
+          currentRatio={selectedSize.ratio}
+          onSelectRatio={(ratio) => {
+            const match = SIZE_PRESETS.find((s) => s.ratio === ratio);
+            if (match) setSelectedSize(match);
+          }}
+        />
 
         {/* ── Prompt box ── */}
         <div className="relative">
@@ -1570,7 +1641,7 @@ function GeneratePageInner() {
                 setShowAiMenu(false);
                 setShowTemplatePicker(false);
               }}
-              className="flex items-center gap-1 h-8 px-2.5 rounded-lg text-xs font-semibold transition-all font-mono"
+              className="flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-lg text-xs font-semibold transition-all font-mono"
               style={
                 showSizePicker
                   ? {
@@ -1584,8 +1655,27 @@ function GeneratePageInner() {
                       color: W.muted,
                     }
               }
+              title={`${selectedSize.label} (${selectedSize.dimensions}) · ${selectedSize.platform}`}
             >
-              {selectedSize.ratio}
+              {/* Scaled Mini Aspect Box */}
+              <div
+                className="rounded-xs shrink-0"
+                style={{
+                  width: Math.round(
+                    14 * (selectedSize.w / Math.max(selectedSize.w, selectedSize.h)),
+                  ),
+                  height: Math.round(
+                    14 * (selectedSize.h / Math.max(selectedSize.w, selectedSize.h)),
+                  ),
+                  background: showSizePicker ? W.red : "rgba(255,255,255,0.45)",
+                  minWidth: 8,
+                  minHeight: 8,
+                }}
+              />
+              <span>{selectedSize.ratio}</span>
+              <span className="hidden sm:inline font-sans text-[11px] font-normal opacity-85 truncate max-w-[120px]">
+                · {selectedSize.platform}
+              </span>
               <ChevronDown
                 className={`w-3 h-3 transition-transform ${showSizePicker ? "rotate-180" : ""}`}
               />
@@ -1597,85 +1687,139 @@ function GeneratePageInner() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 4, scale: 0.97 }}
                   transition={{ duration: 0.13 }}
-                  className="absolute bottom-full mb-2 left-0 z-50 w-44 rounded-2xl overflow-hidden"
+                  className="absolute bottom-full mb-2 left-0 z-50 w-72 sm:w-80 rounded-2xl overflow-hidden"
                   style={{
-                    background: W.card,
+                    background: "#130505",
                     border: `1px solid ${W.border}`,
-                    boxShadow: "0 20px 50px rgba(0,0,0,0.7)",
+                    boxShadow: "0 20px 50px rgba(0,0,0,0.8)",
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div className="p-1.5">
-                    <p
-                      className="text-[10px] font-bold uppercase tracking-widest px-2 pt-1.5 pb-1"
-                      style={{ color: W.dim }}
+                  <div className="p-2 max-h-96 overflow-y-auto">
+                    <div
+                      className="px-2.5 pt-1.5 pb-2 border-b"
+                      style={{ borderColor: "rgba(255,255,255,0.08)" }}
                     >
-                      Size
-                    </p>
-                    {SIZE_PRESETS.map((size) => (
-                      <button
-                        key={size.id}
-                        onClick={() => {
-                          setSelectedSize(size);
-                          setShowSizePicker(false);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all"
-                        style={
-                          selectedSize.id === size.id
-                            ? { background: W.redBg }
-                            : {}
-                        }
-                        onMouseEnter={(e) => {
-                          if (selectedSize.id !== size.id)
-                            e.currentTarget.style.background = W.glass;
-                        }}
-                        onMouseLeave={(e) => {
-                          if (selectedSize.id !== size.id)
-                            e.currentTarget.style.background = "transparent";
-                        }}
+                      <p
+                        className="text-[10px] font-bold uppercase tracking-widest"
+                        style={{ color: W.dim }}
                       >
-                        <div
-                          className="rounded shrink-0"
-                          style={{
-                            width: Math.round(
-                              18 * (size.w / Math.max(size.w, size.h)),
-                            ),
-                            height: Math.round(
-                              18 * (size.h / Math.max(size.w, size.h)),
-                            ),
-                            background:
-                              selectedSize.id === size.id
-                                ? W.red
-                                : "rgba(255,255,255,0.2)",
-                            minWidth: 10,
-                            minHeight: 10,
-                          }}
-                        />
-                        <div>
-                          <p
-                            className="text-[12px] font-medium leading-none"
-                            style={{
-                              color:
-                                selectedSize.id === size.id ? W.red : W.text,
+                        Aspect Ratio &amp; Target Platform
+                      </p>
+                      <p className="text-[11px] text-zinc-400 mt-0.5 leading-tight">
+                        Optimized for e-commerce marketplaces &amp; social feeds
+                      </p>
+                    </div>
+
+                    <div className="space-y-1 mt-1.5">
+                      {SIZE_PRESETS.map((size) => {
+                        const isSelected = selectedSize.id === size.id;
+                        return (
+                          <button
+                            key={size.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedSize(size);
+                              setShowSizePicker(false);
+                            }}
+                            className="w-full flex items-start gap-2.5 px-2.5 py-2 rounded-xl transition-all text-left"
+                            style={
+                              isSelected
+                                ? {
+                                    background: W.redBg,
+                                    border: `1px solid ${W.redBorder}`,
+                                  }
+                                : { border: "1px solid transparent" }
+                            }
+                            onMouseEnter={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = W.glass;
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) e.currentTarget.style.background = "transparent";
                             }}
                           >
-                            {size.label}
-                          </p>
-                          <p
-                            className="text-[10px] font-mono mt-0.5"
-                            style={{ color: W.dim }}
-                          >
-                            {size.ratio}
-                          </p>
-                        </div>
-                        {selectedSize.id === size.id && (
-                          <Check
-                            className="w-3 h-3 ml-auto"
-                            style={{ color: W.red }}
-                          />
-                        )}
-                      </button>
-                    ))}
+                            {/* Scaled Aspect Ratio Preview Frame */}
+                            <div
+                              className="rounded shrink-0 mt-0.5 flex items-center justify-center"
+                              style={{
+                                width: 26,
+                                height: 26,
+                                background: "rgba(255,255,255,0.04)",
+                                border: "1px solid rgba(255,255,255,0.1)",
+                              }}
+                            >
+                              <div
+                                className="rounded-xs"
+                                style={{
+                                  width: Math.round(
+                                    20 * (size.w / Math.max(size.w, size.h)),
+                                  ),
+                                  height: Math.round(
+                                    20 * (size.h / Math.max(size.w, size.h)),
+                                  ),
+                                  background: isSelected
+                                    ? W.red
+                                    : "rgba(255,255,255,0.45)",
+                                  minWidth: 8,
+                                  minHeight: 8,
+                                }}
+                              />
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-1">
+                                <p
+                                  className="text-[12px] font-bold leading-tight"
+                                  style={{
+                                    color: isSelected ? W.red : W.text,
+                                  }}
+                                >
+                                  {size.label}
+                                </p>
+                                <span
+                                  className="text-[10px] font-mono shrink-0"
+                                  style={{ color: isSelected ? W.red : W.dim }}
+                                >
+                                  {size.dimensions}
+                                </span>
+                              </div>
+
+                              {/* Platform badges */}
+                              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                {size.platforms.map((p) => (
+                                  <span
+                                    key={p}
+                                    className="text-[9px] font-semibold px-1.5 py-0.5 rounded"
+                                    style={{
+                                      background: isSelected
+                                        ? "rgba(239, 68, 68, 0.25)"
+                                        : "rgba(255, 255, 255, 0.08)",
+                                      color: isSelected ? "#fca5a5" : "#e4e4e7",
+                                    }}
+                                  >
+                                    {p}
+                                  </span>
+                                ))}
+                              </div>
+
+                              <p
+                                className="text-[10px] mt-1 leading-snug"
+                                style={{ color: W.muted }}
+                              >
+                                {size.desc}
+                              </p>
+                            </div>
+
+                            {isSelected && (
+                              <Check
+                                className="w-3.5 h-3.5 shrink-0 mt-1"
+                                style={{ color: W.red }}
+                              />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </motion.div>
               )}

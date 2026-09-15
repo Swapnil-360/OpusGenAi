@@ -24,6 +24,7 @@ import { FeaturedCarousel } from "@/components/templates/featured-carousel";
 import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { SiteBanner } from "@/components/shared/SiteBanner";
+import { MultiPlatformStrip } from "@/components/landing/MultiPlatformStrip";
 import { cn } from "@/lib/utils";
 
 // ─── Static data ─────────────────────────────────────────────────────────────
@@ -983,6 +984,9 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
+
+        {/* ══ MULTI-PLATFORM READY SHOWCASE ══════════════════════════════════ */}
+        <MultiPlatformStrip />
 
         {/* ══ VIDEO TEMPLATES ══════════════════════════════════════════════════ */}
         <section

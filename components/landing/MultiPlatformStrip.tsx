@@ -85,9 +85,9 @@ export function MultiPlatformStrip() {
                 </span>
               </h3>
               <p className="text-xs sm:text-sm text-zinc-300 mt-2.5 leading-relaxed">
-                Generate studio-grade product visuals tailored to the exact aspect
-                ratios, safe zones, and resolution standards of the world&apos;s leading
-                marketplaces and social channels.
+                Generate studio-grade product visuals tailored to the exact
+                aspect ratios, safe zones, and resolution standards of the
+                world&apos;s leading marketplaces and social channels.
               </p>
             </div>
 
@@ -102,7 +102,8 @@ export function MultiPlatformStrip() {
               >
                 <span className="w-2 h-2 rounded-sm bg-red-500 shrink-0" />
                 <span>
-                  <strong className="text-white">1:1</strong> Marketplace Listings
+                  <strong className="text-white">1:1</strong> Marketplace
+                  Listings
                 </span>
               </div>
 
@@ -115,7 +116,8 @@ export function MultiPlatformStrip() {
               >
                 <span className="w-1.5 h-2.5 rounded-xs bg-cyan-400 shrink-0" />
                 <span>
-                  <strong className="text-white">9:16</strong> Stories &amp; Reels
+                  <strong className="text-white">9:16</strong> Stories &amp;
+                  Reels
                 </span>
               </div>
 
@@ -134,33 +136,53 @@ export function MultiPlatformStrip() {
             </div>
           </div>
 
-          {/* Platform Logos Row */}
+          {/* Platform Logos Marquee Row */}
           <div className="relative z-10 mt-6 md:mt-8 pt-6 border-t border-white/10">
             <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-4 text-center sm:text-left">
               Suitable for all marketplaces, platforms, and channels
             </p>
-            <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2 sm:gap-2.5">
-              {PLATFORMS.map((p) => {
-                const Icon = p.icon;
-                return (
-                  <div
-                    key={p.name}
-                    className="flex flex-col items-center justify-center p-2.5 sm:p-3 rounded-xl border transition-all hover:scale-105"
-                    style={{
-                      background: "rgba(255, 255, 255, 0.03)",
-                      borderColor: "rgba(255, 255, 255, 0.07)",
-                    }}
-                  >
-                    <Icon size={20} className="shrink-0 mb-1.5" />
-                    <span className="text-[11px] font-bold text-zinc-200 leading-tight">
-                      {p.name}
-                    </span>
-                    <span className="text-[9px] text-zinc-400 mt-0.5 text-center leading-none">
-                      {p.tag}
-                    </span>
-                  </div>
-                );
-              })}
+            <div
+              className="w-full overflow-hidden"
+              style={{
+                maskImage:
+                  "linear-gradient(to right, transparent 0%, black min(10vw, 64px), black calc(100% - min(10vw, 64px)), transparent 100%)",
+                WebkitMaskImage:
+                  "linear-gradient(to right, transparent 0%, black min(10vw, 64px), black calc(100% - min(10vw, 64px)), transparent 100%)",
+              }}
+            >
+              <motion.div
+                className="flex items-center gap-3 w-max"
+                animate={{ x: "-50%" }}
+                transition={{
+                  duration: 28,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+              >
+                {[...PLATFORMS, ...PLATFORMS].map((p, i) => {
+                  const Icon = p.icon;
+                  return (
+                    <div
+                      key={`${p.name}-${i}`}
+                      className="flex flex-col items-center justify-center w-28 sm:w-32 py-3 px-2 rounded-2xl border transition-all shrink-0 select-none hover:border-red-500/40 hover:bg-white/5"
+                      style={{
+                        background: "rgba(255, 255, 255, 0.03)",
+                        borderColor: "rgba(255, 255, 255, 0.08)",
+                      }}
+                    >
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-1.5 shrink-0">
+                        <Icon size={22} />
+                      </div>
+                      <span className="text-[11px] font-bold text-zinc-100 leading-tight">
+                        {p.name}
+                      </span>
+                      <span className="text-[9px] text-zinc-400 mt-1 text-center leading-none">
+                        {p.tag}
+                      </span>
+                    </div>
+                  );
+                })}
+              </motion.div>
             </div>
           </div>
         </motion.div>

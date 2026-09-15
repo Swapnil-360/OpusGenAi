@@ -792,14 +792,8 @@ function GeneratePageInner() {
           </div>
         </div>
 
-        {/* ── Multi-Platform Production Ready Banner ── */}
-        <MultiPlatformBanner
-          currentRatio={selectedSize.ratio}
-          onSelectRatio={(ratio) => {
-            const match = SIZE_PRESETS.find((s) => s.ratio === ratio);
-            if (match) setSelectedSize(match);
-          }}
-        />
+        {/* ── Multi-Platform Production Workflow Banner ── */}
+        <MultiPlatformBanner userProductImage={refImage} />
 
         {/* ── Prompt box ── */}
         <div className="relative">

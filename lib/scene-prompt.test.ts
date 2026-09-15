@@ -45,7 +45,12 @@ describe("HF_SIZE_MAP", () => {
     // exactly the kind of bug that's invisible in review but breaks every
     // generated image's framing.
     const targets: Record<string, number> = {
-      "1:1": 1 / 1, "4:5": 4 / 5, "9:16": 9 / 16, "16:9": 16 / 9, "3:4": 3 / 4, "4:3": 4 / 3,
+      "1:1": 1 / 1,
+      "4:5": 4 / 5,
+      "9:16": 9 / 16,
+      "16:9": 16 / 9,
+      "3:4": 3 / 4,
+      "4:3": 4 / 3,
     };
     for (const [ratio, target] of Object.entries(targets)) {
       const { width, height } = HF_SIZE_MAP[ratio];

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   canUseQuality, canUseVideoQuality, canUseMultiImageVideo, hasReachedBasicVideoLimit, isPlanAtLeast,
   BASIC_STANDARD_VIDEO_LIMIT, MULTI_IMAGE_VIDEO_TIER, PLAN_LIMITS, QUALITY_TIERS, VIDEO_TIERS, type VideoQuality,
+  VIDEO_DURATIONS, getVideoCreditCost,
 } from "@/lib/plans";
 
 describe("isPlanAtLeast", () => {
@@ -139,5 +140,31 @@ describe("Basic-plan video access", () => {
       expect(hasReachedBasicVideoLimit("basic", n)).toBe(false);
     }
     expect(hasReachedBasicVideoLimit("basic", BASIC_STANDARD_VIDEO_LIMIT)).toBe(true);
+  });
+});
+
+describe("getVideoCreditCost", () => {
+  it("exposes supported VIDEO_DURATIONS (5s and 10s)", () => {
+    expect(VIDEO_DURATIONS).toEqual([5, 10]);
+  });
+
+  it("calculates 5s credit costs accurately", () => {
+    expect(getVideoCreditCost("standard", 5, false)).toBe(10);
+    expect(getVideoCreditCost("hd", 5, false)).toBe(12);
+    expect(getVideoCreditCost("premium", 5, false)).toBe(25);
+    expect(getVideoCreditCost("standard", 5, true)).toBe(20);
+  });
+
+  it("calculates 10s credit costs as exactly 2x of 5s costs", () => {
+    expect(getVideoCreditCost("standard", 10, false)).toBe(20);
+    expect(getVideoCreditCost("hd", 10, false)).toBe(24);
+    expect(getVideoCreditCost("premium", 10, false)).toBe(50);
+    expect(getVideoCreditCost("standard", 10, true)).toBe(40);
+  });
+
+  it("defaults to 5s when duration is omitted", () => {
+    expect(getVideoCreditCost("standard")).toBe(10);
+    expect(getVideoCreditCost("hd")).toBe(12);
+    expect(getVideoCreditCost("premium")).toBe(25);
   });
 });

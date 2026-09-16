@@ -18,7 +18,9 @@ import {
   hasReachedBasicVideoLimit,
   BASIC_STANDARD_VIDEO_LIMIT,
   MULTI_IMAGE_VIDEO_TIER,
+  getVideoCreditCost,
   type VideoQuality,
+  type VideoDuration,
 } from "@/lib/plans";
 import { resolveTemplatePrompt } from "@/lib/template-prompt";
 import { rejectIfBot } from "@/lib/bot-protect";
@@ -48,6 +50,7 @@ export async function POST(req: NextRequest) {
       templateId,
       placeholderValues,
       quality: rawQuality,
+      duration: rawDuration,
     } = await req.json();
 
     // Either an image this app already generated (https://*.fal.media/...,
@@ -231,7 +234,8 @@ export async function POST(req: NextRequest) {
       motionPrompt = `${motionPrompt} Reference images: ${mapping}`;
     }
 
-    const cost = tier.creditCost;
+    const durationSeconds: VideoDuration = rawDuration === 10 ? 10 : 5;
+    const cost = getVideoCreditCost(quality, durationSeconds, isMultiImage);
     const credits = await getUserCredits(user.id);
     if (!isUnlimited && credits < cost) {
       return NextResponse.json(
@@ -259,8 +263,8 @@ export async function POST(req: NextRequest) {
         user.id,
         cost,
         isMultiImage
-          ? "Image-to-video (multi-image)"
-          : `Image-to-video (${quality})`,
+          ? `Image-to-video (multi-image, ${durationSeconds}s)`
+          : `Image-to-video (${quality}, ${durationSeconds}s)`,
       );
       if (charged === null) {
         return NextResponse.json(
@@ -283,7 +287,7 @@ export async function POST(req: NextRequest) {
       quality: isMultiImage ? "multi" : quality,
       model: tier.model,
       resolution: tier.resolution,
-      durationSeconds: tier.durationSeconds,
+      durationSeconds,
       imageCount: resolvedImageUrls.length,
       templateId: templateId || undefined,
       userPrompt: userPrompt ? sanitizePrompt(userPrompt) : undefined,
@@ -327,14 +331,14 @@ export async function POST(req: NextRequest) {
               prompt: motionPrompt,
               image_urls: resolvedImageUrls,
               resolution: tier.resolution,
-              duration: String(tier.durationSeconds),
+              duration: String(durationSeconds),
               generate_audio: true,
             }
           : {
               prompt: motionPrompt,
               image_url: resolvedImageUrl,
               resolution: tier.resolution,
-              duration: String(tier.durationSeconds),
+              duration: String(durationSeconds),
               generate_audio: true,
             },
       });

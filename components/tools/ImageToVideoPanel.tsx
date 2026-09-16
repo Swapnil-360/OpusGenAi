@@ -20,8 +20,11 @@ import {
   canUseVideoQuality,
   canUseMultiImageVideo,
   hasReachedBasicVideoLimit,
+  getVideoCreditCost,
+  VIDEO_DURATIONS,
   type Plan,
   type VideoQuality,
+  type VideoDuration,
 } from "@/lib/plans";
 import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { toast } from "sonner";
@@ -154,6 +157,7 @@ export function ImageToVideoPanel({
     !isAdmin && hasReachedBasicVideoLimit(plan, standardVideosUsed ?? 0);
 
   const [quality, setQuality] = useState<VideoQuality>("standard");
+  const [duration, setDuration] = useState<VideoDuration>(5);
   const [style, setStyle] = useState(STYLE_OPTIONS[0]);
   const [movement, setMovement] = useState(MOVEMENT_OPTIONS[0]);
   const [videoPrompt, setVideoPrompt] = useState("");
@@ -186,6 +190,7 @@ export function ImageToVideoPanel({
 
   const filledExtraImages = extraImages.filter(Boolean);
   const isMultiImage = filledExtraImages.length > 0;
+  const currentCreditCost = getVideoCreditCost(quality, duration, isMultiImage);
 
   async function uploadExtraImage(index: number, file: File) {
     setUploadingExtraIndex(index);
@@ -406,6 +411,7 @@ export function ImageToVideoPanel({
           templateId: template?.id,
           placeholderValues,
           quality,
+          duration,
         }),
       });
       if (!res.ok) {
@@ -528,8 +534,8 @@ export function ImageToVideoPanel({
           </div>
           <p className="text-[10px] mt-0.5" style={{ color: W.dim }}>
             {isMultiImage
-              ? `${MULTI_IMAGE_VIDEO_TIER.durationSeconds} seconds · ${MULTI_IMAGE_VIDEO_TIER.resolution} · ${MULTI_IMAGE_VIDEO_TIER.creditCost} credits`
-              : `${VIDEO_TIERS[quality].durationSeconds} seconds · ${VIDEO_TIERS[quality].resolution} · ${VIDEO_TIERS[quality].creditCost} credits`}
+              ? `${duration} seconds · ${MULTI_IMAGE_VIDEO_TIER.resolution} · ${currentCreditCost} credits`
+              : `${duration} seconds · ${VIDEO_TIERS[quality].resolution} · ${currentCreditCost} credits`}
           </p>
         </div>
       </div>
@@ -811,7 +817,7 @@ export function ImageToVideoPanel({
                   style={{ color: W.dim }}
                 >
                   Using {MULTI_IMAGE_VIDEO_TIER.modelLabel} to combine all your
-                  photos · {MULTI_IMAGE_VIDEO_TIER.creditCost} credits
+                  photos · {duration}s · {currentCreditCost} credits
                 </p>
               )}
             </div>
@@ -822,6 +828,7 @@ export function ImageToVideoPanel({
                   const tier = VIDEO_TIERS[q];
                   const active = quality === q;
                   const locked = !canUseTier(q);
+                  const tierCost = getVideoCreditCost(q, duration, false);
                   return (
                     <button
                       key={q}
@@ -859,7 +866,7 @@ export function ImageToVideoPanel({
                         {tier.label}
                       </p>
                       <p className="text-[9px]" style={{ color: W.dim }}>
-                        {tier.blurb} · {tier.creditCost}cr
+                        {tier.blurb} · {tierCost}cr
                       </p>
                       <p
                         className="text-[9px] mt-0.5"
@@ -873,6 +880,74 @@ export function ImageToVideoPanel({
                 })}
               </div>
             )}
+
+            {/* Video Duration Selector (5s vs 10s) */}
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <p
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: W.dim }}
+                >
+                  Clip Duration
+                </p>
+                <span className="text-[9px]" style={{ color: W.dim }}>
+                  {duration === 10 ? "2× credits (fal per-second compute)" : "Standard length"}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {VIDEO_DURATIONS.map((d) => {
+                  const active = duration === d;
+                  const dCost = getVideoCreditCost(quality, d, isMultiImage);
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setDuration(d)}
+                      className="flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all cursor-pointer"
+                      style={{
+                        border: `1px solid ${active ? W.redBorder : W.border}`,
+                        background: active ? W.redBg : W.glass,
+                      }}
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p
+                            className="text-[11px] font-bold"
+                            style={{ color: active ? W.red : W.text }}
+                          >
+                            {d} Seconds
+                          </p>
+                          {d === 5 && (
+                            <span
+                              className="text-[8px] font-bold px-1 py-0.2 rounded"
+                              style={{
+                                background: active ? "rgba(220,38,38,0.25)" : W.glassDim,
+                                color: active ? W.red : W.muted,
+                              }}
+                            >
+                              Popular
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[9px]" style={{ color: W.dim }}>
+                          {d === 5 ? "120 frames · Quick clip" : "240 frames · Extended scene"}
+                        </p>
+                      </div>
+                      <span
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 ml-2"
+                        style={{
+                          background: active ? "rgba(220,38,38,0.2)" : W.glassDim,
+                          color: active ? W.red : W.muted,
+                          border: `1px solid ${active ? W.redBorder : W.border}`,
+                        }}
+                      >
+                        {dCost} cr
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* With a template applied its prompt IS the direction — the style /
               movement pickers and the AI prompt writer would only fight it, so
@@ -1095,7 +1170,7 @@ export function ImageToVideoPanel({
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
               onClick={startGeneration}
-              className="w-full h-9 mt-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all"
+              className="w-full h-9 mt-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all cursor-pointer"
               style={{
                 background: "#dc2626",
                 boxShadow: "0 0 20px rgba(220,38,38,0.22)",
@@ -1103,19 +1178,21 @@ export function ImageToVideoPanel({
             >
               {!isEntitled && <Lock className="w-3.5 h-3.5" />}
               <Clapperboard className="w-3.5 h-3.5" />
-              Generate Video
+              Generate {duration}s Video ({currentCreditCost} credits)
             </motion.button>
           </>
         )}
 
       {videoStatus === "processing" &&
         (() => {
-          const estimatedSeconds =
+          const baseEstimate =
             isMultiImage || quality === "premium"
               ? 150
               : quality === "hd"
                 ? 110
                 : 80;
+          const estimatedSeconds =
+            duration === 10 ? Math.round(baseEstimate * 1.75) : baseEstimate;
           const fakeProgress = Math.min(
             PROGRESS_CAP,
             Math.round((elapsedSeconds / estimatedSeconds) * PROGRESS_CAP),
@@ -1155,7 +1232,7 @@ export function ImageToVideoPanel({
               </div>
 
               <p className="text-[9px] mt-2" style={{ color: W.dim }}>
-                Generating with{" "}
+                Generating {duration}s video with{" "}
                 {isMultiImage
                   ? MULTI_IMAGE_VIDEO_TIER.modelLabel
                   : VIDEO_TIERS[quality].modelLabel}
@@ -1219,8 +1296,8 @@ export function ImageToVideoPanel({
           />
           <p className="text-[10px] text-center mt-2" style={{ color: W.dim }}>
             {isMultiImage
-              ? `Generated with ${MULTI_IMAGE_VIDEO_TIER.modelLabel}${MULTI_IMAGE_VIDEO_TIER.includesAudio ? " · includes AI audio" : ""}`
-              : `Generated with ${VIDEO_TIERS[quality].modelLabel}${VIDEO_TIERS[quality].includesAudio ? " · includes AI audio" : ""}`}
+              ? `Generated with ${MULTI_IMAGE_VIDEO_TIER.modelLabel} · ${duration}s${MULTI_IMAGE_VIDEO_TIER.includesAudio ? " · includes AI audio" : ""}`
+              : `Generated with ${VIDEO_TIERS[quality].modelLabel} · ${duration}s${VIDEO_TIERS[quality].includesAudio ? " · includes AI audio" : ""}`}
           </p>
           <div className="flex gap-2 mt-3">
             <button

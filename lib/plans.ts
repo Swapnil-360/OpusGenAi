@@ -106,6 +106,8 @@ export const PLAN_LIMITS: Record<Plan, PlanLimits> = {
 };
 
 export type VideoQuality = "standard" | "hd" | "premium";
+export type VideoDuration = 5 | 10;
+export const VIDEO_DURATIONS: readonly VideoDuration[] = [5, 10] as const;
 
 export interface VideoTier {
   label: string;
@@ -246,3 +248,18 @@ export function canUseMultiImageVideo(plan: Plan): boolean {
 export function hasReachedBasicVideoLimit(plan: Plan, standardVideoCount: number): boolean {
   return plan === "basic" && standardVideoCount >= BASIC_STANDARD_VIDEO_LIMIT;
 }
+
+/** Calculates credit cost based on tier quality, duration (5s vs 10s), and multi-image flag.
+ *  10s clips generate 2x the frames and cost exactly 2x credits matching fal per-second pricing. */
+export function getVideoCreditCost(
+  quality: VideoQuality,
+  duration: VideoDuration = 5,
+  isMultiImage = false,
+): number {
+  const baseCost = isMultiImage
+    ? MULTI_IMAGE_VIDEO_TIER.creditCost
+    : (VIDEO_TIERS[quality]?.creditCost ?? VIDEO_TIERS.standard.creditCost);
+  const multiplier = duration === 10 ? 2 : 1;
+  return baseCost * multiplier;
+}
+

@@ -568,10 +568,6 @@ export default function DashboardLayout({
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
     if (isSigningOut) return;
     setIsSigningOut(true);
     await signOutUser();

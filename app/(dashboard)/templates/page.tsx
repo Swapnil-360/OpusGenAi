@@ -516,6 +516,20 @@ function TemplatesPageInner() {
                     >
                       {preview.category}
                     </span>
+                    {preview.templateType === "video" &&
+                      preview.durationOption &&
+                      preview.durationOption !== "both" && (
+                        <span
+                          className="mt-1 shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full uppercase"
+                          style={{
+                            background: "rgba(245,158,11,0.15)",
+                            color: "#f59e0b",
+                            border: "1px solid rgba(245,158,11,0.3)",
+                          }}
+                        >
+                          {preview.durationOption} only
+                        </span>
+                      )}
                   </div>
 
                   {/* The prompt itself is deliberately not shown while browsing —
@@ -552,19 +566,21 @@ function TemplatesPageInner() {
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 pb-5">
-                    {preview.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="text-xs rounded-lg px-2.5 py-1 font-medium"
-                        style={{
-                          background: W.glass,
-                          border: `1px solid ${W.border}`,
-                          color: W.muted,
-                        }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                    {preview.tags
+                      .filter((tag) => !tag.startsWith("duration:"))
+                      .map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-xs rounded-lg px-2.5 py-1 font-medium"
+                          style={{
+                            background: W.glass,
+                            border: `1px solid ${W.border}`,
+                            color: W.muted,
+                          }}
+                        >
+                          {tag}
+                        </span>
+                      ))}
                   </div>
                 </div>
 

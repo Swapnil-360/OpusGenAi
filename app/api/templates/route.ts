@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractPlaceholders } from "@/lib/template-prompt";
+import { getTemplateDurationOption } from "@/lib/templates-data";
 import { cachedQuery, CACHE_TAGS, CACHE_TTL } from "@/lib/cache";
 
 // Same query for every signed-in user (no per-user filter exists in it), so
@@ -54,6 +55,7 @@ export async function GET() {
   const templates = rows.map(({ prompt, ...rest }) => ({
     ...rest,
     placeholders: extractPlaceholders(prompt ?? ""),
+    durationOption: getTemplateDurationOption(rest.tags ?? []),
   }));
 
   return NextResponse.json({ templates });

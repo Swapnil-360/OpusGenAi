@@ -51,7 +51,7 @@ import {
   type BannerMode,
   type WelcomeConfig,
 } from "@/lib/admin-config";
-import { PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, CAMPAIGN_CATEGORIES, VIDEO_CATEGORIES, type Template, type TemplateType } from "@/lib/templates-data";
+import { PRODUCTION_CATEGORIES, UNIVERSAL_CATEGORIES, CAMPAIGN_CATEGORIES, VIDEO_CATEGORIES, type Template, type TemplateType, type TemplateDurationOption, getTemplateDurationOption } from "@/lib/templates-data";
 import { type Plan } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/client";
 import { signOutUser } from "@/lib/auth-signout";
@@ -162,6 +162,7 @@ type TemplateFormState = {
   category: string;
   description: string;
   tags: string; // comma-separated in the form, split into an array on save
+  durationOption: TemplateDurationOption; // "both" | "5s" | "10s" (video templates)
   prompt: string;
   // Video templates only — comma-separated labels for reference-photo slots
   // beyond the main image (e.g. "Reference Model Photo"). The prompt above
@@ -187,6 +188,7 @@ const EMPTY_TEMPLATE_FORM: TemplateFormState = {
   category: "",
   description: "",
   tags: "",
+  durationOption: "both",
   prompt: "",
   imageSlotLabels: "",
   imageSlotsOptional: false,
@@ -209,13 +211,15 @@ function rowToAdminTemplate(row: {
   image_slots_optional: boolean | null;
   accent_color: string; is_pro: boolean; sort_order: number;
 }): AdminTemplate {
+  const tags = row.tags ?? [];
   return {
     id: row.id,
     name: row.name,
     templateType: row.template_type,
     category: row.category,
     description: row.description,
-    tags: row.tags ?? [],
+    tags,
+    durationOption: getTemplateDurationOption(tags),
     prompt: row.prompt,
     imageSlots: row.image_slot_labels ?? [],
     imageSlotsOptional: row.image_slots_optional ?? false,
@@ -228,13 +232,15 @@ function rowToAdminTemplate(row: {
 }
 
 function templateToForm(tpl: AdminTemplate): TemplateFormState {
+  const cleanTags = tpl.tags.filter((t) => !t.startsWith("duration:"));
   return {
     id: tpl.id,
     name: tpl.name,
     templateType: tpl.templateType,
     category: tpl.category,
     description: tpl.description,
-    tags: tpl.tags.join(", "),
+    tags: cleanTags.join(", "),
+    durationOption: tpl.durationOption ?? getTemplateDurationOption(tpl.tags),
     prompt: tpl.prompt,
     imageSlotLabels: tpl.imageSlots.join(", "),
     imageSlotsOptional: tpl.imageSlotsOptional,
@@ -504,10 +510,6 @@ export default function AdminPage() {
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
     if (isSigningOut) return;
     setIsSigningOut(true);
     await signOutUser();
@@ -631,6 +633,7 @@ export default function AdminPage() {
       category: templateForm.category,
       description: templateForm.description,
       tags: templateForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      durationOption: templateForm.durationOption,
       prompt: templateForm.prompt,
       imageSlotLabels: templateForm.imageSlotLabels.split(",").map((t) => t.trim()).filter(Boolean),
       imageSlotsOptional: templateForm.imageSlotsOptional,
@@ -1464,6 +1467,43 @@ export default function AdminPage() {
 
                 {templateForm.templateType === "video" && (
                   <div className="mb-5">
+                    <label className="block text-xs font-medium mb-1.5" style={{ color: T.muted }}>
+                      Allowed Duration <span style={{ color: T.dim }}>(control whether users can generate 5s, 10s, or either)</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {(
+                        [
+                          { id: "both", label: "Both (5s & 10s)", desc: "User chooses duration" },
+                          { id: "5s", label: "Only 5s", desc: "Locked to 5 seconds" },
+                          { id: "10s", label: "Only 10s", desc: "Locked to 10 seconds" },
+                        ] as const
+                      ).map((opt) => {
+                        const isSelected = templateForm.durationOption === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => setTemplateForm((f) => f && { ...f, durationOption: opt.id })}
+                            className="p-2.5 rounded-xl text-left border transition-all cursor-pointer"
+                            style={{
+                              background: isSelected ? "rgba(220,38,38,0.12)" : "rgba(255,255,255,0.03)",
+                              borderColor: isSelected ? T.redPrimary : T.border,
+                            }}
+                          >
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-xs font-bold" style={{ color: isSelected ? T.text : T.muted }}>
+                                {opt.label}
+                              </span>
+                              {isSelected && <Check className="w-3 h-3 text-red-500" />}
+                            </div>
+                            <p className="text-[10px]" style={{ color: T.dim }}>
+                              {opt.desc}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+
                     <button type="button" onClick={() => setTemplateForm((f) => f && { ...f, imageSlotsOptional: !f.imageSlotsOptional })}
                       className="flex items-center gap-2.5 w-full text-left p-3 rounded-xl mb-3"
                       style={{ background: "rgba(255,255,255,0.03)", border: `1px solid ${T.border}` }}>
@@ -1563,6 +1603,11 @@ export default function AdminPage() {
                         </span>
                       )}
                       {tpl.isPro && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>PRO</span>}
+                      {tpl.templateType === "video" && tpl.durationOption && tpl.durationOption !== "both" && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ background: "rgba(245,158,11,0.14)", color: "#f59e0b" }}>
+                          {tpl.durationOption} only
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs truncate mt-0.5" style={{ color: T.dim }}>{tpl.description}</p>
                   </div>
@@ -1773,12 +1818,17 @@ export default function AdminPage() {
                       {previewTemplate.isPro && (
                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: "rgba(251,191,36,0.12)", color: "#fbbf24" }}>PRO</span>
                       )}
+                      {previewTemplate.templateType === "video" && previewTemplate.durationOption && previewTemplate.durationOption !== "both" && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase" style={{ background: "rgba(245,158,11,0.14)", color: "#f59e0b" }}>
+                          {previewTemplate.durationOption} only
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs mb-3" style={{ color: T.muted }}>{previewTemplate.description}</p>
 
-                    {previewTemplate.tags.length > 0 && (
+                    {previewTemplate.tags.filter((t) => !t.startsWith("duration:")).length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mb-3">
-                        {previewTemplate.tags.map((tag) => (
+                        {previewTemplate.tags.filter((t) => !t.startsWith("duration:")).map((tag) => (
                           <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.04)", color: T.dim }}>{tag}</span>
                         ))}
                       </div>

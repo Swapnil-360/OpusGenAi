@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ADMIN_EMAILS } from "@/lib/admin-config";
 import { invalidateTemplatesCache } from "@/lib/cache";
+import { syncTagsWithDuration, type TemplateDurationOption } from "@/lib/templates-data";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { name, templateType, category, description, tags, prompt, imageSlotLabels, imageSlotsOptional, accentColor, isPro, sortOrder } = await req.json();
+  const { name, templateType, category, description, tags, prompt, imageSlotLabels, imageSlotsOptional, durationOption, accentColor, isPro, sortOrder } = await req.json();
 
   if (!name?.trim() || !category?.trim() || !description?.trim() || !prompt?.trim()) {
     return NextResponse.json({ error: "Name, category, description, and prompt are required" }, { status: 400 });
@@ -58,6 +59,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const rawTags = Array.isArray(tags) ? tags : [];
+  const finalTags = durationOption
+    ? syncTagsWithDuration(rawTags, durationOption as TemplateDurationOption)
+    : rawTags;
+
   const admin = createAdminClient();
   const { data, error } = await admin
     .from("templates")
@@ -66,7 +72,7 @@ export async function POST(req: NextRequest) {
       template_type: templateType,
       category: category.trim(),
       description: description.trim(),
-      tags: Array.isArray(tags) ? tags : [],
+      tags: finalTags,
       prompt: prompt.trim(),
       image_slot_labels: Array.isArray(imageSlotLabels) ? imageSlotLabels : [],
       image_slots_optional: !!imageSlotsOptional,

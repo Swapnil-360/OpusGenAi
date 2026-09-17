@@ -384,9 +384,6 @@ export default function AccountPage() {
   }
 
   async function handleSignOut() {
-    await supabase.auth.signOut();
-    router.push("/login");
-    router.refresh();
     if (isSigningOut) return;
     setIsSigningOut(true);
     await signOutUser();

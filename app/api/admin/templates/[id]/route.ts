@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ADMIN_EMAILS } from "@/lib/admin-config";
 import { invalidateTemplatesCache } from "@/lib/cache";
+import { syncTagsWithDuration, type TemplateDurationOption } from "@/lib/templates-data";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -31,7 +32,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if ((VALID_TEMPLATE_TYPES as readonly string[]).includes(body.templateType)) update.template_type = body.templateType;
   if (typeof body.category === "string") update.category = body.category.trim();
   if (typeof body.description === "string") update.description = body.description.trim();
-  if (Array.isArray(body.tags)) update.tags = body.tags;
+  if (Array.isArray(body.tags)) {
+    update.tags = body.durationOption
+      ? syncTagsWithDuration(body.tags, body.durationOption as TemplateDurationOption)
+      : body.tags;
+  }
   if (typeof body.prompt === "string") update.prompt = body.prompt.trim();
   if (Array.isArray(body.imageSlotLabels)) update.image_slot_labels = body.imageSlotLabels;
   if (typeof body.imageSlotsOptional === "boolean") update.image_slots_optional = body.imageSlotsOptional;

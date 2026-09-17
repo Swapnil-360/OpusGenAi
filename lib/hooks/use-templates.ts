@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { selectPublic } from "@/lib/supabase/public-rest";
-import type { Template, TemplateType } from "@/lib/templates-data";
+import type { Template, TemplateType, TemplateDurationOption } from "@/lib/templates-data";
+import { getTemplateDurationOption } from "@/lib/templates-data";
 
 interface TemplateRow {
   id: string;
@@ -18,6 +19,7 @@ interface TemplateRow {
   image_slots_optional?: boolean;
   cover_image_url: string | null;
   preview_video_url: string | null;
+  durationOption?: TemplateDurationOption;
   accent_color: string;
   is_pro: boolean;
   sort_order: number;
@@ -36,6 +38,7 @@ function mapRow(row: TemplateRow): Template {
     imageSlotsOptional: row.image_slots_optional ?? false,
     coverImageUrl: row.cover_image_url,
     previewVideoUrl: row.preview_video_url,
+    durationOption: row.durationOption ?? getTemplateDurationOption(row.tags ?? []),
     accentColor: row.accent_color,
     isPro: row.is_pro,
     sortOrder: row.sort_order,

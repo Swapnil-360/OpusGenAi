@@ -254,6 +254,20 @@ const Card = ({ tpl, index, total, progress, config, onSelect }: CardProps) => {
         </div>
       )}
 
+      {tpl.templateType === "video" && tpl.durationOption && tpl.durationOption !== "both" && (
+        <span
+          className="absolute top-2 px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-wider backdrop-blur-md pointer-events-none"
+          style={{
+            right: tpl.isPro ? "56px" : "8px",
+            background: "rgba(245,158,11,0.25)",
+            color: "#fbbf24",
+            border: "1px solid rgba(245,158,11,0.45)",
+          }}
+        >
+          {tpl.durationOption}
+        </span>
+      )}
+
       <span
         className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest backdrop-blur-md pointer-events-none"
         style={{ background: `${tpl.accentColor}30`, color: tpl.accentColor, border: `1px solid ${tpl.accentColor}45` }}

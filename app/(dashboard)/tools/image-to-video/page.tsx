@@ -353,6 +353,7 @@ function ImageToVideoPageInner() {
                     placeholders: activeTemplate.placeholders,
                     imageSlots: activeTemplate.imageSlots,
                     imageSlotsOptional: activeTemplate.imageSlotsOptional,
+                    durationOption: activeTemplate.durationOption,
                   }
                 : null
             }

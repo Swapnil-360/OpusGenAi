@@ -23,6 +23,7 @@ import {
   type VideoDuration,
 } from "@/lib/plans";
 import { resolveTemplatePrompt } from "@/lib/template-prompt";
+import { getTemplateDurationOption } from "@/lib/templates-data";
 import { rejectIfBot } from "@/lib/bot-protect";
 import { failAndRefundOnce } from "@/lib/video-status";
 import {
@@ -201,12 +202,26 @@ export async function POST(req: NextRequest) {
       }
       const { data: tpl } = await admin
         .from("templates")
-        .select("prompt")
+        .select("prompt, tags")
         .eq("id", templateId)
         .single();
       if (!tpl) {
         return NextResponse.json(
           { error: "That template no longer exists." },
+          { status: 400 },
+        );
+      }
+      const allowedDuration = getTemplateDurationOption(tpl.tags ?? []);
+      const requestedDuration: VideoDuration = rawDuration === 10 ? 10 : 5;
+      if (allowedDuration === "5s" && requestedDuration !== 5) {
+        return NextResponse.json(
+          { error: "This template is only available for 5-second video generation." },
+          { status: 400 },
+        );
+      }
+      if (allowedDuration === "10s" && requestedDuration !== 10) {
+        return NextResponse.json(
+          { error: "This template is only available for 10-second video generation." },
           { status: 400 },
         );
       }

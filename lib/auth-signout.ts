@@ -19,27 +19,78 @@ export async function signOutUser() {
     // 1. Instantly clear client-side user cache
     resetMeCache();
 
-    // 2. Clear browser client session immediately (scope: "local" avoids waiting for network)
-    const supabase = createClient();
+    // 2. Clear browser local & session storage across all browsers
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem("opusgen:active-tab");
+        for (let i = window.localStorage.length - 1; i >= 0; i--) {
+          const key = window.localStorage.key(i);
+          if (
+            key &&
+            (key.startsWith("sb-") ||
+              key.includes("supabase") ||
+              key.includes("opusgen"))
+          ) {
+            window.localStorage.removeItem(key);
+          }
+        }
+        window.sessionStorage.clear();
+      } catch (storageErr) {
+        console.warn("Storage wipe warning:", storageErr);
+      }
+
+      // 3. Proactively expire client-accessible cookies
+      if (typeof document !== "undefined") {
+        try {
+          const cookies = document.cookie.split(";");
+          for (const c of cookies) {
+            const eqPos = c.indexOf("=");
+            const name = (eqPos > -1 ? c.substring(0, eqPos) : c).trim();
+            if (
+              name.startsWith("sb-") ||
+              name.includes("auth-token") ||
+              name.includes("supabase")
+            ) {
+              document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0; SameSite=Lax;`;
+            }
+          }
+        } catch (cookieErr) {
+          console.warn("Client cookie wipe warning:", cookieErr);
+        }
+      }
+    }
+
+    // 4. Invalidate local Supabase client state (non-blocking, local scope only)
     try {
-      await supabase.auth.signOut({ scope: "local" });
+      const supabase = createClient();
+      await Promise.race([
+        supabase.auth.signOut({ scope: "local" }),
+        new Promise((r) => setTimeout(r, 400)),
+      ]);
     } catch (e) {
       console.warn("Local signOut warning:", e);
     }
 
-    // 3. Clear server cookies with a short timeout race (prevents UI delay if Supabase/network is slow)
+    // 5. Invalidate server cookies via /auth/signout endpoint
     try {
       await Promise.race([
-        fetch("/auth/signout", { method: "POST", cache: "no-store" }),
-        new Promise((resolve) => setTimeout(resolve, 800)),
+        fetch("/auth/signout", {
+          method: "POST",
+          headers: { Accept: "application/json" },
+          cache: "no-store",
+          credentials: "include",
+        }),
+        new Promise((resolve) => setTimeout(resolve, 1200)),
       ]);
     } catch {
-      // Ignore network errors/timeouts
+      // Network hiccup — local storage and client cookies are already wiped
     }
   } finally {
-    // 4. Hard redirect to /login to ensure clean state and avoid Next.js client-router cache traps
+    // 6. Hard redirect to /login to ensure clean state and avoid Next.js client-router cache traps
     if (typeof window !== "undefined") {
       window.location.replace("/login");
+    } else {
+      isSigningOut = false;
     }
   }
 }

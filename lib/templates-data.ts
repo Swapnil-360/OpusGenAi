@@ -4,6 +4,7 @@
 // (category chip labels), not the template rows themselves.
 
 export type TemplateType = "production" | "universal" | "campaign" | "video";
+export type TemplateDurationOption = "both" | "5s" | "10s";
 
 export interface Template {
   id: string;
@@ -38,9 +39,29 @@ export interface Template {
   /** Video templates only — a short looping preview clip. Null until one has
    *  been generated, in which case coverImageUrl acts as the poster frame. */
   previewVideoUrl: string | null;
+  /** Video templates only — whether this template allows 5s, 10s, or both. Defaults to "both". */
+  durationOption?: TemplateDurationOption;
   accentColor: string;
   isPro: boolean;
   sortOrder: number;
+}
+
+export function getTemplateDurationOption(tags: string[] = []): TemplateDurationOption {
+  const match = tags.find((t) => t.toLowerCase().startsWith("duration:"));
+  if (match) {
+    const val = match.toLowerCase().replace("duration:", "").trim();
+    if (val === "5s" || val === "5") return "5s";
+    if (val === "10s" || val === "10") return "10s";
+  }
+  return "both";
+}
+
+export function syncTagsWithDuration(tags: string[], durationOption: TemplateDurationOption): string[] {
+  const filtered = tags.filter((t) => !t.toLowerCase().startsWith("duration:"));
+  if (durationOption === "5s" || durationOption === "10s") {
+    return [...filtered, `duration:${durationOption}`];
+  }
+  return filtered;
 }
 
 // Production templates describe a scene/surface for a product photo.

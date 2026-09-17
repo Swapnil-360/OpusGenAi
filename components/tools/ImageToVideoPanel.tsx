@@ -26,6 +26,7 @@ import {
   type VideoQuality,
   type VideoDuration,
 } from "@/lib/plans";
+import type { TemplateDurationOption } from "@/lib/templates-data";
 import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { toast } from "sonner";
 import { readApiError } from "@/lib/api-error";
@@ -120,6 +121,7 @@ interface ImageToVideoPanelProps {
     placeholders: string[];
     imageSlots: string[];
     imageSlotsOptional: boolean;
+    durationOption?: TemplateDurationOption;
   } | null;
   /** Fires whenever this panel starts/stops an active (paid, cancellable)
    *  generation — lets the parent page disable anything that would orphan
@@ -157,7 +159,18 @@ export function ImageToVideoPanel({
     !isAdmin && hasReachedBasicVideoLimit(plan, standardVideosUsed ?? 0);
 
   const [quality, setQuality] = useState<VideoQuality>("standard");
-  const [duration, setDuration] = useState<VideoDuration>(5);
+  const [duration, setDuration] = useState<VideoDuration>(() => {
+    if (template?.durationOption === "10s") return 10;
+    return 5;
+  });
+
+  useEffect(() => {
+    if (template?.durationOption === "5s") {
+      setDuration(5);
+    } else if (template?.durationOption === "10s") {
+      setDuration(10);
+    }
+  }, [template?.durationOption]);
   const [style, setStyle] = useState(STYLE_OPTIONS[0]);
   const [movement, setMovement] = useState(MOVEMENT_OPTIONS[0]);
   const [videoPrompt, setVideoPrompt] = useState("");
@@ -890,24 +903,51 @@ export function ImageToVideoPanel({
                 >
                   Clip Duration
                 </p>
-                <span className="text-[9px]" style={{ color: W.dim }}>
-                  {duration === 10 ? "2× credits (fal per-second compute)" : "Standard length"}
+                <span
+                  className="text-[9px]"
+                  style={{
+                    color:
+                      template?.durationOption && template.durationOption !== "both"
+                        ? "#f59e0b"
+                        : W.dim,
+                  }}
+                >
+                  {template?.durationOption === "5s"
+                    ? "Template restricted to 5s"
+                    : template?.durationOption === "10s"
+                    ? "Template restricted to 10s"
+                    : duration === 10
+                    ? "2× credits (fal per-second compute)"
+                    : "Standard length"}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {VIDEO_DURATIONS.map((d) => {
                   const active = duration === d;
+                  const isLockedOut =
+                    (template?.durationOption === "5s" && d === 10) ||
+                    (template?.durationOption === "10s" && d === 5);
                   const dCost = getVideoCreditCost(quality, d, isMultiImage);
                   return (
                     <button
                       key={d}
                       type="button"
-                      onClick={() => setDuration(d)}
-                      className="flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all cursor-pointer"
+                      disabled={isLockedOut}
+                      onClick={() => !isLockedOut && setDuration(d)}
+                      className={`flex items-center justify-between px-3 py-2 rounded-xl text-left transition-all ${
+                        isLockedOut
+                          ? "opacity-35 cursor-not-allowed"
+                          : "cursor-pointer"
+                      }`}
                       style={{
                         border: `1px solid ${active ? W.redBorder : W.border}`,
                         background: active ? W.redBg : W.glass,
                       }}
+                      title={
+                        isLockedOut
+                          ? `This template is only available for ${template?.durationOption}`
+                          : undefined
+                      }
                     >
                       <div>
                         <div className="flex items-center gap-1.5">
@@ -917,7 +957,7 @@ export function ImageToVideoPanel({
                           >
                             {d} Seconds
                           </p>
-                          {d === 5 && (
+                          {d === 5 && !isLockedOut && (
                             <span
                               className="text-[8px] font-bold px-1 py-0.2 rounded"
                               style={{
@@ -928,9 +968,24 @@ export function ImageToVideoPanel({
                               Popular
                             </span>
                           )}
+                          {isLockedOut && (
+                            <span
+                              className="text-[8px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1"
+                              style={{
+                                background: "rgba(255,255,255,0.06)",
+                                color: W.dim,
+                              }}
+                            >
+                              <Lock className="w-2.5 h-2.5" /> Locked
+                            </span>
+                          )}
                         </div>
                         <p className="text-[9px]" style={{ color: W.dim }}>
-                          {d === 5 ? "120 frames · Quick clip" : "240 frames · Extended scene"}
+                          {isLockedOut
+                            ? `Template requires ${template?.durationOption}`
+                            : d === 5
+                            ? "120 frames · Quick clip"
+                            : "240 frames · Extended scene"}
                         </p>
                       </div>
                       <span

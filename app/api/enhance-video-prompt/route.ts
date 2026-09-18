@@ -25,7 +25,7 @@ const FAL_URL_RE = /^https:\/\/[^/]*fal\.(media|ai|run)\//;
 
 export async function POST(req: NextRequest) {
   try {
-    const { imageUrl, style, movement, hint } = await req.json();
+    const { imageUrl, style, movement, hint, templateName: rawTemplateName } = await req.json();
 
     if (typeof imageUrl !== "string" || !(FAL_URL_RE.test(imageUrl) || DATA_URL_RE.test(imageUrl))) {
       return NextResponse.json({ error: "An image is required." }, { status: 400 });
@@ -52,18 +52,31 @@ export async function POST(req: NextRequest) {
 
     const resolvedUrl = DATA_URL_RE.test(imageUrl) ? await uploadDataUrlToFal(imageUrl) : imageUrl;
 
-    // All three are interpolated into the model prompt below, and tokens are
+    // All parameters are interpolated into the model prompt below, and tokens are
     // what this call is billed on — so they're length-capped rather than
     // passed through at whatever size the request carried.
     const styleText = sanitizePrompt(style, 120) || "Luxury / Premium";
     const movementText = sanitizePrompt(movement, 120) || "Slow Push-In";
     const hintText = sanitizePrompt(hint, 600);
+    const templateName = sanitizePrompt(rawTemplateName, 120);
 
-    let instruction =
-      `Write a production-ready cinematic video prompt for this exact product. ` +
-      `Style: ${styleText}. Camera movement: ${movementText}.`;
-    if (hintText) {
-      instruction += ` Additional creative direction from the client: "${hintText}"`;
+    let instruction: string;
+    if (templateName) {
+      instruction =
+        `The client is creating a high-end commercial product video using the template "${templateName}". ` +
+        `Write a production-ready cinematic video prompt for this exact product that aligns with this template. `;
+      if (hintText) {
+        instruction += `Client's brand details and creative direction: "${hintText}". Analyze and weave this brand identity, brand name, and product showcase details prominently into the cinematic scene.`;
+      } else {
+        instruction += `Ensure the product branding and aesthetic match the high-end commercial standard of the template.`;
+      }
+    } else {
+      instruction =
+        `Write a production-ready cinematic video prompt for this exact product. ` +
+        `Style: ${styleText}. Camera movement: ${movementText}.`;
+      if (hintText) {
+        instruction += ` Additional creative direction from the client: "${hintText}"`;
+      }
     }
 
     const result = await fal.subscribe("openrouter/router/vision", {

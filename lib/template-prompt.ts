@@ -21,8 +21,30 @@ export function extractPlaceholders(prompt: string): string[] {
 }
 
 /**
+ * Analyzes and formats additional user input (such as brand name, brand story,
+ * custom styling, or tweaks) into an explicit prompt instruction so that
+ * AI image and video diffusion models specifically recognize, prioritize, and showcase the brand.
+ */
+export function formatAdditionalPrompt(extra: string): string {
+  const cleaned = extra.trim().replace(/^[,.\s]+|[,.\s]+$/g, "");
+  if (!cleaned) return "";
+
+  // Check if the user explicitly framed it with brand keywords
+  const hasBrandKeyword =
+    /\b(brand|logo|showcase|tagline|company|label|identity|trademark)\b/i.test(
+      cleaned,
+    );
+
+  if (hasBrandKeyword) {
+    return `Featured brand & custom direction: ${cleaned}. Faithfully incorporate and prominently highlight this brand identity, name, and requested details.`;
+  }
+
+  return `Additional brand details & creative direction: ${cleaned}. Faithfully incorporate and highlight these specifications in the scene.`;
+}
+
+/**
  * Builds the final prompt: substitutes the user's placeholder values, then
- * appends whatever extra direction they typed.
+ * analyzes and appends whatever extra brand info or direction they typed.
  *
  * An unfilled placeholder falls back to its own label with the brackets
  * stripped — the client is expected to require these, but if one slips through
@@ -32,14 +54,22 @@ export function extractPlaceholders(prompt: string): string[] {
 export function resolveTemplatePrompt(
   templatePrompt: string,
   values: Record<string, string> = {},
-  userAdditions = ""
+  userAdditions = "",
 ): string {
-  const resolved = templatePrompt.replace(PLACEHOLDER_RE, (_full, rawKey: string) => {
-    const key = rawKey.trim();
-    const value = values[key];
-    return value && value.trim() ? value.trim() : key;
-  });
+  const resolved = templatePrompt.replace(
+    PLACEHOLDER_RE,
+    (_full, rawKey: string) => {
+      const key = rawKey.trim();
+      const value = values[key];
+      return value && value.trim() ? value.trim() : key;
+    },
+  );
 
   const extra = userAdditions.trim();
-  return extra ? `${resolved} ${extra}` : resolved;
+  if (!extra) return resolved;
+
+  const formattedExtra = formatAdditionalPrompt(extra);
+  const trimmedResolved = resolved.trim();
+  const separator = /[.!?]$/.test(trimmedResolved) ? " " : ". ";
+  return `${trimmedResolved}${separator}${formattedExtra}`;
 }

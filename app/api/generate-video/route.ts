@@ -215,13 +215,19 @@ export async function POST(req: NextRequest) {
       const requestedDuration: VideoDuration = rawDuration === 10 ? 10 : 5;
       if (allowedDuration === "5s" && requestedDuration !== 5) {
         return NextResponse.json(
-          { error: "This template is only available for 5-second video generation." },
+          {
+            error:
+              "This template is only available for 5-second video generation.",
+          },
           { status: 400 },
         );
       }
       if (allowedDuration === "10s" && requestedDuration !== 10) {
         return NextResponse.json(
-          { error: "This template is only available for 10-second video generation." },
+          {
+            error:
+              "This template is only available for 10-second video generation.",
+          },
           { status: 400 },
         );
       }

@@ -269,6 +269,43 @@ export function ImageToVideoPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoStatus]);
 
+  async function enhanceBrandInfo() {
+    if (enhancing) return;
+    const text = videoPrompt.trim();
+    if (!text) {
+      toast.error("Enter your brand details or additional direction first to polish.");
+      return;
+    }
+    setEnhancing(true);
+    toast.loading("Polishing brand details with AI…", {
+      id: "video-brand-polish",
+      duration: 60000,
+    });
+    try {
+      const res = await fetch("/api/enhance-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: text,
+          templateName: template?.name,
+        }),
+      });
+      toast.dismiss("video-brand-polish");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || "Couldn't polish brand info. Try again.");
+        return;
+      }
+      setVideoPrompt(data.prompt);
+      toast.success("Brand details polished and ready!");
+    } catch {
+      toast.dismiss("video-brand-polish");
+      toast.error("Network error. Check your connection.");
+    } finally {
+      setEnhancing(false);
+    }
+  }
+
   async function enhancePrompt() {
     if (!imageUrl || enhancing) return;
     setEnhancing(true);
@@ -281,6 +318,7 @@ export function ImageToVideoPanel({
           style,
           movement,
           hint: videoPrompt.trim(),
+          templateName: template?.name,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1199,17 +1237,34 @@ export function ImageToVideoPanel({
                     )}
                   </div>
 
-                  <div>
-                    <p
-                      className="text-[10px] font-bold uppercase tracking-wider mb-1.5"
-                      style={{ color: W.dim }}
-                    >
-                      Additional notes or tweaks (optional)
-                    </p>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <p
+                          className="text-[10px] font-bold uppercase tracking-wider"
+                          style={{ color: W.dim }}
+                        >
+                          Additional Info & Brand Details (optional)
+                        </p>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-red-500/15 text-red-300 border border-red-500/25">
+                          Analyzed as Prompt
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={enhanceBrandInfo}
+                        disabled={enhancing || !videoPrompt.trim()}
+                        className="flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 transition-all disabled:opacity-40 cursor-pointer"
+                        title="Polish brand details with AI into high-impact prompt directions"
+                      >
+                        <Sparkles className="w-2.5 h-2.5" />
+                        {enhancing ? "Polishing…" : "AI Polish Brand Info"}
+                      </button>
+                    </div>
                     <textarea
                       value={videoPrompt}
                       onChange={(e) => setVideoPrompt(e.target.value)}
-                      placeholder="e.g. keep the background darker, slower camera drift, soften the lighting…"
+                      placeholder="Showcase your brand name, brand story, product highlights, or custom motion direction (e.g. Brand: Lumina Luxe, showcase gold logo emboss, dramatic lighting reflections)…"
                       rows={2}
                       className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2 text-xs leading-relaxed placeholder:opacity-40"
                       style={{
@@ -1218,6 +1273,9 @@ export function ImageToVideoPanel({
                         background: W.glassDim,
                       }}
                     />
+                    <p className="text-[10px] text-zinc-400">
+                      Your brand name, story, and custom specifications are automatically analyzed and incorporated into the template&apos;s motion prompt.
+                    </p>
                   </div>
                 </div>
               ) : (

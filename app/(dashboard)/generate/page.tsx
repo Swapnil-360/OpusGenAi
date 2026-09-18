@@ -487,13 +487,20 @@ function GeneratePageInner() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function improvePrompt() {
-    if (!prompt.trim() && refImages.length === 0) {
-      toast.error("Add a photo or type a prompt first.");
+    if (!prompt.trim() && refImages.length === 0 && !appliedTemplate) {
+      toast.error("Add a photo, prompt, or select a template first.");
+      return;
+    }
+    if (appliedTemplate && !prompt.trim() && refImages.length === 0) {
+      toast.error("Enter your brand details or additional direction first to polish.");
       return;
     }
     setIsEnhancing(true);
     // duration acts purely as a backstop — every exit path dismisses by id.
-    toast.loading("Analyzing…", { id: "enhance-progress", duration: 60000 });
+    toast.loading(appliedTemplate ? "Polishing brand details with AI…" : "Analyzing…", {
+      id: "enhance-progress",
+      duration: 60000,
+    });
 
     try {
       const image = refImages[0]
@@ -506,6 +513,7 @@ function GeneratePageInner() {
           prompt: prompt.trim(),
           image,
           hasProductPhoto: refImages.length > 0,
+          templateName: appliedTemplate?.name,
         }),
       });
 
@@ -519,7 +527,7 @@ function GeneratePageInner() {
 
       const { prompt: improved } = await res.json();
       setPrompt(improved);
-      toast.success("Prompt improved!");
+      toast.success(appliedTemplate ? "Brand details polished!" : "Prompt improved!");
     } catch {
       toast.dismiss("enhance-progress");
       toast.error("Network error. Check your connection.");
@@ -1131,6 +1139,29 @@ function GeneratePageInner() {
                 </div>
               )}
 
+              {appliedTemplate && (
+                <div className="px-4 pt-3 pb-1 flex items-center justify-between border-t border-white/5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-white">
+                      Additional Info & Brand Details
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-red-500/15 text-red-300 border border-red-500/30">
+                      Analyzed as Prompt
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={improvePrompt}
+                    disabled={isEnhancing || !prompt.trim()}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 transition-all disabled:opacity-40 cursor-pointer"
+                    title="Polish brand details with AI into high-impact prompt directions"
+                  >
+                    <Sparkles className="w-3 h-3 text-red-400" />
+                    {isEnhancing ? "Polishing…" : "AI Polish Brand Info"}
+                  </button>
+                </div>
+              )}
+
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -1139,7 +1170,7 @@ function GeneratePageInner() {
                 rows={appliedTemplate ? 3 : 6}
                 placeholder={
                   appliedTemplate
-                    ? "Anything to add? (optional) — e.g. use a darker background, add soft rim lighting…"
+                    ? "Showcase your brand name, brand story, product highlights, or custom scene direction (e.g. Brand: Lumina, luxury gold embossed packaging, dramatic dark stone podium)…"
                     : refImages.length > 0
                       ? "Describe the full scene you want — e.g. on white marble surface with soft morning light, e-commerce product photography…"
                       : "Describe your product scene — e.g. luxury perfume bottle on black marble with cinematic side lighting, editorial style…"
@@ -1148,6 +1179,12 @@ function GeneratePageInner() {
                 style={{ color: W.text }}
                 maxLength={4000}
               />
+
+              {appliedTemplate && (
+                <p className="text-[11px] text-zinc-400 px-4 pb-2">
+                  Your brand name, story, and custom specifications are automatically analyzed and incorporated into the template&apos;s master prompt.
+                </p>
+              )}
 
               {/* ── Inline AI Prompt Editor Drawer ── */}
               <AnimatePresence>
@@ -1318,7 +1355,13 @@ function GeneratePageInner() {
                       ) : (
                         <Sparkles className="w-3 h-3 text-red-500 shrink-0" />
                       )}
-                      <span>{isEnhancing ? "Analyzing…" : "Enhance"}</span>
+                      <span>
+                        {isEnhancing
+                          ? "Analyzing…"
+                          : appliedTemplate
+                            ? "Enhance Brand Info"
+                            : "Enhance"}
+                      </span>
                     </button>
 
                     <div

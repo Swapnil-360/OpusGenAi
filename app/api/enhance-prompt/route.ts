@@ -17,12 +17,14 @@ export async function POST(req: NextRequest) {
       hasProductPhoto,
       instruction: rawInstruction,
       action,
+      templateName: rawTemplateName,
     } = await req.json();
 
     // Capped before use: this string is interpolated into the instruction
     // below, and this call is billed per token.
     const prompt = sanitizePrompt(rawPrompt, 2000);
     const userInstruction = sanitizePrompt(rawInstruction, 1000);
+    const templateName = sanitizePrompt(rawTemplateName, 120);
 
     if (!prompt && !image && !userInstruction) {
       return NextResponse.json({ error: "Add a photo, prompt, or instruction first." }, { status: 400 });
@@ -52,7 +54,9 @@ export async function POST(req: NextRequest) {
     }
 
     let instruction: string;
-    if (action === "edit" || userInstruction) {
+    if (templateName) {
+      instruction = `The user is creating an e-commerce image using the commercial template "${templateName}". They provided this additional brand information or direction: "${prompt}". Polish and enrich this into a concise, high-impact commercial prompt addition that prominently highlights their brand name, brand story/identity, and product features to harmonize with the template. Keep it under 50 words. Return ONLY the improved prompt text.`;
+    } else if (action === "edit" || userInstruction) {
       if (prompt && userInstruction) {
         instruction = `You are a professional product photography art director. Modify this existing product prompt according to this edit request: "${userInstruction}". Keep the core subject/product, but update the lighting, background, surface, environment, mood, and aesthetic as requested. Original prompt: "${prompt}". Return ONLY the updated prompt text under 60 words.`;
       } else if (userInstruction) {

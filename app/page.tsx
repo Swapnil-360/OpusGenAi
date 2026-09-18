@@ -13,13 +13,25 @@ import {
   useAnimationFrame,
   type MotionValue,
 } from "framer-motion";
-import { ArrowRight, Check, X, Play, Crown, Sparkles, Film } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  X,
+  Play,
+  Crown,
+  Sparkles,
+  Film,
+} from "lucide-react";
 import { PLANS, type Plan } from "@/lib/mock-data";
 import { type Plan as PlanId } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useTemplates } from "@/lib/hooks/use-templates";
-import { VIDEO_CATEGORIES, getTemplateDurationOption, type Template } from "@/lib/templates-data";
+import {
+  VIDEO_CATEGORIES,
+  getTemplateDurationOption,
+  type Template,
+} from "@/lib/templates-data";
 import { useHeroImages } from "@/lib/hooks/use-hero-images";
 import { FeaturedCarousel } from "@/components/templates/featured-carousel";
 import { LandingNav } from "@/components/landing/LandingNav";
@@ -662,7 +674,8 @@ export default function LandingPage() {
     orbitAngle.set((t * 0.015) % 360);
   });
 
-  const [selectedVideoTemplate, setSelectedVideoTemplate] = useState<Template | null>(null);
+  const [selectedVideoTemplate, setSelectedVideoTemplate] =
+    useState<Template | null>(null);
 
   useEffect(() => {
     if (!selectedVideoTemplate) return;
@@ -679,7 +692,7 @@ export default function LandingPage() {
   }, [selectedVideoTemplate]);
 
   return (
-    <div className="text-white" style={{ background: "#0f0404" }}>
+    <div className="text-white" style={{ background: "#0f0404" }} suppressHydrationWarning>
       {/* Fixed atmospheric background */}
       <div
         className="fixed inset-0 pointer-events-none"
@@ -1063,8 +1076,8 @@ export default function LandingPage() {
                   durationOpt === "5s"
                     ? "5s only"
                     : durationOpt === "10s"
-                    ? "10s only"
-                    : "5s / 10s";
+                      ? "10s only"
+                      : "5s / 10s";
 
                 return (
                   <FadeIn key={tpl.id} delay={i * 0.06}>
@@ -1195,7 +1208,11 @@ export default function LandingPage() {
                     initial={{ scale: 0.94, opacity: 0, y: 16 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
                     exit={{ scale: 0.94, opacity: 0, y: 16 }}
-                    transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+                    transition={{
+                      type: "spring",
+                      duration: 0.35,
+                      bounce: 0.15,
+                    }}
                     className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl bg-[#0f0404] border border-white/10 shadow-2xl shadow-red-950/40 p-4 sm:p-6 md:p-8"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -1215,7 +1232,9 @@ export default function LandingPage() {
                         {selectedVideoTemplate.previewVideoUrl ? (
                           <video
                             src={selectedVideoTemplate.previewVideoUrl}
-                            poster={selectedVideoTemplate.coverImageUrl ?? undefined}
+                            poster={
+                              selectedVideoTemplate.coverImageUrl ?? undefined
+                            }
                             autoPlay
                             muted
                             loop
@@ -1250,7 +1269,9 @@ export default function LandingPage() {
                                 border: `1px solid ${selectedVideoTemplate.accentColor}88`,
                               }}
                             >
-                              {videoCategoryLabel(selectedVideoTemplate.category)}
+                              {videoCategoryLabel(
+                                selectedVideoTemplate.category,
+                              )}
                             </span>
                             {selectedVideoTemplate.isPro && (
                               <span className="flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/40">
@@ -1266,11 +1287,11 @@ export default function LandingPage() {
                                 )) === "5s"
                                 ? "5s generation only"
                                 : (selectedVideoTemplate.durationOption ||
-                                    getTemplateDurationOption(
-                                      selectedVideoTemplate.tags,
-                                    )) === "10s"
-                                ? "10s generation only"
-                                : "5s or 10s generation"}
+                                      getTemplateDurationOption(
+                                        selectedVideoTemplate.tags,
+                                      )) === "10s"
+                                  ? "10s generation only"
+                                  : "5s or 10s generation"}
                             </span>
                           </div>
 

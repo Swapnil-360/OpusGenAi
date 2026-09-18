@@ -805,7 +805,7 @@ export default function LandingPage() {
                     </span>
                   </motion.button>
                 </Link>
-                <Link href="#templates">
+                <Link href="#video-templates">
                   <motion.button
                     whileHover={{
                       scale: 1.02,
@@ -1021,7 +1021,7 @@ export default function LandingPage() {
         {/* ══ VIDEO TEMPLATES ══════════════════════════════════════════════════ */}
         <section
           id="video-templates"
-          className="py-10 md:py-16 lg:py-20 px-4 sm:px-6"
+          className="scroll-mt-20 py-10 md:py-16 lg:py-20 px-4 sm:px-6"
         >
           <div className="max-w-7xl mx-auto">
             <FadeIn>
@@ -1371,7 +1371,7 @@ export default function LandingPage() {
         {/* ══ TEMPLATES ════════════════════════════════════════════════════════ */}
         <section
           id="templates"
-          className="py-10 md:py-16 lg:py-20 px-4 sm:px-6"
+          className="scroll-mt-20 py-10 md:py-16 lg:py-20 px-4 sm:px-6"
           style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}
         >
           <div className="max-w-7xl mx-auto">
@@ -1436,7 +1436,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══ PRICING ══════════════════════════════════════════════════════════ */}
-        <section id="pricing" className="py-14 md:py-24 lg:py-28 px-4 sm:px-6">
+        <section id="pricing" className="scroll-mt-20 py-14 md:py-24 lg:py-28 px-4 sm:px-6">
           <div className="max-w-5xl mx-auto">
             <FadeIn className="mb-10 md:mb-16">
               <SectionLabel>Pricing</SectionLabel>

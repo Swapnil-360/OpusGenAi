@@ -18,7 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 // handles highlighting it correctly.
 const NAV_LINKS = [
   { href: "/", label: "Home", section: null },
-  { href: "#templates", label: "Templates", section: "templates" },
+  { href: "#video-templates", label: "Templates", section: "video-templates" },
   { href: "/gallery", label: "Gallery", section: null },
   { href: "#pricing", label: "Pricing", section: "pricing" },
 ];
@@ -151,8 +151,10 @@ export function LandingNav() {
             >
               {NAV_LINKS.map(({ href, label }) => {
                 const isActive = label === active;
+                const targetHref =
+                  href.startsWith("#") && pathname !== "/" ? `/${href}` : href;
                 return (
-                  <Link key={href} href={href} className="relative">
+                  <Link key={href} href={targetHref} className="relative">
                     {isActive && (
                       <motion.span
                         layoutId="nav-pill"
@@ -248,25 +250,29 @@ export function LandingNav() {
               }}
             >
               <div className="p-3 space-y-0.5">
-                {NAV_LINKS.map(({ href, label }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
-                    style={{ color: "rgba(255,255,255,0.65)" }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                      e.currentTarget.style.color = "rgba(255,255,255,1)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = "rgba(255,255,255,0.65)";
-                    }}
-                  >
-                    {label}
-                  </Link>
-                ))}
+                {NAV_LINKS.map(({ href, label }) => {
+                  const targetHref =
+                    href.startsWith("#") && pathname !== "/" ? `/${href}` : href;
+                  return (
+                    <Link
+                      key={href}
+                      href={targetHref}
+                      onClick={() => setMobileOpen(false)}
+                      className="flex items-center px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
+                      style={{ color: "rgba(255,255,255,0.65)" }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                        e.currentTarget.style.color = "rgba(255,255,255,1)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = "rgba(255,255,255,0.65)";
+                      }}
+                    >
+                      {label}
+                    </Link>
+                  );
+                })}
                 <div className="h-px my-1" style={{ background: "rgba(255,255,255,0.05)" }} />
                 {authChecked && authUser ? (
                   <Link

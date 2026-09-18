@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  AnimatePresence,
   motion,
   useMotionValue,
   useTransform,
@@ -12,13 +13,13 @@ import {
   useAnimationFrame,
   type MotionValue,
 } from "framer-motion";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, X, Play, Crown, Sparkles, Film } from "lucide-react";
 import { PLANS, type Plan } from "@/lib/mock-data";
 import { type Plan as PlanId } from "@/lib/plans";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 import { useTemplates } from "@/lib/hooks/use-templates";
-import { VIDEO_CATEGORIES } from "@/lib/templates-data";
+import { VIDEO_CATEGORIES, getTemplateDurationOption, type Template } from "@/lib/templates-data";
 import { useHeroImages } from "@/lib/hooks/use-hero-images";
 import { FeaturedCarousel } from "@/components/templates/featured-carousel";
 import { LandingNav } from "@/components/landing/LandingNav";
@@ -661,6 +662,22 @@ export default function LandingPage() {
     orbitAngle.set((t * 0.015) % 360);
   });
 
+  const [selectedVideoTemplate, setSelectedVideoTemplate] = useState<Template | null>(null);
+
+  useEffect(() => {
+    if (!selectedVideoTemplate) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelectedVideoTemplate(null);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [selectedVideoTemplate]);
+
   return (
     <div className="text-white" style={{ background: "#0f0404" }}>
       {/* Fixed atmospheric background */}
@@ -1038,92 +1055,295 @@ export default function LandingPage() {
                 that only after uploading a photo. previewVideoUrl plays when
                 one exists; until then coverImageUrl is the poster, falling
                 back to an accent gradient. */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 items-stretch">
-              {VIDEO_TEMPLATES.map((tpl, i) => (
-                <FadeIn key={tpl.id} delay={i * 0.06}>
-                  <Link
-                    href={`/templates?type=video&template=${tpl.id}`}
-                    className="group block rounded-2xl overflow-hidden h-full transition-all"
-                    style={{
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      background: "#140505",
-                    }}
-                  >
-                    <div
-                      className="relative aspect-video overflow-hidden"
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 items-stretch">
+              {VIDEO_TEMPLATES.map((tpl, i) => {
+                const durationOpt =
+                  tpl.durationOption || getTemplateDurationOption(tpl.tags);
+                const durationBadge =
+                  durationOpt === "5s"
+                    ? "5s only"
+                    : durationOpt === "10s"
+                    ? "10s only"
+                    : "5s / 10s";
+
+                return (
+                  <FadeIn key={tpl.id} delay={i * 0.06}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVideoTemplate(tpl)}
+                      className="group relative block w-full text-left rounded-2xl overflow-hidden aspect-[3/4] sm:aspect-[4/5] transition-all duration-300 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-red-500/50 cursor-pointer"
                       style={{
-                        background: `linear-gradient(150deg, ${tpl.accentColor}26 0%, #0d0303 85%)`,
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        background: "#140505",
                       }}
                     >
-                      {tpl.previewVideoUrl ? (
-                        // Always playing, not hover-to-play — a visitor should see the
-                        // actual motion output without having to discover a hover
-                        // interaction first. autoPlay requires muted to satisfy browser
-                        // autoplay policy, which this already was for the hover version.
-                        <video
-                          src={tpl.previewVideoUrl}
-                          poster={tpl.coverImageUrl ?? undefined}
-                          autoPlay
-                          muted
-                          loop
-                          playsInline
-                          preload="auto"
-                          aria-hidden="true"
-                          tabIndex={-1}
-                          className="w-full h-full object-cover pointer-events-none"
-                        >
-                          <track
-                            kind="captions"
-                            src="data:text/vtt,WEBVTT"
-                            label="Captions"
-                            default={false}
-                          />
-                        </video>
-                      ) : tpl.coverImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={tpl.coverImageUrl}
-                          alt={tpl.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : null}
-                      <span
-                        className="absolute top-2 left-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wide"
+                      {/* Video / Poster preview */}
+                      <div
+                        className="absolute inset-0 w-full h-full overflow-hidden"
                         style={{
-                          background: "rgba(0,0,0,0.85)",
-                          backdropFilter: "blur(4px)",
-                          color: "white",
-                          border: `1px solid ${tpl.accentColor}66`,
+                          background: `linear-gradient(150deg, ${tpl.accentColor}26 0%, #0d0303 85%)`,
                         }}
                       >
-                        {videoCategoryLabel(tpl.category)}
-                      </span>
-                      {tpl.isPro && (
+                        {tpl.previewVideoUrl ? (
+                          <video
+                            src={tpl.previewVideoUrl}
+                            poster={tpl.coverImageUrl ?? undefined}
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
+                            preload="auto"
+                            aria-hidden="true"
+                            tabIndex={-1}
+                            className="w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-105"
+                          >
+                            <track
+                              kind="captions"
+                              src="data:text/vtt,WEBVTT"
+                              label="Captions"
+                              default={false}
+                            />
+                          </video>
+                        ) : tpl.coverImageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={tpl.coverImageUrl}
+                            alt={tpl.name}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                        ) : null}
+                      </div>
+
+                      {/* Top Badges */}
+                      <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none z-10">
                         <span
-                          className="absolute top-2 right-2 text-[9px] font-black px-1.5 py-0.5 rounded-full"
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm"
                           style={{
-                            background: "rgba(0,0,0,0.88)",
-                            color: "#fbbf24",
-                            border: "1px solid rgba(251,191,36,0.6)",
+                            background: "rgba(0,0,0,0.85)",
+                            backdropFilter: "blur(6px)",
+                            color: "white",
+                            border: `1px solid ${tpl.accentColor}66`,
                           }}
                         >
-                          PRO
+                          {videoCategoryLabel(tpl.category)}
                         </span>
-                      )}
-                    </div>
-                    <div className="p-3">
-                      <p className="text-sm font-bold mb-0.5">{tpl.name}</p>
-                      <p
-                        className="text-[11px] leading-snug"
-                        style={{ color: "rgba(255,255,255,0.72)" }}
-                      >
-                        {tpl.description}
-                      </p>
-                    </div>
-                  </Link>
-                </FadeIn>
-              ))}
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="text-[10px] font-medium px-2 py-0.5 rounded-full text-zinc-300"
+                            style={{
+                              background: "rgba(0,0,0,0.75)",
+                              backdropFilter: "blur(6px)",
+                              border: "1px solid rgba(255,255,255,0.12)",
+                            }}
+                          >
+                            {durationBadge}
+                          </span>
+                          {tpl.isPro && (
+                            <span
+                              className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                              style={{
+                                background: "rgba(0,0,0,0.88)",
+                                color: "#fbbf24",
+                                border: "1px solid rgba(251,191,36,0.6)",
+                              }}
+                            >
+                              PRO
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Hover Play Indicator overlay */}
+                      <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none z-10">
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-white text-xs font-semibold shadow-xl transform scale-95 group-hover:scale-100 transition-transform">
+                          <Play className="w-3.5 h-3.5 fill-white" />
+                          <span>View Details</span>
+                        </div>
+                      </div>
+
+                      {/* Bottom Card Title Overlay (No multiline description to obscure video) */}
+                      <div className="absolute inset-x-0 bottom-0 pt-12 pb-3 px-3.5 bg-gradient-to-t from-black/95 via-black/60 to-transparent pointer-events-none z-10 flex items-end justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-white tracking-tight truncate group-hover:text-red-300 transition-colors">
+                            {tpl.name}
+                          </p>
+                          <p className="text-[11px] text-zinc-400 font-medium truncate">
+                            Click for full video & details
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-zinc-400 group-hover:text-white transition-colors">
+                          <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                        </div>
+                      </div>
+                    </button>
+                  </FadeIn>
+                );
+              })}
             </div>
+
+            {/* Template Details Modal */}
+            <AnimatePresence>
+              {selectedVideoTemplate && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md"
+                  onClick={() => setSelectedVideoTemplate(null)}
+                >
+                  <motion.div
+                    initial={{ scale: 0.94, opacity: 0, y: 16 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.94, opacity: 0, y: 16 }}
+                    transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+                    className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl bg-[#0f0404] border border-white/10 shadow-2xl shadow-red-950/40 p-4 sm:p-6 md:p-8"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Close Button */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVideoTemplate(null)}
+                      className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                      aria-label="Close template modal"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-center">
+                      {/* Video Player Column */}
+                      <div className="relative aspect-[3/4] sm:aspect-[4/5] md:aspect-[9/16] max-h-[65vh] w-full rounded-2xl overflow-hidden bg-black/70 border border-white/10 flex items-center justify-center mx-auto shadow-inner">
+                        {selectedVideoTemplate.previewVideoUrl ? (
+                          <video
+                            src={selectedVideoTemplate.previewVideoUrl}
+                            poster={selectedVideoTemplate.coverImageUrl ?? undefined}
+                            autoPlay
+                            muted
+                            loop
+                            controls
+                            playsInline
+                            className="w-full h-full object-contain"
+                          />
+                        ) : selectedVideoTemplate.coverImageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={selectedVideoTemplate.coverImageUrl}
+                            alt={selectedVideoTemplate.name}
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-zinc-500 gap-2">
+                            <Film className="w-10 h-10 opacity-40" />
+                            <span className="text-xs">No preview video</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Details Column */}
+                      <div className="flex flex-col justify-between h-full space-y-5">
+                        <div>
+                          {/* Badges */}
+                          <div className="flex flex-wrap items-center gap-2 mb-3">
+                            <span
+                              className="text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider text-white"
+                              style={{
+                                background: "rgba(255,255,255,0.08)",
+                                border: `1px solid ${selectedVideoTemplate.accentColor}88`,
+                              }}
+                            >
+                              {videoCategoryLabel(selectedVideoTemplate.category)}
+                            </span>
+                            {selectedVideoTemplate.isPro && (
+                              <span className="flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/40">
+                                <Crown className="w-3.5 h-3.5 fill-current" />
+                                PRO TEMPLATE
+                              </span>
+                            )}
+                            <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-zinc-800/80 text-zinc-300 border border-zinc-700/60">
+                              ⚡{" "}
+                              {(selectedVideoTemplate.durationOption ||
+                                getTemplateDurationOption(
+                                  selectedVideoTemplate.tags,
+                                )) === "5s"
+                                ? "5s generation only"
+                                : (selectedVideoTemplate.durationOption ||
+                                    getTemplateDurationOption(
+                                      selectedVideoTemplate.tags,
+                                    )) === "10s"
+                                ? "10s generation only"
+                                : "5s or 10s generation"}
+                            </span>
+                          </div>
+
+                          {/* Title */}
+                          <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight mb-3">
+                            {selectedVideoTemplate.name}
+                          </h3>
+
+                          {/* Description */}
+                          <div className="bg-white/[0.03] border border-white/5 rounded-xl p-4 mb-4">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+                              About this template
+                            </p>
+                            <p className="text-sm leading-relaxed text-zinc-200">
+                              {selectedVideoTemplate.description}
+                            </p>
+                          </div>
+
+                          {/* Extra Slot Requirements if any */}
+                          {selectedVideoTemplate.imageSlots &&
+                            selectedVideoTemplate.imageSlots.length > 0 && (
+                              <div className="mb-4 p-3 rounded-xl bg-red-950/20 border border-red-500/20 text-xs text-red-200">
+                                <span className="font-bold">
+                                  Required Photo Slots:
+                                </span>{" "}
+                                {selectedVideoTemplate.imageSlots.join(", ")}
+                              </div>
+                            )}
+
+                          {/* Tags */}
+                          {selectedVideoTemplate.tags &&
+                            selectedVideoTemplate.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-4">
+                                {selectedVideoTemplate.tags
+                                  .filter(
+                                    (t) =>
+                                      !t.toLowerCase().startsWith("duration:"),
+                                  )
+                                  .map((tag) => (
+                                    <span
+                                      key={tag}
+                                      className="text-[11px] px-2 py-0.5 rounded-md bg-white/5 text-zinc-400 border border-white/5"
+                                    >
+                                      #{tag}
+                                    </span>
+                                  ))}
+                              </div>
+                            )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row gap-3">
+                          <Link
+                            href={`/tools/image-to-video?template=${selectedVideoTemplate.id}`}
+                            className="flex-1 flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-lg shadow-red-600/30 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                            Use This Template
+                            <ArrowRight className="w-4 h-4 ml-1" />
+                          </Link>
+                          <Link
+                            href={`/templates?type=video&template=${selectedVideoTemplate.id}`}
+                            className="px-4 py-3.5 rounded-xl font-semibold text-sm text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 text-center transition-colors"
+                          >
+                            Explore in Library
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </section>
 

@@ -26,7 +26,12 @@ const NAV_LINKS = [
 type AuthUser = { name: string; avatarUrl: string | null } | null;
 
 function getInitials(name: string): string {
-  return name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
 export function LandingNav() {
@@ -42,8 +47,13 @@ export function LandingNav() {
 
     async function loadUser() {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { setAuthUser(null); return; }
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          setAuthUser(null);
+          return;
+        }
 
         const meta = user.user_metadata ?? {};
         const { data: profile } = await supabase
@@ -73,7 +83,9 @@ export function LandingNav() {
     }
     loadUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => loadUser());
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(() => loadUser());
     return () => subscription.unsubscribe();
   }, []);
 
@@ -132,7 +144,6 @@ export function LandingNav() {
         }}
       >
         <div className="max-w-7xl mx-auto px-5 h-16 relative flex items-center">
-
           {/* ── Logo (left) ── */}
           <Link href="/" className="shrink-0">
             <LogoBrand imgClass="h-11 w-auto" />
@@ -160,12 +171,18 @@ export function LandingNav() {
                         layoutId="nav-pill"
                         className="absolute inset-0 rounded-full"
                         style={{ background: "#dc2626" }}
-                        transition={{ type: "spring", stiffness: 420, damping: 32 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 420,
+                          damping: 32,
+                        }}
                       />
                     )}
                     <span
                       className="relative z-10 block px-4 py-1.75 rounded-full text-[13px] font-semibold transition-colors"
-                      style={{ color: isActive ? "#fff" : "rgba(255,255,255,0.72)" }}
+                      style={{
+                        color: isActive ? "#fff" : "rgba(255,255,255,0.72)",
+                      }}
                     >
                       {label}
                     </span>
@@ -178,7 +195,11 @@ export function LandingNav() {
           {/* ── Right actions ── */}
           <div className="ml-auto hidden md:flex items-center gap-2">
             {authUser ? (
-              <Link href="/account" className="flex items-center gap-2.5 pl-2 pr-1 py-1 rounded-full transition-colors group" style={{ background: "rgba(255,255,255,0.05)" }}>
+              <Link
+                href="/account"
+                className="flex items-center gap-2.5 pl-2 pr-1 py-1 rounded-full transition-colors group"
+                style={{ background: "rgba(255,255,255,0.05)" }}
+              >
                 <span
                   className="text-[13px] font-semibold transition-colors"
                   style={{ color: "rgba(255,255,255,0.88)" }}
@@ -187,9 +208,20 @@ export function LandingNav() {
                 </span>
                 <Avatar className="w-8 h-8 shrink-0" aria-hidden="true">
                   {authUser.avatarUrl && (
-                    <AvatarImage src={authUser.avatarUrl} alt="" aria-hidden="true" referrerPolicy="no-referrer" />
+                    <AvatarImage
+                      src={authUser.avatarUrl}
+                      alt=""
+                      aria-hidden="true"
+                      referrerPolicy="no-referrer"
+                    />
                   )}
-                  <AvatarFallback className="text-xs font-bold" style={{ background: "rgba(220,38,38,0.2)", color: "#f87171" }}>
+                  <AvatarFallback
+                    className="text-xs font-bold"
+                    style={{
+                      background: "rgba(220,38,38,0.2)",
+                      color: "#f87171",
+                    }}
+                  >
                     {getInitials(authUser.name)}
                   </AvatarFallback>
                 </Avatar>
@@ -252,7 +284,9 @@ export function LandingNav() {
               <div className="p-3 space-y-0.5">
                 {NAV_LINKS.map(({ href, label }) => {
                   const targetHref =
-                    href.startsWith("#") && pathname !== "/" ? `/${href}` : href;
+                    href.startsWith("#") && pathname !== "/"
+                      ? `/${href}`
+                      : href;
                   return (
                     <Link
                       key={href}
@@ -261,7 +295,8 @@ export function LandingNav() {
                       className="flex items-center px-4 py-2.5 rounded-xl text-sm font-medium transition-colors"
                       style={{ color: "rgba(255,255,255,0.65)" }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                        e.currentTarget.style.background =
+                          "rgba(255,255,255,0.05)";
                         e.currentTarget.style.color = "rgba(255,255,255,1)";
                       }}
                       onMouseLeave={(e) => {
@@ -273,7 +308,10 @@ export function LandingNav() {
                     </Link>
                   );
                 })}
-                <div className="h-px my-1" style={{ background: "rgba(255,255,255,0.05)" }} />
+                <div
+                  className="h-px my-1"
+                  style={{ background: "rgba(255,255,255,0.05)" }}
+                />
                 {authChecked && authUser ? (
                   <Link
                     href="/account"
@@ -283,13 +321,25 @@ export function LandingNav() {
                   >
                     <Avatar className="w-7 h-7 shrink-0">
                       {authUser.avatarUrl && (
-                        <AvatarImage src={authUser.avatarUrl} alt={authUser.name} referrerPolicy="no-referrer" />
+                        <AvatarImage
+                          src={authUser.avatarUrl}
+                          alt={authUser.name}
+                          referrerPolicy="no-referrer"
+                        />
                       )}
-                      <AvatarFallback className="text-xs font-bold" style={{ background: "rgba(220,38,38,0.2)", color: "#f87171" }}>
+                      <AvatarFallback
+                        className="text-xs font-bold"
+                        style={{
+                          background: "rgba(220,38,38,0.2)",
+                          color: "#f87171",
+                        }}
+                      >
                         {getInitials(authUser.name)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-[13px] font-semibold">{authUser.name}</span>
+                    <span className="text-[13px] font-semibold">
+                      {authUser.name}
+                    </span>
                   </Link>
                 ) : (
                   <div className="flex gap-2 p-1">

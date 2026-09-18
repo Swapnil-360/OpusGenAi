@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Clapperboard,
   Crown,
   Download,
+  Film,
   ImagePlus,
+  Info,
   Lock,
   Plus,
   RefreshCw,
+  Sparkles,
   Wand2,
   X,
 } from "lucide-react";
@@ -26,11 +29,12 @@ import {
   type VideoQuality,
   type VideoDuration,
 } from "@/lib/plans";
-import type { TemplateDurationOption } from "@/lib/templates-data";
+import type { Template, TemplateDurationOption } from "@/lib/templates-data";
 import { fileToUploadDataUrl } from "@/lib/mask-canvas";
 import { toast } from "sonner";
 import { readApiError } from "@/lib/api-error";
 import { triggerUpgradeModal } from "@/components/dashboard/UpgradeModal";
+import { VideoTemplatePicker } from "@/components/tools/VideoTemplatePicker";
 
 const W = {
   text: "rgba(255,255,255,0.90)",
@@ -115,14 +119,23 @@ interface ImageToVideoPanelProps {
    *  the user to fill in, and the reference-photo slots it needs beyond the
    *  main image (empty = classic single-image template, unless
    *  imageSlotsOptional makes it an unstructured multi-photo one instead). */
-  template?: {
-    id: string;
-    name: string;
-    placeholders: string[];
-    imageSlots: string[];
-    imageSlotsOptional: boolean;
-    durationOption?: TemplateDurationOption;
-  } | null;
+  template?:
+    | (Template | {
+        id: string;
+        name: string;
+        description?: string;
+        category?: string;
+        coverImageUrl?: string | null;
+        previewVideoUrl?: string | null;
+        isPro?: boolean;
+        placeholders: string[];
+        imageSlots: string[];
+        imageSlotsOptional: boolean;
+        durationOption?: TemplateDurationOption;
+      })
+    | null;
+  videoTemplates?: Template[];
+  onSelectTemplate?: (template: Template | null) => void;
   /** Fires whenever this panel starts/stops an active (paid, cancellable)
    *  generation — lets the parent page disable anything that would orphan
    *  it (e.g. "Change image"), since this component has no way to stop a
@@ -145,9 +158,12 @@ export function ImageToVideoPanel({
   isAdmin,
   standardVideosUsed,
   template,
+  videoTemplates,
+  onSelectTemplate,
   onProcessingChange,
   onChangeImage,
 }: ImageToVideoPanelProps) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   // Basic and Pro both unlock at least Standard quality now; HD/Premium and
   // multi-image stay Pro-only via their own minPlan. Admin bypasses all of
   // it, same as the server's hasUnlimitedCredits check.
@@ -171,6 +187,12 @@ export function ImageToVideoPanel({
       setDuration(10);
     }
   }, [template?.durationOption]);
+
+  useEffect(() => {
+    const slots = (template?.imageSlots ?? []).slice(0, MAX_EXTRA_IMAGES);
+    setExtraImages(slots.map(() => ""));
+    setPlaceholderValues({});
+  }, [template?.id]);
   const [style, setStyle] = useState(STYLE_OPTIONS[0]);
   const [movement, setMovement] = useState(MOVEMENT_OPTIONS[0]);
   const [videoPrompt, setVideoPrompt] = useState("");
@@ -1004,223 +1026,366 @@ export function ImageToVideoPanel({
               </div>
             </div>
 
-            {/* With a template applied its prompt IS the direction — the style /
-              movement pickers and the AI prompt writer would only fight it, so
-              they're replaced by the template card and whatever fields it needs. */}
-            {template ? (
-              <>
-                <div
-                  className="mt-3 rounded-xl p-3"
-                  style={{
-                    border: `1px solid ${W.redBorder}`,
-                    background: W.redBg,
-                  }}
+            {/* Motion Direction Mode Switcher & Controls */}
+            <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p
+                  className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: W.dim }}
                 >
-                  <div className="flex items-start gap-2.5">
-                    <Clapperboard
-                      className="w-3.5 h-3.5 mt-0.5 shrink-0"
-                      style={{ color: W.red }}
+                  Motion Direction
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setPickerOpen(true)}
+                    className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                    style={{
+                      background: template ? "rgba(220,38,38,0.18)" : W.glassDim,
+                      color: template ? W.red : W.muted,
+                      border: `1px solid ${template ? W.redBorder : W.border}`,
+                    }}
+                  >
+                    <Film className="w-3 h-3" />
+                    {template ? "Change Template" : "Choose Template"}
+                  </button>
+                  {template && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectTemplate?.(null)}
+                      className="text-[11px] font-medium px-2 py-1 rounded-lg text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                      style={{
+                        border: `1px solid ${W.border}`,
+                        background: W.glassDim,
+                      }}
+                    >
+                      Custom Mode
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {template ? (
+                /* TEMPLATE MODE: Style and Camera Movement are hidden because the template controls motion */
+                <div className="space-y-3">
+                  <div
+                    className="rounded-2xl p-3.5 space-y-3"
+                    style={{
+                      border: `1px solid ${W.redBorder}`,
+                      background:
+                        "linear-gradient(180deg, rgba(220,38,38,0.12) 0%, rgba(20,4,4,0.6) 100%)",
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div
+                          className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                          style={{
+                            background: "rgba(220,38,38,0.25)",
+                            border: `1px solid ${W.redBorder}`,
+                          }}
+                        >
+                          <Film className="w-4 h-4" style={{ color: W.red }} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4
+                              className="text-xs font-bold"
+                              style={{ color: W.text }}
+                            >
+                              {template.name}
+                            </h4>
+                            {template.category && (
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-white/10 text-zinc-300">
+                                {template.category}
+                              </span>
+                            )}
+                            {template.isPro && (
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500 text-black flex items-center gap-0.5">
+                                <Crown className="w-2.5 h-2.5" /> PRO
+                              </span>
+                            )}
+                            {template.durationOption && (
+                              <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-red-900/40 text-red-300 border border-red-700/40">
+                                {template.durationOption === "5s"
+                                  ? "5s only"
+                                  : template.durationOption === "10s"
+                                  ? "10s only"
+                                  : "5s or 10s"}
+                              </span>
+                            )}
+                          </div>
+                          <p
+                            className="text-[10px] mt-0.5"
+                            style={{ color: W.dim }}
+                          >
+                            Pre-engineered commercial motion & camera direction
+                          </p>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setPickerOpen(true)}
+                        className="text-[10px] font-semibold text-red-400 hover:text-red-300 shrink-0 underline decoration-red-500/30 cursor-pointer"
+                      >
+                        Switch
+                      </button>
+                    </div>
+
+                    {/* Prominent advisory notice: read template description carefully */}
+                    <div className="rounded-xl p-3 bg-black/50 border border-white/10 space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-amber-400">
+                        <Info className="w-3.5 h-3.5 shrink-0" />
+                        <span className="text-[11px] font-bold tracking-wide uppercase">
+                          Read Description Carefully Before Generating
+                        </span>
+                      </div>
+                      <p className="text-xs leading-relaxed text-zinc-200 font-normal">
+                        {template.description ||
+                          "Pre-engineered commercial video motion template."}
+                      </p>
+                    </div>
+
+                    {/* Notice explaining why style & camera movement pickers are hidden */}
+                    <div className="rounded-lg px-2.5 py-2 bg-white/[0.02] border border-white/5 flex items-start gap-2">
+                      <Sparkles className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
+                      <p className="text-[10px] leading-relaxed text-zinc-400">
+                        <strong className="text-zinc-300">
+                          Preset motion active:
+                        </strong>{" "}
+                        Camera movements, lighting sweeps, and physics are
+                        automatically locked to this template. Style and Camera
+                        Movement pickers are disabled so the generated video
+                        faithfully reproduces the template&apos;s commercial
+                        direction.
+                      </p>
+                    </div>
+
+                    {template.placeholders.length > 0 && (
+                      <div className="space-y-2 pt-1">
+                        <p
+                          className="text-[10px] font-bold uppercase tracking-wider"
+                          style={{ color: W.dim }}
+                        >
+                          Template inputs required
+                        </p>
+                        {template.placeholders.map((field) => (
+                          <div key={field} className="space-y-1">
+                            <label className="text-[10px] text-zinc-400 font-medium">
+                              {field
+                                .toLowerCase()
+                                .replace(/\b\w/g, (c) => c.toUpperCase())}
+                            </label>
+                            <input
+                              value={placeholderValues[field] ?? ""}
+                              onChange={(e) =>
+                                setPlaceholderValues((v) => ({
+                                  ...v,
+                                  [field]: e.target.value,
+                                }))
+                              }
+                              placeholder={`Enter ${field.toLowerCase()}…`}
+                              className="w-full h-8 px-2.5 rounded-lg text-xs outline-none"
+                              style={{
+                                background: W.glassDim,
+                                border: `1px solid ${W.border}`,
+                                color: W.text,
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-wider mb-1.5"
+                      style={{ color: W.dim }}
+                    >
+                      Additional notes or tweaks (optional)
+                    </p>
+                    <textarea
+                      value={videoPrompt}
+                      onChange={(e) => setVideoPrompt(e.target.value)}
+                      placeholder="e.g. keep the background darker, slower camera drift, soften the lighting…"
+                      rows={2}
+                      className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2 text-xs leading-relaxed placeholder:opacity-40"
+                      style={{
+                        color: W.text,
+                        border: `1px solid ${W.border}`,
+                        background: W.glassDim,
+                      }}
                     />
-                    <div className="min-w-0">
-                      <p
-                        className="text-xs font-bold"
-                        style={{ color: W.text }}
-                      >
-                        {template.name}
-                      </p>
-                      <p
-                        className="text-[10px] mt-0.5"
-                        style={{ color: W.dim }}
-                      >
-                        Motion direction is applied automatically.
-                      </p>
+                  </div>
+                </div>
+              ) : (
+                /* CUSTOM MOTION MODE: User chooses Style, Camera Movement, and custom prompt */
+                <div className="space-y-3">
+                  <div className="p-3 rounded-xl bg-white/[0.02] border border-white/10 flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <Wand2 className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-white">
+                          Custom Motion & Prompt Mode
+                        </p>
+                        <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">
+                          Direct your own camera movement, aesthetic style mood,
+                          and write a custom prompt or let AI write one for you.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPickerOpen(true)}
+                      className="text-[10px] font-semibold text-red-400 hover:text-red-300 shrink-0 underline decoration-red-500/30 cursor-pointer"
+                    >
+                      Browse Templates
+                    </button>
+                  </div>
+
+                  <div>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-wider mb-1.5"
+                      style={{ color: W.dim }}
+                    >
+                      Style Mood
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {STYLE_OPTIONS.map((s) => {
+                        const active = style === s;
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => setStyle(s)}
+                            className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer"
+                            style={
+                              active
+                                ? {
+                                    border: `1px solid ${W.redBorder}`,
+                                    background: W.redBg,
+                                    color: W.red,
+                                  }
+                                : {
+                                    border: `1px solid ${W.border}`,
+                                    background: W.glass,
+                                    color: W.muted,
+                                  }
+                            }
+                          >
+                            {s}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 
-                  {template.placeholders.length > 0 && (
-                    <div className="mt-3 space-y-2">
+                  <div>
+                    <p
+                      className="text-[10px] font-bold uppercase tracking-wider mb-1.5"
+                      style={{ color: W.dim }}
+                    >
+                      Camera Movement
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {MOVEMENT_OPTIONS.map((m) => {
+                        const active = movement === m;
+                        return (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setMovement(m)}
+                            className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer"
+                            style={
+                              active
+                                ? {
+                                    border: `1px solid ${W.redBorder}`,
+                                    background: W.redBg,
+                                    color: W.red,
+                                  }
+                                : {
+                                    border: `1px solid ${W.border}`,
+                                    background: W.glass,
+                                    color: W.muted,
+                                  }
+                            }
+                          >
+                            {m}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
                       <p
                         className="text-[10px] font-bold uppercase tracking-wider"
                         style={{ color: W.dim }}
                       >
-                        This template needs
+                        Production Prompt
                       </p>
-                      {template.placeholders.map((field) => (
-                        <input
-                          key={field}
-                          value={placeholderValues[field] ?? ""}
-                          onChange={(e) =>
-                            setPlaceholderValues((v) => ({
-                              ...v,
-                              [field]: e.target.value,
-                            }))
-                          }
-                          placeholder={field
-                            .toLowerCase()
-                            .replace(/\b\w/g, (c) => c.toUpperCase())}
-                          className="w-full h-8 px-2.5 rounded-lg text-xs outline-none"
+                      {!isMultiImage && (
+                        <button
+                          type="button"
+                          onClick={enhancePrompt}
+                          disabled={enhancing}
+                          className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-60 cursor-pointer"
                           style={{
-                            background: W.glassDim,
-                            border: `1px solid ${W.border}`,
-                            color: W.text,
+                            color: W.red,
+                            background: W.redBg,
+                            border: `1px solid ${W.redBorder}`,
                           }}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <p
-                  className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5"
-                  style={{ color: W.dim }}
-                >
-                  Anything to add? (optional)
-                </p>
-                <textarea
-                  value={videoPrompt}
-                  onChange={(e) => setVideoPrompt(e.target.value)}
-                  placeholder="e.g. keep the background darker, slow the motion down…"
-                  rows={3}
-                  className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2.5 text-xs leading-relaxed placeholder:opacity-40"
-                  style={{
-                    color: W.text,
-                    border: `1px solid ${W.border}`,
-                    background: W.glassDim,
-                  }}
-                />
-              </>
-            ) : (
-              <>
-                <p
-                  className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5"
-                  style={{ color: W.dim }}
-                >
-                  Style
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {STYLE_OPTIONS.map((s) => {
-                    const active = style === s;
-                    return (
-                      <button
-                        key={s}
-                        onClick={() => setStyle(s)}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                        style={
-                          active
-                            ? {
-                                border: `1px solid ${W.redBorder}`,
-                                background: W.redBg,
-                                color: W.red,
-                              }
-                            : {
-                                border: `1px solid ${W.border}`,
-                                background: W.glass,
-                                color: W.muted,
-                              }
-                        }
-                      >
-                        {s}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <p
-                  className="text-[10px] font-bold uppercase tracking-wider mt-3 mb-1.5"
-                  style={{ color: W.dim }}
-                >
-                  Camera movement
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {MOVEMENT_OPTIONS.map((m) => {
-                    const active = movement === m;
-                    return (
-                      <button
-                        key={m}
-                        onClick={() => setMovement(m)}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-medium transition-all"
-                        style={
-                          active
-                            ? {
-                                border: `1px solid ${W.redBorder}`,
-                                background: W.redBg,
-                                color: W.red,
-                              }
-                            : {
-                                border: `1px solid ${W.border}`,
-                                background: W.glass,
-                                color: W.muted,
-                              }
-                        }
-                      >
-                        {m}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="flex items-center justify-between mt-3 mb-1.5">
-                  <p
-                    className="text-[10px] font-bold uppercase tracking-wider"
-                    style={{ color: W.dim }}
-                  >
-                    Production prompt
-                  </p>
-                  {!isMultiImage && (
-                    <button
-                      onClick={enhancePrompt}
-                      disabled={enhancing}
-                      className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition-all disabled:opacity-60"
-                      style={{
-                        color: W.red,
-                        background: W.redBg,
-                        border: `1px solid ${W.redBorder}`,
-                      }}
-                    >
-                      {enhancing ? (
-                        <div className="w-2.5 h-2.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-                      ) : (
-                        <Wand2 className="w-2.5 h-2.5" />
+                        >
+                          {enhancing ? (
+                            <div className="w-2.5 h-2.5 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                          ) : (
+                            <Wand2 className="w-2.5 h-2.5" />
+                          )}
+                          {enhancing ? "Writing…" : "Write Production Prompt"}
+                        </button>
                       )}
-                      {enhancing ? "Writing…" : "Write Production Prompt"}
-                    </button>
-                  )}
+                    </div>
+                    {isMultiImage && (
+                      <p
+                        className="text-[10px] mb-1.5 leading-relaxed"
+                        style={{ color: W.dim }}
+                      >
+                        Your main photo is <code>@Image1</code>
+                        {filledExtraImages.map((_, i) => (
+                          <span key={i}>
+                            {" "}
+                            · reference photo {i + 2} is{" "}
+                            <code>@Image{i + 2}</code>
+                          </span>
+                        ))}{" "}
+                        — mention them in your prompt to say how they combine,
+                        e.g. &quot;put the outfit from @Image2 on the person in
+                        @Image1&quot;.
+                      </p>
+                    )}
+                    <textarea
+                      value={videoPrompt}
+                      onChange={(e) => setVideoPrompt(e.target.value)}
+                      placeholder={
+                        isMultiImage
+                          ? "Describe how the photos combine — e.g. @Image1 is the product, @Image2 is the desired background…"
+                          : "Pick a style + camera movement above, then tap Write Production Prompt — or write your own detailed direction here."
+                      }
+                      rows={5}
+                      className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2.5 text-xs leading-relaxed placeholder:opacity-40"
+                      style={{
+                        color: W.text,
+                        border: `1px solid ${W.border}`,
+                        background: W.glassDim,
+                      }}
+                    />
+                  </div>
                 </div>
-                {isMultiImage && (
-                  <p
-                    className="text-[10px] mb-1.5 leading-relaxed"
-                    style={{ color: W.dim }}
-                  >
-                    Your main photo is <code>@Image1</code>
-                    {filledExtraImages.map((_, i) => (
-                      <span key={i}>
-                        {" "}
-                        · reference photo {i + 2} is <code>@Image{i + 2}</code>
-                      </span>
-                    ))}{" "}
-                    — mention them in your prompt to say how they combine, e.g.
-                    &quot;put the outfit from @Image2 on the person in
-                    @Image1&quot;.
-                  </p>
-                )}
-                <textarea
-                  value={videoPrompt}
-                  onChange={(e) => setVideoPrompt(e.target.value)}
-                  placeholder={
-                    isMultiImage
-                      ? "Describe how the photos combine — e.g. @Image1 is the product, @Image2 is the desired background…"
-                      : "Pick a style + camera movement above, then tap Write Production Prompt — or write your own detailed direction here."
-                  }
-                  rows={6}
-                  className="w-full bg-transparent resize-none outline-none rounded-xl px-3 py-2.5 text-xs leading-relaxed placeholder:opacity-40"
-                  style={{
-                    color: W.text,
-                    border: `1px solid ${W.border}`,
-                    background: W.glassDim,
-                  }}
-                />
-              </>
-            )}
+              )}
+            </div>
             <motion.button
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
@@ -1401,6 +1566,22 @@ export function ImageToVideoPanel({
           </button>
         </div>
       )}
+
+      {/* Video Template Picker Modal */}
+      <AnimatePresence>
+        {pickerOpen && (
+          <VideoTemplatePicker
+            templates={videoTemplates ?? []}
+            selectedTemplateId={template?.id ?? null}
+            onSelectTemplate={(tpl) => {
+              onSelectTemplate?.(tpl);
+              setPickerOpen(false);
+            }}
+            onClose={() => setPickerOpen(false)}
+            isModal
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

@@ -666,8 +666,16 @@ export default function LandingPage() {
   // sneakers, ...) rather than a style axis, so the category itself is worth
   // surfacing on the card — this is what turns the raw "sneakers" id into
   // the "Sneakers" label shown below.
-  const videoCategoryLabel = (id: string) =>
-    VIDEO_CATEGORIES.find((c) => c.id === id)?.label ?? id;
+  const videoCategoryLabel = (rawCategory: string) => {
+    if (!rawCategory) return "Commercial";
+    const primary = rawCategory.split(",")[0].trim();
+    const match = VIDEO_CATEGORIES.find(
+      (c) =>
+        c.id.toLowerCase() === primary.toLowerCase() ||
+        c.label.toLowerCase() === primary.toLowerCase(),
+    );
+    return match ? match.label : primary;
+  };
   const { images: heroImages } = useHeroImages(8);
   const orbitAngle = useMotionValue(0);
   useAnimationFrame((t) => {
@@ -1077,7 +1085,7 @@ export default function LandingPage() {
                     ? "5s only"
                     : durationOpt === "10s"
                       ? "10s only"
-                      : "5s / 10s";
+                      : "5s · 10s";
 
                 return (
                   <FadeIn key={tpl.id} delay={i * 0.06}>
@@ -1128,24 +1136,24 @@ export default function LandingPage() {
                       </div>
 
                       {/* Top Badges */}
-                      <div className="absolute top-2.5 inset-x-2.5 flex items-center justify-between pointer-events-none z-10">
+                      <div className="absolute top-2 inset-x-2 sm:top-2.5 sm:inset-x-2.5 flex items-center justify-between gap-1.5 pointer-events-none z-10">
                         <span
-                          className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm"
+                          className="text-[9px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-full truncate whitespace-nowrap max-w-[55%] sm:max-w-[65%] shadow-sm"
                           style={{
-                            background: "rgba(0,0,0,0.85)",
-                            backdropFilter: "blur(6px)",
+                            background: "rgba(0,0,0,0.72)",
+                            backdropFilter: "blur(8px)",
                             color: "white",
-                            border: `1px solid ${tpl.accentColor}66`,
+                            border: `1px solid ${tpl.accentColor}55`,
                           }}
                         >
                           {videoCategoryLabel(tpl.category)}
                         </span>
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 shrink-0">
                           <span
-                            className="text-[10px] font-medium px-2 py-0.5 rounded-full text-zinc-300"
+                            className="text-[9px] sm:text-[10px] font-medium px-1.5 sm:px-2 py-0.5 rounded-full text-zinc-300 whitespace-nowrap shrink-0"
                             style={{
-                              background: "rgba(0,0,0,0.75)",
-                              backdropFilter: "blur(6px)",
+                              background: "rgba(0,0,0,0.70)",
+                              backdropFilter: "blur(8px)",
                               border: "1px solid rgba(255,255,255,0.12)",
                             }}
                           >
@@ -1153,9 +1161,9 @@ export default function LandingPage() {
                           </span>
                           {tpl.isPro && (
                             <span
-                              className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                              className="text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-full whitespace-nowrap shrink-0"
                               style={{
-                                background: "rgba(0,0,0,0.88)",
+                                background: "rgba(0,0,0,0.85)",
                                 color: "#fbbf24",
                                 border: "1px solid rgba(251,191,36,0.6)",
                               }}

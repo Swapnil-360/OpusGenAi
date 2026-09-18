@@ -10,6 +10,7 @@ import {
   Film,
   Wand2,
   Info,
+  ChevronDown,
 } from "lucide-react";
 import { UploadZone } from "@/components/tools/ToolPageShell";
 import { ImageToVideoPanel } from "@/components/tools/ImageToVideoPanel";
@@ -60,7 +61,7 @@ function ImageToVideoPageInner() {
     Template | null | undefined
   >(undefined);
   const [pickerModalOpen, setPickerModalOpen] = useState(false);
-  const [showHowItWorks, setShowHowItWorks] = useState(true);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   const videoTemplates = useMemo(() => {
     return templates.filter((t) => t.templateType === "video");
@@ -194,25 +195,36 @@ function ImageToVideoPageInner() {
 
         {/* ── Guidance & Best Practices Banner ── */}
         <div
-          className="rounded-2xl p-4 border border-red-500/20"
+          className={`rounded-2xl border border-red-500/20 transition-all ${
+            showHowItWorks ? "p-3.5 sm:p-4" : "py-2 px-3 sm:py-2.5 sm:px-3.5"
+          }`}
           style={{
             background:
               "linear-gradient(135deg, rgba(220,38,38,0.1) 0%, rgba(15,4,4,0.85) 100%)",
           }}
         >
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-red-400 shrink-0" />
-              <h2 className="text-xs font-bold text-white uppercase tracking-wider">
-                Video Generation Guide & Best Practices
-              </h2>
-            </div>
+          <div className="flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => setShowHowItWorks((v) => !v)}
-              className="text-[11px] font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              className="flex items-center gap-2 text-left cursor-pointer hover:opacity-90 transition-opacity min-w-0"
             >
-              {showHowItWorks ? "Hide guide" : "Show guide"}
+              <Sparkles className="w-3.5 h-3.5 text-red-400 shrink-0" />
+              <h2 className="text-xs font-bold text-white uppercase tracking-wider truncate">
+                Video Generation Guide & Best Practices
+              </h2>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowHowItWorks((v) => !v)}
+              className="flex items-center gap-1 text-[11px] font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+            >
+              <span>{showHowItWorks ? "Hide guide" : "Show guide"}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                  showHowItWorks ? "rotate-180" : ""
+                }`}
+              />
             </button>
           </div>
 

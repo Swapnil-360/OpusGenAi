@@ -269,10 +269,10 @@ const Card = ({ tpl, index, total, progress, config, onSelect }: CardProps) => {
       )}
 
       <span
-        className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest backdrop-blur-md pointer-events-none"
+        className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-widest backdrop-blur-md pointer-events-none truncate max-w-[55%] whitespace-nowrap"
         style={{ background: `${tpl.accentColor}30`, color: tpl.accentColor, border: `1px solid ${tpl.accentColor}45` }}
       >
-        {tpl.category}
+        {(tpl.category || "").split(",")[0].trim()}
       </span>
 
       <div className="absolute bottom-3 left-2.5 right-2.5 sm:bottom-4 sm:left-3.5 sm:right-3.5 text-white text-left pointer-events-none">

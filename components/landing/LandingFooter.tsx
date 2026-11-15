@@ -106,24 +106,6 @@ export function LandingFooter() {
               visuals in seconds — no camera, no studio, no experience required.
             </p>
 
-            {/* Stats row */}
-            <div className="flex items-center gap-6 mb-8">
-              {[
-                ["12k+", "Products created"],
-                ["15s", "Avg. generation"],
-                ["98%", "Success rate"],
-              ].map(([val, lbl]) => (
-                <div key={lbl}>
-                  <p className="text-sm font-black" style={{ color: W.text }}>
-                    {val}
-                  </p>
-                  <p className="text-[10px]" style={{ color: W.dim }}>
-                    {lbl}
-                  </p>
-                </div>
-              ))}
-            </div>
-
             {/* Contact */}
             <p
               className="text-[11px] font-bold uppercase tracking-widest mb-2.5"

@@ -1,6 +1,7 @@
 "use client";
 
-import { Sparkles, Layers, Sliders, Globe } from "lucide-react";
+import { useState } from "react";
+import { Sparkles, ChevronDown } from "lucide-react";
 import {
   AmazonLogo,
   ShopifyLogo,
@@ -27,105 +28,110 @@ const PLATFORMS = [
   { name: "Pinterest", icon: PinterestLogo },
 ] as const;
 
-const WORKFLOW_STEPS = [
+const GUIDE_STEPS = [
   {
-    icon: Layers,
-    title: "Realistic Scene Blending",
-    desc: "AI accurately matches reflections, lighting angles, and ground shadows to your product.",
+    step: 1,
+    title: "Upload Clear Product Photo",
+    accent: "red",
+    desc: "Use a well-lit photo centered on your product. Clean backgrounds and sharp edges produce the most realistic AI scene blending.",
   },
   {
-    icon: Sliders,
-    title: "Brand & Color Fidelity",
-    desc: "Keeps your product label, typography, and original colors sharp and unaltered.",
+    step: 2,
+    title: "Describe Scene & Mood",
+    accent: "amber",
+    desc: "Specify surface textures (e.g., black marble, natural oak), lighting direction, and aesthetic ambiance to match your brand style.",
   },
   {
-    icon: Globe,
-    title: "Multi-Platform Export",
-    desc: "Production-grade assets optimized for e-commerce listings, banners, and social ads.",
+    step: 3,
+    title: "Select Framing & Aspect Ratio",
+    accent: "red",
+    desc: "Choose 1:1 for Amazon & Shopify square listings, 9:16 for vertical reels and ads, or 16:9 for landscape website banners.",
+  },
+  {
+    step: 4,
+    title: "Studio-Grade Lighting & Shadows",
+    accent: "red",
+    desc: "OpusGen AI automatically calculates contact shadows, reflections, and depth of field for marketplace-ready results.",
   },
 ];
 
 export function MultiPlatformBanner({}: MultiPlatformBannerProps = {}) {
+  const [showGuide, setShowGuide] = useState(false);
+
   return (
-    <div className="w-full space-y-3 mb-6">
-      {/* Professional Studio Workflow Info Card (Replacing static image banner) */}
+    <div className="w-full space-y-2.5 mb-5">
+      {/* ── Guidance & Best Practices Banner (Matching Video Generation Style) ── */}
       <div
-        className="relative w-full rounded-2xl p-4 sm:p-5 border overflow-hidden backdrop-blur-md"
+        className={`rounded-2xl border border-red-500/20 transition-all ${
+          showGuide ? "p-3.5 sm:p-4" : "py-2 px-3 sm:py-2.5 sm:px-3.5"
+        }`}
         style={{
           background:
-            "linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(18, 4, 4, 0.55) 100%)",
-          borderColor: "rgba(255, 255, 255, 0.08)",
-          boxShadow:
-            "0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06)",
+            "linear-gradient(135deg, rgba(220,38,38,0.1) 0%, rgba(15,4,4,0.85) 100%)",
         }}
       >
-        {/* Subtle background red glow */}
-        <div
-          className="absolute -top-12 -right-12 w-64 h-64 rounded-full pointer-events-none opacity-20 blur-3xl"
-          style={{
-            background: "radial-gradient(circle, #dc2626 0%, transparent 70%)",
-          }}
-          aria-hidden="true"
-        />
-
-        {/* Top Header */}
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span
-              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider uppercase"
-              style={{
-                background: "rgba(220, 38, 38, 0.14)",
-                border: "1px solid rgba(220, 38, 38, 0.3)",
-                color: "#fca5a5",
-              }}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              AI Studio Pipeline
-            </span>
-            <span className="text-xs sm:text-sm font-bold text-white tracking-tight">
-              Turn Raw Photos Into Production-Ready Visuals
-            </span>
-          </div>
-
-          <div className="text-[11px] text-zinc-400 font-medium">
-            Studio-quality scenes in seconds
-          </div>
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setShowGuide((v) => !v)}
+            className="flex items-center gap-2 text-left cursor-pointer hover:opacity-90 transition-opacity min-w-0"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-red-400 shrink-0" />
+            <h2 className="text-xs font-bold text-white uppercase tracking-wider truncate">
+              Image Generation Guide &amp; Best Practices
+            </h2>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowGuide((v) => !v)}
+            className="flex items-center gap-1 text-[11px] font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
+          >
+            <span>{showGuide ? "Hide guide" : "View guide"}</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                showGuide ? "rotate-180" : ""
+              }`}
+            />
+          </button>
         </div>
 
-        {/* 3-Column Professional Workflow Info */}
-        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          {WORKFLOW_STEPS.map((step) => {
-            const Icon = step.icon;
-            return (
-              <div
-                key={step.title}
-                className="p-3 rounded-xl border flex items-start gap-2.5 transition-colors"
-                style={{
-                  background: "rgba(255, 255, 255, 0.02)",
-                  borderColor: "rgba(255, 255, 255, 0.06)",
-                }}
-              >
-                <div
-                  className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                  style={{
-                    background: "rgba(220, 38, 38, 0.1)",
-                    border: "1px solid rgba(220, 38, 38, 0.2)",
-                  }}
-                >
-                  <Icon className="w-3.5 h-3.5 text-red-400" />
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold text-white">
-                    {step.title}
+        {showGuide && (
+          <div className="space-y-2.5 mt-2.5 pt-2.5 border-t border-white/10 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {GUIDE_STEPS.map((s) => {
+                const isAmber = s.accent === "amber";
+                return (
+                  <div
+                    key={s.step}
+                    className={`rounded-xl p-2.5 bg-black/40 border ${
+                      isAmber ? "border-amber-500/25" : "border-white/5"
+                    } space-y-1`}
+                  >
+                    <div
+                      className={`flex items-center gap-1.5 font-semibold ${
+                        isAmber ? "text-amber-300" : "text-red-300"
+                      }`}
+                    >
+                      <span
+                        className={`w-4 h-4 rounded-full ${
+                          isAmber
+                            ? "bg-amber-500/30 text-amber-400"
+                            : "bg-red-600/30 text-red-400"
+                        } flex items-center justify-center text-[10px] font-bold`}
+                      >
+                        {s.step}
+                      </span>
+                      {s.title}
+                    </div>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">
+                      {s.desc}
+                    </p>
                   </div>
-                  <div className="text-[11px] text-zinc-400 leading-snug mt-0.5">
-                    {step.desc}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Production Ready Formats Strip */}

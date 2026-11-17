@@ -43,6 +43,8 @@ import {
   ThumbsDown,
   ThumbsUp,
   Loader2,
+  ClipboardList,
+  Download,
 } from "lucide-react";
 import {
   DEFAULT_BANNER,
@@ -65,6 +67,14 @@ type Feedback = {
   category: "bug" | "feature" | "compliment" | "general";
   message: string;
   status: "new" | "read" | "archived";
+  created_at: string;
+};
+
+type WaitlistEntry = {
+  id: string;
+  email: string;
+  role: string;
+  source: string;
   created_at: string;
 };
 
@@ -295,7 +305,7 @@ const BANNER_MODES: { mode: BannerMode; label: string; icon: React.ElementType; 
 export default function AdminPage() {
   const router = useRouter();
   const [adminEmail, setAdminEmail] = useState("");
-  const [activeTab, setActiveTab] = useState<"overview" | "messages" | "feedback" | "users" | "templates" | "hero" | "gallery">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "messages" | "feedback" | "users" | "templates" | "hero" | "gallery" | "waitlist">("overview");
   const [banner, setBanner] = useState<BannerConfig>(DEFAULT_BANNER);
   const [welcome, setWelcome] = useState<WelcomeConfig>(DEFAULT_WELCOME);
   const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
@@ -487,6 +497,28 @@ export default function AdminPage() {
         if (data?.value) setWelcome((prev) => ({ ...prev, ...(data.value as Partial<WelcomeConfig>) }));
       });
   }, []);
+
+  // ── waitlist tab state ───────────────────────────────────────────────────────
+  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const [waitlistLoading, setWaitlistLoading] = useState(true);
+  const [waitlistReloadKey, setWaitlistReloadKey] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setWaitlistLoading(true);
+    fetch("/api/admin/waitlist", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : { waitlist: [] }))
+      .then((data) => {
+        if (!cancelled) setWaitlist(data.waitlist ?? []);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setWaitlistLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [waitlistReloadKey]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -861,6 +893,7 @@ export default function AdminPage() {
     { id: "templates", label: "Templates", icon: Layers },
     { id: "hero", label: "Hero", icon: Images },
     { id: "gallery", label: "Gallery", icon: GalleryThumbnails },
+    { id: "waitlist", label: "Waitlist", icon: ClipboardList },
   ] as const;
 
   return (
@@ -2070,6 +2103,92 @@ export default function AdminPage() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* ── WAITLIST TAB ───────────────────────────────────────────────── */}
+        {activeTab === "waitlist" && (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: T.text }}>Coming Soon Waitlist</h2>
+                <p className="text-xs mt-0.5" style={{ color: T.muted }}>
+                  {waitlist.length} {waitlist.length === 1 ? "entry" : "entries"} captured from the homepage waitlist form.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setWaitlistReloadKey((k) => k + 1)}
+                  disabled={waitlistLoading}
+                  className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  style={{ background: "rgba(255,255,255,0.05)", border: `1px solid ${T.border}`, color: T.muted }}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${waitlistLoading ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+                <a
+                  href="/api/admin/waitlist/export"
+                  download
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer hover:opacity-90"
+                  style={{ background: T.redPrimary, color: "white" }}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export CSV
+                </a>
+              </div>
+            </div>
+
+            {waitlistLoading ? (
+              <div className="flex items-center justify-center h-48 rounded-2xl"
+                style={{ background: T.card, border: `1px solid ${T.border}` }}>
+                <Loader2 className="w-5 h-5 animate-spin" style={{ color: T.red }} />
+              </div>
+            ) : waitlist.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-48 rounded-2xl text-center px-4"
+                style={{ background: T.card, border: `1px solid ${T.border}` }}>
+                <ClipboardList className="w-8 h-8 mb-2 opacity-30" style={{ color: T.muted }} />
+                <p className="text-sm font-semibold" style={{ color: T.text }}>No waitlist entries yet</p>
+                <p className="text-xs mt-1" style={{ color: T.muted }}>
+                  Signups submitted in the &quot;What&apos;s coming next&quot; section will appear here and can be exported as CSV anytime.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-2xl overflow-hidden"
+                style={{ background: T.card, border: `1px solid ${T.border}` }}>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${T.border}`, background: "rgba(255,255,255,0.02)" }}>
+                        <th className="py-3 px-4 font-bold" style={{ color: T.muted }}>Email</th>
+                        <th className="py-3 px-4 font-bold" style={{ color: T.muted }}>Role (I am a)</th>
+                        <th className="py-3 px-4 font-bold" style={{ color: T.muted }}>Source</th>
+                        <th className="py-3 px-4 font-bold" style={{ color: T.muted }}>Signed Up At</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/[0.04]">
+                      {waitlist.map((row) => (
+                        <tr key={row.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="py-3.5 px-4 font-medium" style={{ color: T.text }}>{row.email}</td>
+                          <td className="py-3.5 px-4">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                              style={{
+                                background: row.role === "Brand" ? "rgba(239,68,68,0.12)" : row.role === "Agency" ? "rgba(59,130,246,0.12)" : "rgba(16,185,129,0.12)",
+                                color: row.role === "Brand" ? "#fca5a5" : row.role === "Agency" ? "#93c5fd" : "#6ee7b7",
+                              }}>
+                              {row.role}
+                            </span>
+                          </td>
+                          <td className="py-3.5 px-4" style={{ color: T.muted }}>{row.source || "coming_soon"}</td>
+                          <td className="py-3.5 px-4" style={{ color: T.dim }}>
+                            {new Date(row.created_at).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </motion.div>

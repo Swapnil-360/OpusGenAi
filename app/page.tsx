@@ -38,6 +38,7 @@ import { LandingNav } from "@/components/landing/LandingNav";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 import { SiteBanner } from "@/components/shared/SiteBanner";
 import { MultiPlatformStrip } from "@/components/landing/MultiPlatformStrip";
+import { ComingSoonSection } from "@/components/landing/ComingSoonSection";
 import { cn } from "@/lib/utils";
 
 // ─── Static data ─────────────────────────────────────────────────────────────
@@ -1442,6 +1443,9 @@ export default function LandingPage() {
             </FadeIn>
           </div>
         </section>
+
+        {/* ══ WHAT'S COMING NEXT (COMING SOON) ══════════════════════════════ */}
+        <ComingSoonSection />
 
         {/* ══ PRICING ══════════════════════════════════════════════════════════ */}
         <section id="pricing" className="scroll-mt-20 py-14 md:py-24 lg:py-28 px-4 sm:px-6">
